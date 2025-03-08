@@ -1,0 +1,15 @@
+# Ignorer les dépendances node_modules
+node_modules/
+*.log
+
+# Ignorer les fichiers d'environnement sensibles
+.env
+backend/.env
+
+# Ignorer les fichiers de build (Next.js et Express)
+.next/
+out/
+dist/
+
+# Ignorer les fichiers de cache
+.cache/
