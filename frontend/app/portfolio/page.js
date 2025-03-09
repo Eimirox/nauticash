@@ -1,61 +1,105 @@
-"use client"; // Next.js 13+ avec App Router
+"use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function Portfolio() {
-  const [ticker, setTicker] = useState(""); // Champ d'entrée
-  const [stocks, setStocks] = useState([]); // Liste des actions
+  const router = useRouter();
+  const [ticker, setTicker] = useState("");
+  const [stocks, setStocks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Charger les actions sauvegardées en localStorage au démarrage
+  // Vérifier l'authentification et charger les actions
   useEffect(() => {
-    const savedStocks = JSON.parse(localStorage.getItem("stocks")) || [];
-    setStocks(savedStocks);
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      router.push("/login"); // 🔀 Redirige vers login si non connecté
+      return;
+    }
+
+    const fetchPortfolio = async () => {
+      try {
+        const res = await fetch("http://localhost:5000/api/user/portfolio", {
+          method: "GET",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!res.ok) throw new Error("Erreur lors de la récupération du portefeuille.");
+
+        const data = await res.json();
+        setStocks(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPortfolio();
   }, []);
 
-  // Sauvegarder les actions à chaque mise à jour
-  useEffect(() => {
-    localStorage.setItem("stocks", JSON.stringify(stocks));
-  }, [stocks]);
+  // Ajouter une action au portefeuille
+  const addStock = async () => {
+    if (!ticker.trim()) return;
+    if (stocks.includes(ticker.toUpperCase())) return; // Évite les doublons
 
-  // Fonction pour récupérer le prix depuis Yahoo Finance
-  const fetchStockPrice = async (ticker) => {
+    const token = localStorage.getItem("token");
+    if (!token) return router.push("/login");
+
     try {
-      const response = await fetch(
-        `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${ticker}`
-      );
-      const data = await response.json();
-      return data.quoteResponse.result[0]?.regularMarketPrice || "N/A";
-    } catch (error) {
-      console.error("Erreur lors de la récupération des prix :", error);
-      return "Erreur";
+      const res = await fetch("http://localhost:5000/api/user/portfolio", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ ticker: ticker.toUpperCase() }),
+      });
+
+      if (!res.ok) throw new Error("Erreur lors de l'ajout de l'action.");
+
+      const updatedPortfolio = await res.json();
+      setStocks(updatedPortfolio);
+      setTicker(""); // Réinitialiser le champ
+    } catch (err) {
+      setError(err.message);
     }
   };
 
-  // Ajouter une action avec le prix
-  const addStock = async () => {
-    if (!ticker.trim()) return;
-    if (stocks.some(stock => stock.ticker === ticker.toUpperCase())) return; // Évite les doublons
+  // Supprimer une action du portefeuille
+  const removeStock = async (tickerToRemove) => {
+    const token = localStorage.getItem("token");
+    if (!token) return router.push("/login");
 
-    const price = await fetchStockPrice(ticker.toUpperCase());
+    try {
+      const res = await fetch("http://localhost:5000/api/user/portfolio", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ ticker: tickerToRemove }),
+      });
 
-    const newStock = { ticker: ticker.toUpperCase(), price: price };
-    setStocks([...stocks, newStock]);
-    setTicker(""); // Réinitialiser le champ
-  };
+      if (!res.ok) throw new Error("Erreur lors de la suppression de l'action.");
 
-  // Supprimer une action
-  const removeStock = (tickerToRemove) => {
-    setStocks(stocks.filter(stock => stock.ticker !== tickerToRemove));
+      const updatedPortfolio = await res.json();
+      setStocks(updatedPortfolio);
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   return (
     <main className="flex flex-col min-h-screen bg-gray-100 p-10">
-      {/* Titre */}
       <h1 className="text-4xl font-bold text-[#1E3A8A] mb-6 text-center">
         Mon Portefeuille d'Actions 📊
       </h1>
 
-      {/* Barre d'ajout de ticker */}
+      {error && <p className="text-red-500 text-center">{error}</p>}
+
       <div className="flex justify-center gap-4 mb-6">
         <input
           type="text"
@@ -72,25 +116,26 @@ export default function Portfolio() {
         </button>
       </div>
 
-      {/* Tableau des actions */}
       <div className="bg-white shadow-md rounded-lg overflow-hidden">
         <table className="w-full text-left border-collapse">
           <thead className="bg-[#1E3A8A] text-white">
             <tr>
               <th className="p-3">Ticker</th>
-              <th className="p-3">Prix Actuel</th>
               <th className="p-3">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {stocks.length > 0 ? (
+            {loading ? (
+              <tr>
+                <td colSpan="2" className="p-3 text-center">Chargement...</td>
+              </tr>
+            ) : stocks.length > 0 ? (
               stocks.map((stock) => (
-                <tr key={stock.ticker} className="border-b">
-                  <td className="p-3 font-semibold">{stock.ticker}</td>
-                  <td className="p-3 text-gray-600">{stock.price} $</td>
+                <tr key={stock} className="border-b">
+                  <td className="p-3 font-semibold">{stock}</td>
                   <td className="p-3">
                     <button
-                      onClick={() => removeStock(stock.ticker)}
+                      onClick={() => removeStock(stock)}
                       className="px-4 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
                     >
                       Supprimer
@@ -100,7 +145,7 @@ export default function Portfolio() {
               ))
             ) : (
               <tr>
-                <td colSpan="3" className="p-3 text-center text-gray-500">
+                <td colSpan="2" className="p-3 text-center text-gray-500">
                   Aucune action ajoutée
                 </td>
               </tr>
