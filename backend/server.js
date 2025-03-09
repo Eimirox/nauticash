@@ -2,11 +2,19 @@ require("dotenv").config();
 const express = require("express");
 const axios = require("axios");
 const cors = require("cors");
+const mongoose = require("mongoose");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// ✅ Connexion à MongoDB Atlas
+mongoose.connect(process.env.MONGO_URI)
+.then(() => console.log("✅ Connecté à MongoDB Atlas"))
+.catch(err => console.error("❌ Erreur de connexion à MongoDB :", err));
+
 app.use(cors());
+app.use(express.json()); // 🔥 Permet à Express de lire le JSON envoyé par le client
+app.use(express.urlencoded({ extended: true }));
 
 // ✅ Route pour récupérer les prix en temps réel de plusieurs actions
 app.get("/api/quotes", async (req, res) => {
@@ -50,6 +58,20 @@ app.get("/api/quotes", async (req, res) => {
 
     res.status(500).json({ error: "Erreur serveur interne" });
   }
+});
+
+
+// ✅ Importer les routes
+const authRoutes = require("./routes/auth");
+app.use("/api/auth", authRoutes);
+
+const userRoutes = require("./routes/user"); // 🔥 Ajout de la route pour le portefeuille
+app.use("/api/user", userRoutes);
+
+
+// ✅ Route de test pour voir si le serveur tourne
+app.get("/", (req, res) => {
+  res.send("✅ Serveur Express fonctionne !");
 });
 
 // ✅ Lancer le serveur
