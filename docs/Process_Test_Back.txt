@@ -1,0 +1,127 @@
+🚀 **Processus Backend & Tests API**
+
+---
+
+## ✅ **1️⃣ Lancer le Backend**
+📌 **Démarrer le serveur Express**
+```powershell
+cd backend
+node server.js
+```
+✅ **Si tout fonctionne, tu verras :**
+```
+✅ Connecté à MongoDB Atlas
+✅ Serveur Express en ligne sur http://localhost:5000
+```
+🚨 **Si erreur :** Vérifie `.env` et MongoDB Atlas.
+
+---
+
+## ✅ **2️⃣ Lister les utilisateurs enregistrés**
+📌 **Test de la route `/api/auth/users`**
+```powershell
+Invoke-WebRequest -Uri "http://localhost:5000/api/auth/users" -Method GET
+```
+📌 **Si succès, réponse JSON :**
+```json
+[
+  { "_id": "67cd769569567d8d8bd31d8a", "email": "test@example.com" }
+]
+```
+🚨 **Si erreur `Cannot GET` :** Vérifie que la route `/users` est bien ajoutée dans `auth.js` et relance `node server.js`.
+
+---
+
+## ✅ **3️⃣ Créer un nouvel utilisateur (`Signup`)**
+📌 **Ajouter un utilisateur avec**
+```powershell
+Invoke-WebRequest -Uri "http://localhost:5000/api/auth/signup" `
+-Method POST `
+-Headers @{"Content-Type"="application/json"} `
+-Body '{"email":"newuser@example.com", "password":"password123"}' `
+-UseBasicParsing
+```
+✅ **Réponse attendue :**
+```json
+{ "message": "Utilisateur créé avec succès !" }
+```
+📌 **Vérifie dans MongoDB Atlas (`walletDB → users`) que l’utilisateur est bien ajouté.**
+
+---
+
+## ✅ **4️⃣ Tester la connexion (`Login`)**
+📌 **Connexion avec les identifiants de l’utilisateur :**
+```powershell
+Invoke-WebRequest -Uri "http://localhost:5000/api/auth/login" `
+-Method POST `
+-Headers @{"Content-Type"="application/json"} `
+-Body '{"email":"newuser@example.com", "password":"password123"}' `
+-UseBasicParsing
+```
+✅ **Si succès, tu obtiens un `token JWT` :**
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "userId": "67cd769569567d8d8bd31d8a"
+}
+```
+📌 **Copie ce `token JWT` pour les tests suivants.**
+
+---
+
+## ✅ **5️⃣ Tester le portefeuille utilisateur (`GET /api/user/portfolio`)**
+📌 **Avec le `token JWT` obtenu après `login` :**
+```powershell
+Invoke-WebRequest -Uri "http://localhost:5000/api/user/portfolio" `
+-Method GET `
+-Headers @{"Authorization"="Bearer TON_TOKEN_JWT"}
+```
+✅ **Réponse attendue (portefeuille vide) :**
+```json
+[]
+```
+
+---
+
+## ✅ **6️⃣ Ajouter une action au portefeuille (`POST /api/user/portfolio`)**
+📌 **Ajout de `AAPL` :**
+```powershell
+Invoke-WebRequest -Uri "http://localhost:5000/api/user/portfolio" `
+-Method POST `
+-Headers @{"Authorization"="Bearer TON_TOKEN_JWT"; "Content-Type"="application/json"} `
+-Body '{"ticker":"AAPL"}'
+```
+✅ **Réponse attendue :**
+```json
+["AAPL"]
+```
+📌 **Vérifie dans MongoDB Atlas si l'action est bien enregistrée.**
+
+---
+
+## ✅ **7️⃣ Supprimer une action du portefeuille (`DELETE /api/user/portfolio`)**
+📌 **Suppression de `AAPL` :**
+```powershell
+Invoke-WebRequest -Uri "http://localhost:5000/api/user/portfolio" `
+-Method DELETE `
+-Headers @{"Authorization"="Bearer TON_TOKEN_JWT"; "Content-Type"="application/json"} `
+-Body '{"ticker":"AAPL"}'
+```
+✅ **Réponse attendue :**
+```json
+[]
+```
+📌 **Vérifie dans MongoDB Atlas que l’action a bien été supprimée.**
+
+---
+
+## 🚀 **Prochaines étapes avant le frontend**
+✔ Vérifier que toutes les fonctionnalités backend fonctionnent correctement ✅  
+✔ Ajouter un bouton "Déconnexion" sur le frontend 🔜  
+✔ Afficher les prix des actions en temps réel sur `/portfolio` 🔜  
+✔ Améliorer le design du frontend 🔜  
+
+---
+
+💬 **Une fois ces tests validés, on améliore le backend avant d'aller sur le frontend ! 🚀🔥**
+

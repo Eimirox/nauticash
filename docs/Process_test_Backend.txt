@@ -1,0 +1,37 @@
+# 📌 Lancer le serveur
+cd backend
+node server.js
+
+# 📌 Lister les utilisateurs
+Invoke-WebRequest -Uri "http://localhost:5000/api/auth/users" -Method GET
+
+# 📌 Créer un utilisateur (Signup)
+Invoke-WebRequest -Uri "http://localhost:5000/api/auth/signup" `
+-Method POST `
+-Headers @{"Content-Type"="application/json"} `
+-Body '{"email":"newuser@example.com", "password":"password123"}' `
+-UseBasicParsing
+
+# 📌 Se connecter (Login)
+Invoke-WebRequest -Uri "http://localhost:5000/api/auth/login" `
+-Method POST `
+-Headers @{"Content-Type"="application/json"} `
+-Body '{"email":"newuser@example.com", "password":"password123"}' `
+-UseBasicParsing
+
+# 📌 Récupérer le portefeuille (GET)
+Invoke-WebRequest -Uri "http://localhost:5000/api/user/portfolio" `
+-Method GET `
+-Headers @{"Authorization"="Bearer TON_TOKEN_JWT"}
+
+# 📌 Ajouter une action au portefeuille (POST)
+Invoke-WebRequest -Uri "http://localhost:5000/api/user/portfolio" `
+-Method POST `
+-Headers @{"Authorization"="Bearer TON_TOKEN_JWT"; "Content-Type"="application/json"} `
+-Body '{"ticker":"AAPL"}'
+
+# 📌 Supprimer une action du portefeuille (DELETE)
+Invoke-WebRequest -Uri "http://localhost:5000/api/user/portfolio" `
+-Method DELETE `
+-Headers @{"Authorization"="Bearer TON_TOKEN_JWT"; "Content-Type"="application/json"} `
+-Body '{"ticker":"AAPL"}'

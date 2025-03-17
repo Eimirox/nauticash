@@ -74,6 +74,11 @@ app.get("/", (req, res) => {
   res.send("✅ Serveur Express fonctionne !");
 });
 
+// pour les transactions des utilisateurs
+const transactionRoutes = require("./routes/transactions");
+app.use("/api/transactions", transactionRoutes);
+
+
 // ✅ Lancer le serveur
 app.listen(PORT, () => {
   console.log(`✅ Serveur Express en ligne sur http://localhost:${PORT}`);
