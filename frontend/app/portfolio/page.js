@@ -10,7 +10,7 @@ export default function Portfolio() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Vérifier l'authentification et charger les actions
+  // Vérifier l'authentification et charger les actions au montage
   useEffect(() => {
     const token = localStorage.getItem("token");
 
@@ -28,8 +28,9 @@ export default function Portfolio() {
 
         if (!res.ok) throw new Error("Erreur lors de la récupération du portefeuille.");
 
-        const data = await res.json();
-        setStocks(data);
+        const tickers = await res.json();
+        const stocksWithPrices = await fetchStockPrices(tickers);
+        setStocks(stocksWithPrices);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -40,10 +41,40 @@ export default function Portfolio() {
     fetchPortfolio();
   }, []);
 
-  // Ajouter une action au portefeuille
+  // ✅ Fonction pour récupérer les prix des actions
+  const fetchStockPrices = async (tickers) => {
+    return await Promise.all(
+      tickers.map(async (ticker) => ({
+        ticker,
+        price: await fetchStockPrice(ticker),
+      }))
+    );
+  };
+
+  // ✅ Fonction pour récupérer le prix d'une action
+  const fetchStockPrice = async (ticker) => {
+    try {
+      const response = await fetch(
+        `https://yh-finance.p.rapidapi.com/market/v2/get-quotes?region=US&symbols=${ticker}`,
+        {
+          headers: {
+            "X-RapidAPI-Key": "74165ac8a1msh6505a6041df5d2ap1fd4cfjsnb9639d21ce02", // 🔥 Remplace par ta clé API
+            "X-RapidAPI-Host": "yh-finance.p.rapidapi.com",
+          },
+        }
+      );
+      const data = await response.json();
+      return data.quoteResponse.result[0]?.regularMarketPrice || "N/A";
+    } catch (error) {
+      console.error("Erreur récupération du prix :", error);
+      return "Erreur";
+    }
+  };
+
+  // ✅ Ajouter une action au portefeuille
   const addStock = async () => {
     if (!ticker.trim()) return;
-    if (stocks.includes(ticker.toUpperCase())) return; // Évite les doublons
+    if (stocks.some((stock) => stock.ticker === ticker.toUpperCase())) return; // Évite les doublons
 
     const token = localStorage.getItem("token");
     if (!token) return router.push("/login");
@@ -61,14 +92,16 @@ export default function Portfolio() {
       if (!res.ok) throw new Error("Erreur lors de l'ajout de l'action.");
 
       const updatedPortfolio = await res.json();
-      setStocks(updatedPortfolio);
+      const updatedStocks = await fetchStockPrices(updatedPortfolio);
+
+      setStocks(updatedStocks);
       setTicker(""); // Réinitialiser le champ
     } catch (err) {
       setError(err.message);
     }
   };
 
-  // Supprimer une action du portefeuille
+  // ✅ Supprimer une action du portefeuille
   const removeStock = async (tickerToRemove) => {
     const token = localStorage.getItem("token");
     if (!token) return router.push("/login");
@@ -86,14 +119,30 @@ export default function Portfolio() {
       if (!res.ok) throw new Error("Erreur lors de la suppression de l'action.");
 
       const updatedPortfolio = await res.json();
-      setStocks(updatedPortfolio);
+      const updatedStocks = await fetchStockPrices(updatedPortfolio);
+
+      setStocks(updatedStocks);
     } catch (err) {
       setError(err.message);
     }
   };
 
+  // ✅ Fonction pour se déconnecter
+  const logout = () => {
+    localStorage.removeItem("token"); // 🔥 Supprime le token JWT
+    router.push("/login"); // 🔀 Redirige vers la page de connexion
+  };
+
   return (
     <main className="flex flex-col min-h-screen bg-gray-100 p-10">
+      {/* Bouton Déconnexion */}
+      <button
+        onClick={logout}
+        className="absolute top-4 right-4 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
+      >
+        Déconnexion
+      </button>
+
       <h1 className="text-4xl font-bold text-[#1E3A8A] mb-6 text-center">
         Mon Portefeuille d'Actions 📊
       </h1>
@@ -121,21 +170,23 @@ export default function Portfolio() {
           <thead className="bg-[#1E3A8A] text-white">
             <tr>
               <th className="p-3">Ticker</th>
+              <th className="p-3">Prix Actuel</th>
               <th className="p-3">Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="2" className="p-3 text-center">Chargement...</td>
+                <td colSpan="3" className="p-3 text-center">Chargement...</td>
               </tr>
             ) : stocks.length > 0 ? (
               stocks.map((stock) => (
-                <tr key={stock} className="border-b">
-                  <td className="p-3 font-semibold">{stock}</td>
+                <tr key={stock.ticker} className="border-b">
+                  <td className="p-3 font-semibold">{stock.ticker}</td>
+                  <td className="p-3 text-gray-600">{stock.price} $</td>
                   <td className="p-3">
                     <button
-                      onClick={() => removeStock(stock)}
+                      onClick={() => removeStock(stock.ticker)}
                       className="px-4 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
                     >
                       Supprimer
@@ -145,7 +196,7 @@ export default function Portfolio() {
               ))
             ) : (
               <tr>
-                <td colSpan="2" className="p-3 text-center text-gray-500">
+                <td colSpan="3" className="p-3 text-center text-gray-500">
                   Aucune action ajoutée
                 </td>
               </tr>
