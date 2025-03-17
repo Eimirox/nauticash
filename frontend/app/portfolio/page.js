@@ -15,7 +15,7 @@ export default function Portfolio() {
     const token = localStorage.getItem("token");
 
     if (!token) {
-      router.push("/login"); // 🔀 Redirige vers login si non connecté
+      router.push("/login");
       return;
     }
 
@@ -41,14 +41,18 @@ export default function Portfolio() {
     fetchPortfolio();
   }, []);
 
-  // ✅ Fonction pour récupérer les prix des actions
+  // ✅ Fonction pour récupérer les prix des actions avec délai pour éviter 429 Too Many Requests
   const fetchStockPrices = async (tickers) => {
-    return await Promise.all(
-      tickers.map(async (ticker) => ({
-        ticker,
-        price: await fetchStockPrice(ticker),
-      }))
-    );
+    const results = [];
+
+    for (const ticker of tickers) {
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Pause de 1s entre chaque requête
+
+      const price = await fetchStockPrice(ticker);
+      results.push({ ticker, price });
+    }
+
+    return results;
   };
 
   // ✅ Fonction pour récupérer le prix d'une action
@@ -63,10 +67,15 @@ export default function Portfolio() {
           },
         }
       );
+
       const data = await response.json();
+
+      if (!data?.quoteResponse?.result || data.quoteResponse.result.length === 0) {
+        return "Donnée non disponible";
+      }
+
       return data.quoteResponse.result[0]?.regularMarketPrice || "N/A";
     } catch (error) {
-      console.error("Erreur récupération du prix :", error);
       return "Erreur";
     }
   };
@@ -74,7 +83,7 @@ export default function Portfolio() {
   // ✅ Ajouter une action au portefeuille
   const addStock = async () => {
     if (!ticker.trim()) return;
-    if (stocks.some((stock) => stock.ticker === ticker.toUpperCase())) return; // Évite les doublons
+    if (stocks.some((stock) => stock.ticker === ticker.toUpperCase())) return;
 
     const token = localStorage.getItem("token");
     if (!token) return router.push("/login");
@@ -129,8 +138,8 @@ export default function Portfolio() {
 
   // ✅ Fonction pour se déconnecter
   const logout = () => {
-    localStorage.removeItem("token"); // 🔥 Supprime le token JWT
-    router.push("/login"); // 🔀 Redirige vers la page de connexion
+    localStorage.removeItem("token");
+    router.push("/login");
   };
 
   return (
@@ -144,11 +153,12 @@ export default function Portfolio() {
       </button>
 
       <h1 className="text-4xl font-bold text-[#1E3A8A] mb-6 text-center">
-        Mon Portefeuille d'Actions 📊
+        Mon Portefeuille d'Actions 
       </h1>
 
       {error && <p className="text-red-500 text-center">{error}</p>}
 
+      {/* Barre d'ajout de ticker */}
       <div className="flex justify-center gap-4 mb-6">
         <input
           type="text"
