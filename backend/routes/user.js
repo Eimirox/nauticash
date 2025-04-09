@@ -4,7 +4,7 @@ const User = require("../models/User");
 
 const router = express.Router();
 
-// 📌 Récupérer le portefeuille de l'utilisateur (GET)
+//  Récupérer le portefeuille de l'utilisateur (GET)
 router.get("/portfolio", auth, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId);
@@ -14,7 +14,7 @@ router.get("/portfolio", auth, async (req, res) => {
   }
 });
 
-// 📌 Ajouter une action au portefeuille (POST)
+//  Ajouter une action au portefeuille (POST)
 router.post("/portfolio", auth, async (req, res) => {
   try {
     const { ticker } = req.body;
@@ -31,7 +31,7 @@ router.post("/portfolio", auth, async (req, res) => {
   }
 });
 
-// 📌 Supprimer une action du portefeuille (DELETE)
+//  Supprimer une action du portefeuille (DELETE)
 router.delete("/portfolio", auth, async (req, res) => {
   try {
     const { ticker } = req.body;

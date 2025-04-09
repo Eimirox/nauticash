@@ -13,7 +13,7 @@ mongoose.connect(process.env.MONGO_URI)
 .catch(err => console.error("❌ Erreur de connexion à MongoDB :", err));
 
 app.use(cors());
-app.use(express.json()); // 🔥 Permet à Express de lire le JSON envoyé par le client
+app.use(express.json()); //  Permet à Express de lire le JSON envoyé par le client
 app.use(express.urlencoded({ extended: true }));
 
 // ✅ Route pour récupérer les prix en temps réel de plusieurs actions
@@ -65,7 +65,7 @@ app.get("/api/quotes", async (req, res) => {
 const authRoutes = require("./routes/auth");
 app.use("/api/auth", authRoutes);
 
-const userRoutes = require("./routes/user"); // 🔥 Ajout de la route pour le portefeuille
+const userRoutes = require("./routes/user"); //  Ajout de la route pour le portefeuille
 app.use("/api/user", userRoutes);
 
 

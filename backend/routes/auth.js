@@ -5,7 +5,7 @@ const User = require("../models/User");
 
 const router = express.Router();
 
-// 📌 Route d'inscription (Signup)
+//  Route d'inscription (Signup)
 router.post("/signup", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -28,7 +28,7 @@ router.post("/signup", async (req, res) => {
   }
 });
 
-// 📌 Route de connexion (Login)
+//  Route de connexion (Login)
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -50,7 +50,7 @@ router.post("/login", async (req, res) => {
   }
 });
 
-// 📌 Route pour récupérer tous les utilisateurs (⚠️ Pour test uniquement, à retirer en production)
+//  Route pour récupérer tous les utilisateurs (⚠️ Pour test uniquement, à retirer en production)
 router.get("/users", async (req, res) => {
   try {
     const users = await User.find({}, "email"); // Récupère uniquement les emails

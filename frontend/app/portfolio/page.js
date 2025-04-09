@@ -41,7 +41,7 @@ export default function Portfolio() {
     fetchPortfolio();
   }, []);
 
-  // ✅ Fonction pour récupérer les prix des actions avec délai pour éviter 429 Too Many Requests
+  //  Fonction pour récupérer les prix des actions avec délai pour éviter 429 Too Many Requests
   const fetchStockPrices = async (tickers) => {
     const results = [];
 
@@ -55,14 +55,14 @@ export default function Portfolio() {
     return results;
   };
 
-  // ✅ Fonction pour récupérer le prix d'une action
+  //  Fonction pour récupérer le prix d'une action
   const fetchStockPrice = async (ticker) => {
     try {
       const response = await fetch(
         `https://yh-finance.p.rapidapi.com/market/v2/get-quotes?region=US&symbols=${ticker}`,
         {
           headers: {
-            "X-RapidAPI-Key": "74165ac8a1msh6505a6041df5d2ap1fd4cfjsnb9639d21ce02", // 🔥 Remplace par ta clé API
+            "X-RapidAPI-Key": "74165ac8a1msh6505a6041df5d2ap1fd4cfjsnb9639d21ce02", // clé API
             "X-RapidAPI-Host": "yh-finance.p.rapidapi.com",
           },
         }
@@ -80,14 +80,16 @@ export default function Portfolio() {
     }
   };
 
-  // ✅ Ajouter une action au portefeuille
+  //  Ajouter une action au portefeuille
   const addStock = async () => {
     if (!ticker.trim()) return;
-    if (stocks.some((stock) => stock.ticker === ticker.toUpperCase())) return;
-
+    const newTicker = ticker.toUpperCase();
+  
+    if (stocks.some((stock) => stock.ticker === newTicker)) return;
+  
     const token = localStorage.getItem("token");
     if (!token) return router.push("/login");
-
+  
     try {
       const res = await fetch("http://localhost:5000/api/user/portfolio", {
         method: "POST",
@@ -95,26 +97,27 @@ export default function Portfolio() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ ticker: ticker.toUpperCase() }),
+        body: JSON.stringify({ ticker: newTicker }),
       });
-
+  
       if (!res.ok) throw new Error("Erreur lors de l'ajout de l'action.");
-
-      const updatedPortfolio = await res.json();
-      const updatedStocks = await fetchStockPrices(updatedPortfolio);
-
-      setStocks(updatedStocks);
-      setTicker(""); // Réinitialiser le champ
+  
+      //  Récupérer juste le prix de la nouvelle action
+      const price = await fetchStockPrice(newTicker);
+  
+      //  Ajouter immédiatement au state sans recharger tout
+      setStocks([...stocks, { ticker: newTicker, price }]);
+      setTicker(""); // reset champ
+  
     } catch (err) {
       setError(err.message);
     }
   };
-
-  // ✅ Supprimer une action du portefeuille
+  // Suprréssion des actions
   const removeStock = async (tickerToRemove) => {
     const token = localStorage.getItem("token");
     if (!token) return router.push("/login");
-
+  
     try {
       const res = await fetch("http://localhost:5000/api/user/portfolio", {
         method: "DELETE",
@@ -124,19 +127,18 @@ export default function Portfolio() {
         },
         body: JSON.stringify({ ticker: tickerToRemove }),
       });
-
+  
       if (!res.ok) throw new Error("Erreur lors de la suppression de l'action.");
-
-      const updatedPortfolio = await res.json();
-      const updatedStocks = await fetchStockPrices(updatedPortfolio);
-
-      setStocks(updatedStocks);
+  
+      //  Supprimer localement sans recharger les prix de toutes les actions
+      setStocks(stocks.filter((stock) => stock.ticker !== tickerToRemove));
+  
     } catch (err) {
       setError(err.message);
     }
   };
 
-  // ✅ Fonction pour se déconnecter
+  //  Fonction pour se déconnecter
   const logout = () => {
     localStorage.removeItem("token");
     router.push("/login");

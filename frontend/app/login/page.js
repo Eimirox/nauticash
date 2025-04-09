@@ -1,4 +1,4 @@
-"use client"; // ✅ Permet d'utiliser des hooks dans Next.js 13+
+"use client"; //  Permet d'utiliser des hooks dans Next.js 13+
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -26,7 +26,7 @@ export default function Login() {
         throw new Error(data.message || "Erreur de connexion");
       }
 
-      // ✅ Stocker le token JWT dans le localStorage
+      //  Stocker le token JWT dans le localStorage
       localStorage.setItem("token", data.token);
 
       // 🔀 Rediriger l'utilisateur vers la page du portefeuille
