@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { sortByPrice } from "./utils/sort";
+import { formatCurrencySymbol } from "./utils/formats";
 
 export default function Portfolio() {
   const router = useRouter();
@@ -9,6 +11,7 @@ export default function Portfolio() {
   const [stocks, setStocks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [sortOrder, setSortOrder] = useState("none");
 
   // Vérifier l'authentification et charger les actions au montage
   useEffect(() => {
@@ -48,37 +51,51 @@ export default function Portfolio() {
     for (const ticker of tickers) {
       await new Promise(resolve => setTimeout(resolve, 1000)); // Pause de 1s entre chaque requête
 
-      const price = await fetchStockPrice(ticker);
-      results.push({ ticker, price });
+      const { price, country, currency } = await fetchStockPrice(ticker);
+      results.push({ ticker, price, country, currency });
     }
 
     return results;
   };
 
-  //  Fonction pour récupérer le prix d'une action
   const fetchStockPrice = async (ticker) => {
     try {
       const response = await fetch(
         `https://yh-finance.p.rapidapi.com/market/v2/get-quotes?region=US&symbols=${ticker}`,
         {
           headers: {
-            "X-RapidAPI-Key": "74165ac8a1msh6505a6041df5d2ap1fd4cfjsnb9639d21ce02", // clé API
+            "X-RapidAPI-Key": "74165ac8a1msh6505a6041df5d2ap1fd4cfjsnb9639d21ce02",
             "X-RapidAPI-Host": "yh-finance.p.rapidapi.com",
           },
         }
       );
-
+  
       const data = await response.json();
-
-      if (!data?.quoteResponse?.result || data.quoteResponse.result.length === 0) {
-        return "Donnée non disponible";
+      const result = data?.quoteResponse?.result?.[0];
+  
+      if (!result) {
+        return {
+          price: "Donnée non disponible",
+          country: "Inconnu",
+          currency: "?"
+        };
       }
-
-      return data.quoteResponse.result[0]?.regularMarketPrice || "N/A";
+  
+      return {
+        price: typeof result.regularMarketPrice === "number" ? result.regularMarketPrice : "N/A",
+        country: result.fullExchangeName || "Inconnu",
+        currency: result.currency || "?"
+      };
+  
     } catch (error) {
-      return "Erreur";
+      return {
+        price: "Erreur",
+        country: "Erreur",
+        currency: "?"
+      };
     }
   };
+
 
   //  Ajouter une action au portefeuille
   const addStock = async () => {
@@ -103,10 +120,10 @@ export default function Portfolio() {
       if (!res.ok) throw new Error("Erreur lors de l'ajout de l'action.");
   
       //  Récupérer juste le prix de la nouvelle action
-      const price = await fetchStockPrice(newTicker);
+      const { price, country, currency } = await fetchStockPrice(newTicker);
   
       //  Ajouter immédiatement au state sans recharger tout
-      setStocks([...stocks, { ticker: newTicker, price }]);
+      setStocks([...stocks, { ticker: newTicker, price, country, currency }]);
       setTicker(""); // reset champ
   
     } catch (err) {
@@ -144,6 +161,19 @@ export default function Portfolio() {
     router.push("/login");
   };
 
+  const handleSortByPrice = () => {
+    let newOrder = "asc";
+    if (sortOrder === "asc") newOrder = "desc";
+    else if (sortOrder === "desc") newOrder = "none";
+  
+    setSortOrder(newOrder);
+  
+    if (newOrder === "none") return;
+  
+    const sorted = sortByPrice(stocks, newOrder);
+    setStocks(sorted);
+  };
+
   return (
     <main className="flex flex-col min-h-screen bg-gray-100 p-10">
       {/* Bouton Déconnexion */}
@@ -176,13 +206,17 @@ export default function Portfolio() {
           Ajouter
         </button>
       </div>
-
       <div className="bg-white shadow-md rounded-lg overflow-hidden">
         <table className="w-full text-left border-collapse">
           <thead className="bg-[#1E3A8A] text-white">
             <tr>
               <th className="p-3">Ticker</th>
-              <th className="p-3">Prix Actuel</th>
+              <th className="p-3">Pays</th>
+              <th className="p-3 cursor-pointer select-none" 
+              onClick={handleSortByPrice}
+              >Prix Actuel {sortOrder === "asc" ? "↑" : sortOrder === "desc" ? "↓" : ""}    </th>
+              <th className="p-3">Quantité</th>
+              <th className="p-3">PRU</th>
               <th className="p-3">Actions</th>
             </tr>
           </thead>
@@ -195,7 +229,12 @@ export default function Portfolio() {
               stocks.map((stock) => (
                 <tr key={stock.ticker} className="border-b">
                   <td className="p-3 font-semibold">{stock.ticker}</td>
-                  <td className="p-3 text-gray-600">{stock.price} $</td>
+                  <td className="p-3 text-gray-600">{stock.country || "--"}</td>
+                  <td className="p-3 text-gray-600">
+                  {stock.price} {formatCurrencySymbol(stock.currency)}
+                  </td>
+                  <td className="p-3 text-gray-600">--</td>      {/* Quantité */}
+                  <td className="p-3 text-gray-600">--</td>      {/* PRU */}
                   <td className="p-3">
                     <button
                       onClick={() => removeStock(stock.ticker)}
