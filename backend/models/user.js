@@ -3,7 +3,15 @@ const mongoose = require("mongoose");
 const UserSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
-  portfolio: { type: Array, default: [] } // Stocke les actions de l'utilisateur
+
+  portfolio: [
+    {
+      ticker: { type: String, required: true },
+      quantity: { type: Number, default: 0 },
+      pru: { type: Number, default: 0 }
+    }
+  ]
+
 }, { timestamps: true });
 
-module.exports = mongoose.model("User", UserSchema);
+module.exports = mongoose.models.User || mongoose.model("User", UserSchema);

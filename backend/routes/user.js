@@ -1,6 +1,6 @@
 const express = require("express");
 const auth = require("../middleware/auth"); // Importer le middleware d'authentification
-const User = require("../models/User");
+const User = require("../models/user");
 
 const router = express.Router();
 
@@ -14,15 +14,17 @@ router.get("/portfolio", auth, async (req, res) => {
   }
 });
 
-//  Ajouter une action au portefeuille (POST)
+// Ajouter une action au portefeuille (POST)
 router.post("/portfolio", auth, async (req, res) => {
   try {
-    const { ticker } = req.body;
+    //  récupère les 3 valeurs depuis le frontend
+    const { ticker, quantity = 0, pru = 0 } = req.body;
     const user = await User.findById(req.user.userId);
 
-    if (!user.portfolio.includes(ticker)) {
-      user.portfolio.push(ticker);
-      await user.save();
+    const exists = user.portfolio.find(item => item.ticker === ticker);
+    if (!exists) {
+      user.portfolio.push({ ticker, quantity, pru });
+      await user.save(); // indispensable pour enregistrer
     }
 
     res.json(user.portfolio);
@@ -37,7 +39,7 @@ router.delete("/portfolio", auth, async (req, res) => {
     const { ticker } = req.body;
     const user = await User.findById(req.user.userId);
 
-    user.portfolio = user.portfolio.filter(t => t !== ticker);
+    user.portfolio = user.portfolio.filter(item => item.ticker !== ticker);
     await user.save();
 
     res.json(user.portfolio);

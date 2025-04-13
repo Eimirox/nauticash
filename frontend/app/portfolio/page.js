@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { sortByPrice } from "./utils/sort";
 import { formatCurrencySymbol } from "./utils/formats";
+import { exchangeToCountry } from "./utils/exchangeMap";
 
 export default function Portfolio() {
   const router = useRouter();
@@ -31,8 +32,8 @@ export default function Portfolio() {
 
         if (!res.ok) throw new Error("Erreur lors de la récupération du portefeuille.");
 
-        const tickers = await res.json();
-        const stocksWithPrices = await fetchStockPrices(tickers);
+        const portfolio = await res.json(); // contient { ticker, quantity, pru }
+        const stocksWithPrices = await fetchStockPrices(portfolio);
         setStocks(stocksWithPrices);
       } catch (err) {
         setError(err.message);
@@ -45,16 +46,16 @@ export default function Portfolio() {
   }, []);
 
   //  Fonction pour récupérer les prix des actions avec délai pour éviter 429 Too Many Requests
-  const fetchStockPrices = async (tickers) => {
+  const fetchStockPrices = async (portfolio) => {
     const results = [];
-
-    for (const ticker of tickers) {
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Pause de 1s entre chaque requête
-
+  
+    for (const { ticker, quantity, pru } of portfolio) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+  
       const { price, country, currency } = await fetchStockPrice(ticker);
-      results.push({ ticker, price, country, currency });
+      results.push({ ticker, price, country, currency, quantity, pru });
     }
-
+  
     return results;
   };
 
@@ -123,9 +124,15 @@ export default function Portfolio() {
       const { price, country, currency } = await fetchStockPrice(newTicker);
   
       //  Ajouter immédiatement au state sans recharger tout
-      setStocks([...stocks, { ticker: newTicker, price, country, currency }]);
+      setStocks([...stocks, {
+        ticker: newTicker,
+        price,
+        country,
+        currency,
+        quantity: 0,
+        pru: 0
+      }]);
       setTicker(""); // reset champ
-  
     } catch (err) {
       setError(err.message);
     }
@@ -172,6 +179,15 @@ export default function Portfolio() {
   
     const sorted = sortByPrice(stocks, newOrder);
     setStocks(sorted);
+  };
+
+  // Fonction met à jour une propriété pour un action spécifique
+  const handleUpdateStock = (ticker, field, value) => {
+    setStocks(prevStocks =>
+      prevStocks.map(stock =>
+        stock.ticker === ticker ? { ...stock, [field]: value } : stock
+      )
+    );
   };
 
   return (
@@ -227,14 +243,30 @@ export default function Portfolio() {
               </tr>
             ) : stocks.length > 0 ? (
               stocks.map((stock) => (
-                <tr key={stock.ticker} className="border-b">
+                <tr key={stock.ticker + stock.quantity + stock.pru} className="border-b">
                   <td className="p-3 font-semibold">{stock.ticker}</td>
-                  <td className="p-3 text-gray-600">{stock.country || "--"}</td>
+                  <td className="p-3 text-gray-600">
+                  {exchangeToCountry[stock.country] || stock.country || "--"}
+                  </td>
                   <td className="p-3 text-gray-600">
                   {stock.price} {formatCurrencySymbol(stock.currency)}
                   </td>
-                  <td className="p-3 text-gray-600">--</td>      {/* Quantité */}
-                  <td className="p-3 text-gray-600">--</td>      {/* PRU */}
+                  <td className="p-3 text-gray-600">
+                  <input
+                  type="number"
+                  value={stock.quantity ?? ""}
+                  onChange={(e) => handleUpdateStock(stock.ticker, "quantity", parseFloat(e.target.value))}
+                  className="w-20 border px-2 py-1 rounded"
+                  /> 
+                  </td>   
+                  <td className="p-3 text-gray-600">
+                  <input
+                  type="number"
+                  value={stock.pru ?? ""}
+                  onChange={(e) => handleUpdateStock(stock.ticker, "pru", parseFloat(e.target.value))}
+                  className="w-20 border px-2 py-1 rounded"
+                  />
+                  </td>    
                   <td className="p-3">
                     <button
                       onClick={() => removeStock(stock.ticker)}
