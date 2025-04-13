@@ -188,6 +188,29 @@ export default function Portfolio() {
         stock.ticker === ticker ? { ...stock, [field]: value } : stock
       )
     );
+  
+    syncStockUpdate(ticker, field, value); // ✅ Envoi au backend
+  };
+
+  // Fonction qui permet de synchro la valeurs du users avec la base MongoDB
+  const syncStockUpdate = async (ticker, field, value) => {
+    const token = localStorage.getItem("token");
+    if (!token) return router.push("/login");
+  
+    try {
+      const res = await fetch("http://localhost:5000/api/user/portfolio", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ ticker, field, value }),
+      });
+  
+      if (!res.ok) throw new Error("Erreur lors de la synchronisation.");
+    } catch (err) {
+      console.error("Sync backend failed:", err.message);
+    }
   };
 
   return (

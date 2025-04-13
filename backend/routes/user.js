@@ -48,4 +48,21 @@ router.delete("/portfolio", auth, async (req, res) => {
   }
 });
 
+router.patch("/portfolio", auth, async (req, res) => {
+  try {
+    const { ticker, field, value } = req.body;
+    const user = await User.findById(req.user.userId);
+
+    const item = user.portfolio.find(stock => stock.ticker === ticker);
+    if (!item) return res.status(404).json({ message: "Action non trouvée." });
+
+    item[field] = value; // ✅ Mise à jour dynamique du champ
+    await user.save();
+
+    res.json({ message: "Mis à jour avec succès" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
