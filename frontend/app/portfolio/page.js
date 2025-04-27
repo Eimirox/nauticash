@@ -13,6 +13,7 @@ export default function Portfolio() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [sortOrder, setSortOrder] = useState("none");
+  const [localEdits, setLocalEdits] = useState({});
 
   // Vérifier l'authentification et charger les actions au montage
   useEffect(() => {
@@ -275,29 +276,107 @@ export default function Portfolio() {
                   {stock.price} {formatCurrencySymbol(stock.currency)}
                   </td>
                   <td className="p-3 text-gray-600">
-                  <input
-                  type="number"
-                  value={stock.quantity ?? ""}
-                  onChange={(e) => handleUpdateStock(stock.ticker, "quantity", parseFloat(e.target.value))}
-                  className="w-20 border px-2 py-1 rounded"
-                  /> 
-                  </td>   
-                  <td className="p-3 text-gray-600">
-                  <input
-                  type="number"
-                  value={stock.pru ?? ""}
-                  onChange={(e) => handleUpdateStock(stock.ticker, "pru", parseFloat(e.target.value))}
-                  className="w-20 border px-2 py-1 rounded"
-                  />
-                  </td>    
-                  <td className="p-3">
-                    <button
-                      onClick={() => removeStock(stock.ticker)}
-                      className="px-4 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
-                    >
-                      Supprimer
-                    </button>
+                    {/* Champ Quantité - édition fluide + sauvegarde à Enter */}
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      value={
+                        localEdits[stock.ticker]?.quantity !== undefined
+                          ? localEdits[stock.ticker].quantity
+                          : stock.quantity ?? ""
+                      }
+                      onFocus={() => {
+                        setLocalEdits((prev) => ({
+                          ...prev,
+                          [stock.ticker]: {
+                            ...(prev[stock.ticker] || {}),
+                            quantity: stock.quantity ?? ""
+                          }
+                        }));
+                      }}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setLocalEdits((prev) => ({
+                          ...prev,
+                          [stock.ticker]: {
+                            ...(prev[stock.ticker] || {}),
+                            quantity: val
+                          }
+                        }));
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          const val = parseFloat(localEdits[stock.ticker]?.quantity);
+                          if (!Number.isNaN(val)) {
+                            handleUpdateStock(stock.ticker, "quantity", val);
+                            syncStockUpdate(stock.ticker, "quantity", val);
+                          }
+                          setLocalEdits((prev) => {
+                            const updated = { ...prev };
+                            delete updated[stock.ticker]?.quantity;
+                            return updated;
+                          });
+                          e.target.blur();
+                        }
+                      }}
+                      className="w-20 border px-2 py-1 rounded appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    />
                   </td>
+                  <td className="p-3 text-gray-600">
+                    {/* Champ PRU - édition fluide + sauvegarde à Enter */}
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      value={
+                        localEdits[stock.ticker]?.pru !== undefined
+                          ? localEdits[stock.ticker].pru
+                          : stock.pru ?? ""
+                      }
+                      onFocus={() => {
+                        setLocalEdits((prev) => ({
+                          ...prev,
+                          [stock.ticker]: {
+                            ...(prev[stock.ticker] || {}),
+                            pru: stock.pru ?? ""
+                          }
+                        }));
+                      }}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setLocalEdits((prev) => ({
+                          ...prev,
+                          [stock.ticker]: {
+                            ...(prev[stock.ticker] || {}),
+                            pru: val
+                          }
+                        }));
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          const val = parseFloat(localEdits[stock.ticker]?.pru);
+                          if (!Number.isNaN(val)) {
+                            handleUpdateStock(stock.ticker, "pru", val);
+                            syncStockUpdate(stock.ticker, "pru", val);
+                          }
+                          setLocalEdits((prev) => {
+                            const updated = { ...prev };
+                            delete updated[stock.ticker]?.pru;
+                            return updated;
+                          });
+                          e.target.blur();
+                        }
+                      }}
+                      className="w-20 border px-2 py-1 rounded appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    />
+                  </td>
+                  <td className="p-3">
+                  <button
+                    onClick={() => removeStock(stock.ticker)}
+                    className="px-4 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
+                  >
+                    Supprimer
+                  </button>
+                </td>
                 </tr>
               ))
             ) : (
