@@ -190,7 +190,7 @@ export default function Portfolio() {
       )
     );
   
-    syncStockUpdate(ticker, field, value); // ✅ Envoi au backend
+    syncStockUpdate(ticker, field, value); // Envoi au backend
   };
 
   // Fonction qui permet de synchro la valeurs du users avec la base MongoDB
@@ -256,132 +256,140 @@ export default function Portfolio() {
               onClick={handleSortByPrice}
               >Prix Actuel {sortOrder === "asc" ? "↑" : sortOrder === "desc" ? "↓" : ""}    </th>
               <th className="p-3">Quantité</th>
-              <th className="p-3">PRU</th>
+              <th className="p-3">PRU</th> 
+              <th className="p-3">Performance</th>
               <th className="p-3">Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="3" className="p-3 text-center">Chargement...</td>
+                <td colSpan="6" className="p-10 text-center text-gray-500 text-xl">Chargement...</td>
               </tr>
             ) : stocks.length > 0 ? (
-              stocks.map((stock) => (
-                <tr key={stock.ticker + stock.quantity + stock.pru} className="border-b">
-                  <td className="p-3 font-semibold">{stock.ticker}</td>
-                  <td className="p-3 text-gray-600">
-                  {exchangeToCountry[stock.country] || stock.country || "--"}
-                  </td>
-                  <td className="p-3 text-gray-600">
-                  {stock.price} {formatCurrencySymbol(stock.currency)}
-                  </td>
-                  <td className="p-3 text-gray-600">
-                    {/* Champ Quantité - édition fluide + sauvegarde à Enter */}
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      value={
-                        localEdits[stock.ticker]?.quantity !== undefined
-                          ? localEdits[stock.ticker].quantity
-                          : stock.quantity ?? ""
-                      }
-                      onFocus={() => {
-                        setLocalEdits((prev) => ({
-                          ...prev,
-                          [stock.ticker]: {
-                            ...(prev[stock.ticker] || {}),
-                            quantity: stock.quantity ?? ""
-                          }
-                        }));
-                      }}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setLocalEdits((prev) => ({
-                          ...prev,
-                          [stock.ticker]: {
-                            ...(prev[stock.ticker] || {}),
-                            quantity: val
-                          }
-                        }));
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          const val = parseFloat(localEdits[stock.ticker]?.quantity);
-                          if (!Number.isNaN(val)) {
-                            handleUpdateStock(stock.ticker, "quantity", val);
-                            syncStockUpdate(stock.ticker, "quantity", val);
-                          }
-                          setLocalEdits((prev) => {
-                            const updated = { ...prev };
-                            delete updated[stock.ticker]?.quantity;
-                            return updated;
-                          });
-                          e.target.blur();
+              stocks.map((stock) => {
+                const performance = stock.pru > 0 ? ((stock.price - stock.pru) / stock.pru) * 100 : null;
+
+                return (
+                  <tr key={stock.ticker + stock.quantity + stock.pru} className="border-b">
+                    <td className="p-3 font-semibold">{stock.ticker}</td>
+                    <td className="p-3 text-gray-600">
+                    {exchangeToCountry[stock.country] || stock.country || "--"}
+                    </td>
+                    <td className="p-3 text-gray-600">
+                    {stock.price} {formatCurrencySymbol(stock.currency)}
+                    </td>
+                    <td className="p-3 text-gray-600">
+                      {/* Champ Quantité - édition fluide + sauvegarde à Enter */}
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        value={
+                          localEdits[stock.ticker]?.quantity !== undefined
+                            ? localEdits[stock.ticker].quantity
+                            : stock.quantity ?? ""
                         }
-                      }}
-                      className="w-20 border px-2 py-1 rounded appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                    />
-                  </td>
-                  <td className="p-3 text-gray-600">
-                    {/* Champ PRU - édition fluide + sauvegarde à Enter */}
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      value={
-                        localEdits[stock.ticker]?.pru !== undefined
-                          ? localEdits[stock.ticker].pru
-                          : stock.pru ?? ""
-                      }
-                      onFocus={() => {
-                        setLocalEdits((prev) => ({
-                          ...prev,
-                          [stock.ticker]: {
-                            ...(prev[stock.ticker] || {}),
-                            pru: stock.pru ?? ""
+                        onFocus={() => {
+                          setLocalEdits((prev) => ({
+                            ...prev,
+                            [stock.ticker]: {
+                              ...(prev[stock.ticker] || {}),
+                              quantity: stock.quantity ?? ""
+                            }
+                          }));
+                        }}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setLocalEdits((prev) => ({
+                            ...prev,
+                            [stock.ticker]: {
+                              ...(prev[stock.ticker] || {}),
+                              quantity: val
+                            }
+                          }));
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            const val = parseFloat(localEdits[stock.ticker]?.quantity);
+                            if (!Number.isNaN(val)) {
+                              handleUpdateStock(stock.ticker, "quantity", val);
+                              syncStockUpdate(stock.ticker, "quantity", val);
+                            }
+                            setLocalEdits((prev) => {
+                              const updated = { ...prev };
+                              delete updated[stock.ticker]?.quantity;
+                              return updated;
+                            });
+                            e.target.blur();
                           }
-                        }));
-                      }}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setLocalEdits((prev) => ({
-                          ...prev,
-                          [stock.ticker]: {
-                            ...(prev[stock.ticker] || {}),
-                            pru: val
-                          }
-                        }));
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          const val = parseFloat(localEdits[stock.ticker]?.pru);
-                          if (!Number.isNaN(val)) {
-                            handleUpdateStock(stock.ticker, "pru", val);
-                            syncStockUpdate(stock.ticker, "pru", val);
-                          }
-                          setLocalEdits((prev) => {
-                            const updated = { ...prev };
-                            delete updated[stock.ticker]?.pru;
-                            return updated;
-                          });
-                          e.target.blur();
+                        }}
+                        className="w-20 border px-2 py-1 rounded appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                      />
+                    </td>
+                    <td className="p-3 text-gray-600">
+                      {/* Champ PRU - édition fluide + sauvegarde à Enter */}
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        value={
+                          localEdits[stock.ticker]?.pru !== undefined
+                            ? localEdits[stock.ticker].pru
+                            : stock.pru ?? ""
                         }
-                      }}
-                      className="w-20 border px-2 py-1 rounded appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                    />
+                        onFocus={() => {
+                          setLocalEdits((prev) => ({
+                            ...prev,
+                            [stock.ticker]: {
+                              ...(prev[stock.ticker] || {}),
+                              pru: stock.pru ?? ""
+                            }
+                          }));
+                        }}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setLocalEdits((prev) => ({
+                            ...prev,
+                            [stock.ticker]: {
+                              ...(prev[stock.ticker] || {}),
+                              pru: val
+                            }
+                          }));
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            const val = parseFloat(localEdits[stock.ticker]?.pru);
+                            if (!Number.isNaN(val)) {
+                              handleUpdateStock(stock.ticker, "pru", val);
+                              syncStockUpdate(stock.ticker, "pru", val);
+                            }
+                            setLocalEdits((prev) => {
+                              const updated = { ...prev };
+                              delete updated[stock.ticker]?.pru;
+                              return updated;
+                            });
+                            e.target.blur();
+                          }
+                        }}
+                        className="w-20 border px-2 py-1 rounded appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                      />
+                    </td>
+                    <td className="p-3 text-gray-600">
+                    {performance !== null ? performance.toFixed(2) + " %" : "--"}
+                    </td>
+                    <td className="p-3">
+                    <button
+                      onClick={() => removeStock(stock.ticker)}
+                      className="px-4 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
+                    >
+                      Supprimer
+                    </button>
                   </td>
-                  <td className="p-3">
-                  <button
-                    onClick={() => removeStock(stock.ticker)}
-                    className="px-4 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
-                  >
-                    Supprimer
-                  </button>
-                </td>
-                </tr>
-              ))
+                  </tr>
+                );
+              })
             ) : (
               <tr>
-                <td colSpan="3" className="p-3 text-center text-gray-500">
+                <td colSpan="6" className="p-10 text-center text-gray-500 text-xl">
                   Aucune action ajoutée
                 </td>
               </tr>
