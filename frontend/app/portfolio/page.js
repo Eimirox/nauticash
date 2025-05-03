@@ -60,44 +60,84 @@ export default function Portfolio() {
     return results;
   };
 
+  const apiConfigs = [
+    {
+      key: process.env.NEXT_PUBLIC_RAPIDAPI_KEY_1,
+      host: process.env.NEXT_PUBLIC_RAPIDAPI_HOST_1,
+    },
+    {
+      key: process.env.NEXT_PUBLIC_RAPIDAPI_KEY_2,
+      host: process.env.NEXT_PUBLIC_RAPIDAPI_HOST_2,
+    }
+  ];
+  
   const fetchStockPrice = async (ticker) => {
-    try {
-      const response = await fetch(
-        `https://yh-finance.p.rapidapi.com/market/v2/get-quotes?region=US&symbols=${ticker}`,
-        {
-          headers: {
-            "X-RapidAPI-Key": "74165ac8a1msh6505a6041df5d2ap1fd4cfjsnb9639d21ce02",
-            "X-RapidAPI-Host": "yh-finance.p.rapidapi.com",
-          },
-        }
-      );
-  
-      const data = await response.json();
-      const result = data?.quoteResponse?.result?.[0];
-  
-      if (!result) {
-        return {
-          price: "Donnée non disponible",
-          country: "Inconnu",
-          currency: "?"
-        };
+    for (const { key, host } of apiConfigs) {
+      if (!key || !host) {
+        console.error("Clé ou host RapidAPI manquant.");
+        continue;
       }
   
-      return {
-        price: typeof result.regularMarketPrice === "number" ? result.regularMarketPrice : "N/A",
-        country: result.fullExchangeName || "Inconnu",
-        currency: result.currency || "?"
-      };
+      const cacheKey = `price_${ticker}_${host}`;
+      const cached = localStorage.getItem(cacheKey);
   
-    } catch (error) {
-      return {
-        price: "Erreur",
-        country: "Erreur",
-        currency: "?"
-      };
+      if (cached) {
+        const { data, timestamp } = JSON.parse(cached);
+        if (Date.now() - timestamp < 24 * 60 * 60 * 1000) return data;
+      }
+  
+      try {
+        // Choix de l'URL en fonction du host
+        const isYahoo = host.includes("yh-finance");
+        const url = isYahoo
+          ? `https://${host}/market/v2/get-quotes?region=US&symbols=${ticker}`
+          : `https://${host}/search?query=${ticker}&language=en`;
+  
+        const response = await fetch(url, {
+          headers: {
+            "X-RapidAPI-Key": key,
+            "X-RapidAPI-Host": host,
+          },
+        });
+  
+        if (response.status === 429) {
+          console.warn(`Quota dépassé pour ${host}`);
+          continue;
+        }
+  
+        const data = await response.json();
+  
+        let result;
+  
+        if (isYahoo) {
+          result = data?.quoteResponse?.result?.[0];
+        } else {
+          result = data?.data?.stock?.[0];
+        }
+  
+        if (!result) continue;
+  
+        const stockData = {
+          price: typeof result.price === "number" ? result.price : "N/A",
+          country: result.exchange || result.country_code || "Inconnu",
+          currency: result.currency || "?",
+        };
+  
+        localStorage.setItem(cacheKey, JSON.stringify({ data: stockData, timestamp: Date.now() }));
+        return stockData;
+  
+      } catch (err) {
+        console.error(`Erreur avec ${host} :`, err.message);
+      }
     }
+  
+    return {
+      price: "Erreur",
+      country: "Erreur",
+      currency: "?",
+    };
   };
-
+  
 
   //  Ajouter une action au portefeuille
   const addStock = async () => {
