@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { sortByPrice } from "./utils/sort";
 import { formatCurrencySymbol } from "./utils/formats";
 import { exchangeToCountry } from "./utils/exchangeMap";
+import { getPerformanceClass } from "./utils/styles";
 
 export default function Portfolio() {
   const router = useRouter();
@@ -253,18 +254,22 @@ export default function Portfolio() {
               <th className="p-3">Quantité</th>
               <th className="p-3">PRU</th> 
               <th className="p-3">Performance</th>
+              <th className="p-3">Total</th>
               <th className="p-3">Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="6" className="p-10 text-center text-gray-500 text-xl">Chargement...</td>
+                <td colSpan="8" className="p-10 text-center text-gray-500 text-xl">Chargement...</td>
               </tr>
             ) : stocks.length > 0 ? (
               stocks.map((stock) => {
                 const performance = stock.pru > 0 ? ((stock.price - stock.pru) / stock.pru) * 100 : null;
-
+                const total = typeof stock.price === "number" && typeof stock.quantity === "number"
+                ? stock.price * stock.quantity
+                : null;
+                
                 return (
                   <tr key={stock.ticker + stock.quantity + stock.pru} className="border-b">
                     <td className="p-3 font-semibold">{stock.ticker}</td>
@@ -368,8 +373,11 @@ export default function Portfolio() {
                         className="w-20 border px-2 py-1 rounded appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                       />
                     </td>
-                    <td className="p-3 text-gray-600">
+                    <td className={`p-3 ${getPerformanceClass(performance)}`}>
                     {performance !== null ? performance.toFixed(2) + " %" : "--"}
+                    </td>
+                    <td className="p-3 text-gray-600">
+                    {total !== null ? total.toFixed(2) + " " + formatCurrencySymbol(stock.currency) : "--"}
                     </td>
                     <td className="p-3">
                     <button
@@ -384,7 +392,7 @@ export default function Portfolio() {
               })
             ) : (
               <tr>
-                <td colSpan="6" className="p-10 text-center text-gray-500 text-xl">
+                <td colSpan="8" className="p-10 text-center text-gray-500 text-xl">
                   Aucune action ajoutée
                 </td>
               </tr>

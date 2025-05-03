@@ -6,27 +6,27 @@ const mongoose = require("mongoose");
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ✅ Connexion MongoDB
+// Connexion MongoDB
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("✅ Connecté à MongoDB Atlas"))
   .catch((err) => console.error("❌ Erreur MongoDB :", err));
 
-// ✅ Middlewares utiles
+// Middlewares utiles
 app.use(cors());
 app.use(express.json());
 
-// ✅ Routes API
+// Routes API
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/user", require("./routes/user"));
 app.use("/api/transactions", require("./routes/transactions"));
 app.use("/api/quotes", require("./api/quote")); // Ta route propre des APIs
 
-// ✅ Route de test
+// Route de test
 app.get("/", (req, res) => {
   res.send("✅ Serveur Express opérationnel !");
 });
 
-// ✅ Lancement du serveur
+// Lancement du serveur
 app.listen(PORT, () => {
   console.log(`✅ Serveur Express en ligne sur http://localhost:${PORT}`);
 });
