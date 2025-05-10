@@ -7,7 +7,6 @@ import { formatCurrencySymbol } from "./utils/formats";
 import { exchangeToCountry } from "./utils/exchangeMap";
 import { getPerformanceClass } from "./utils/styles";
 
-
 export default function Portfolio() {
   const router = useRouter();
   const [ticker, setTicker] = useState("");
@@ -17,35 +16,24 @@ export default function Portfolio() {
   const [sortOrder, setSortOrder] = useState("none");
   const [localEdits, setLocalEdits] = useState({});
 
-  // 1) Fonction réutilisable pour charger le portfolio
+  // 1) Chargement centralisé du portfolio enrichi
   const fetchPortfolio = async () => {
     setLoading(true);
     setError(null);
     try {
       const token = localStorage.getItem("token");
+      if (!token) throw new Error("Token manquant");
+
       const res = await fetch("http://localhost:5000/api/user/portfolio", {
-        method: "GET",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
       });
-      if (!res.ok) throw new Error("Erreur lors de la récupération du portefeuille.");
+      if (!res.ok) throw new Error(`Status ${res.status}`);
 
-      const json = await res.json();
-      const portfolio = Array.isArray(json) ? json : json.portfolio;
-
-      const formatted = portfolio.map((stk) => ({
-        ticker: stk.ticker,
-        price: stk.close,
-        open: stk.open,
-        high: stk.high,
-        low: stk.low,
-        volume: stk.volume,
-        date: stk.date,
-        country: stk.country || "US",
-        currency: stk.currency || "USD",
-        quantity: stk.quantity,
-        pru: stk.pru,
-      }));
-      setStocks(formatted);
+      const data = await res.json();
+      setStocks(data);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -53,7 +41,7 @@ export default function Portfolio() {
     }
   };
 
-  // 2) Au montage, on charge le portfolio
+  // 2) Au montage, on s’assure que l’utilisateur est loggué puis on charge
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) {
@@ -61,20 +49,19 @@ export default function Portfolio() {
       return;
     }
     fetchPortfolio();
-  }, []);
+  }, [router]);
 
   // 3) Tri par prix
   const handleSortByPrice = () => {
-    let newOrder = "asc";
-    if (sortOrder === "asc") newOrder = "desc";
-    else if (sortOrder === "desc") newOrder = "none";
+    const newOrder =
+      sortOrder === "asc" ? "desc" : sortOrder === "desc" ? "none" : "asc";
     setSortOrder(newOrder);
     if (newOrder !== "none") {
       setStocks(sortByPrice(stocks, newOrder));
     }
   };
 
-  // 4) Ajouter une action
+  // 4) Ajouter une action → on recharge tout le portfolio
   const addStock = async () => {
     if (!ticker.trim()) return;
     const newTicker = ticker.toUpperCase();
@@ -92,9 +79,9 @@ export default function Portfolio() {
         },
         body: JSON.stringify({ ticker: newTicker }),
       });
-      if (!res.ok) throw new Error("Erreur lors de l'ajout de l'action.");
+      if (!res.ok) throw new Error(`Status ${res.status}`);
 
-      // On recharge tout le portfolio
+      // On recharge tout le portfolio pour récupérer les champs enrichis
       await fetchPortfolio();
       setTicker("");
     } catch (err) {
@@ -102,7 +89,7 @@ export default function Portfolio() {
     }
   };
 
-  // 5) Supprimer une action
+  // 5) Supprimer une action localement et côté serveur
   const removeStock = async (tickerToRemove) => {
     const token = localStorage.getItem("token");
     if (!token) return router.push("/login");
@@ -116,7 +103,7 @@ export default function Portfolio() {
         },
         body: JSON.stringify({ ticker: tickerToRemove }),
       });
-      if (!res.ok) throw new Error("Erreur lors de la suppression de l'action.");
+      if (!res.ok) throw new Error(`Status ${res.status}`);
 
       setStocks((prev) => prev.filter((s) => s.ticker !== tickerToRemove));
     } catch (err) {
@@ -143,12 +130,13 @@ export default function Portfolio() {
         },
         body: JSON.stringify({ ticker, field, value }),
       });
-      if (!res.ok) throw new Error("Erreur lors de la synchronisation.");
+      if (!res.ok) throw new Error(`Status ${res.status}`);
     } catch (err) {
       console.error("Sync backend failed:", err.message);
     }
   };
 
+  // 7) Déconnexion
   const logout = () => {
     localStorage.removeItem("token");
     router.push("/login");
@@ -180,7 +168,7 @@ export default function Portfolio() {
         />
         <button
           onClick={addStock}
-          className="px-6 py-2 bg-[#1E3A8A] text-white rounded-lg hover:bg-[#3B82F6]"
+          className="px-6 py-2 bg-[#1E3A8A] text-white rounded-lg hover:bg-[#3B82F6] transition"
         >
           Ajouter
         </button>
@@ -213,10 +201,10 @@ export default function Portfolio() {
             ) : stocks.length > 0 ? (
               stocks.map((stock) => {
                 const perf =
-                  stock.pru > 0 ? ((stock.price - stock.pru) / stock.pru) * 100 : null;
+                  stock.pru > 0 ? ((stock.close - stock.pru) / stock.pru) * 100 : null;
                 const total =
-                  typeof stock.price === "number" && typeof stock.quantity === "number"
-                    ? stock.price * stock.quantity
+                  typeof stock.close === "number" && typeof stock.quantity === "number"
+                    ? stock.close * stock.quantity
                     : null;
                 return (
                   <tr key={stock.ticker} className="border-b">
@@ -225,7 +213,7 @@ export default function Portfolio() {
                       {exchangeToCountry[stock.country] || stock.country}
                     </td>
                     <td className="p-3 text-gray-600">
-                      {stock.price} {formatCurrencySymbol(stock.currency)}
+                      {stock.close} {formatCurrencySymbol(stock.currency)}
                     </td>
                     <td className="p-3 text-gray-600">
                       <input
@@ -250,8 +238,11 @@ export default function Portfolio() {
                         }
                         onKeyDown={(e) => {
                           if (e.key === "Enter") {
-                            const val = parseFloat(localEdits[stock.ticker]?.quantity);
-                            if (!isNaN(val)) handleUpdateStock(stock.ticker, "quantity", val);
+                            const val = parseFloat(
+                              localEdits[stock.ticker]?.quantity
+                            );
+                            if (!isNaN(val))
+                              handleUpdateStock(stock.ticker, "quantity", val);
                             setLocalEdits((prev) => {
                               const next = { ...prev };
                               delete next[stock.ticker];
@@ -284,7 +275,8 @@ export default function Portfolio() {
                         onKeyDown={(e) => {
                           if (e.key === "Enter") {
                             const val = parseFloat(localEdits[stock.ticker]?.pru);
-                            if (!isNaN(val)) handleUpdateStock(stock.ticker, "pru", val);
+                            if (!isNaN(val))
+                              handleUpdateStock(stock.ticker, "pru", val);
                             setLocalEdits((prev) => {
                               const next = { ...prev };
                               delete next[stock.ticker];
