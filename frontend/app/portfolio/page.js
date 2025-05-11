@@ -9,10 +9,10 @@ import { getPerformanceClass } from "./utils/styles";
 
 export default function Portfolio() {
   const router = useRouter();
-  const [ticker, setTicker] = useState("");
-  const [stocks, setStocks] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [ticker, setTicker]       = useState("");
+  const [stocks, setStocks]       = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState(null);
   const [sortOrder, setSortOrder] = useState("none");
   const [localEdits, setLocalEdits] = useState({});
 
@@ -54,7 +54,9 @@ export default function Portfolio() {
   // 3) Tri par prix
   const handleSortByPrice = () => {
     const newOrder =
-      sortOrder === "asc" ? "desc" : sortOrder === "desc" ? "none" : "asc";
+      sortOrder === "asc" ? "desc" :
+      sortOrder === "desc" ? "none" :
+      "asc";
     setSortOrder(newOrder);
     if (newOrder !== "none") {
       setStocks(sortByPrice(stocks, newOrder));
@@ -81,7 +83,7 @@ export default function Portfolio() {
       });
       if (!res.ok) throw new Error(`Status ${res.status}`);
 
-      // On recharge tout le portfolio pour récupérer les champs enrichis
+      // Reconstruire le portfolio enrichi
       await fetchPortfolio();
       setTicker("");
     } catch (err) {
@@ -157,7 +159,7 @@ export default function Portfolio() {
 
       {error && <p className="text-red-500 text-center">{error}</p>}
 
-      {/* Barre d'ajout */}
+      {/* Barre d'ajout + actualisation */}
       <div className="flex justify-center gap-4 mb-6">
         <input
           type="text"
@@ -171,6 +173,12 @@ export default function Portfolio() {
           className="px-6 py-2 bg-[#1E3A8A] text-white rounded-lg hover:bg-[#3B82F6] transition"
         >
           Ajouter
+        </button>
+        <button
+          onClick={fetchPortfolio}
+          className="px-6 py-2 border border-[#1E3A8A] text-[#1E3A8A] rounded-lg hover:bg-[#1E3A8A] hover:text-white transition"
+        >
+          Actualiser
         </button>
       </div>
 
@@ -218,9 +226,7 @@ export default function Portfolio() {
                     <td className="p-3 text-gray-600">
                       <input
                         type="number"
-                        value={
-                          localEdits[stock.ticker]?.quantity ?? stock.quantity ?? ""
-                        }
+                        value={localEdits[stock.ticker]?.quantity ?? stock.quantity ?? ""}
                         onFocus={() =>
                           setLocalEdits((prev) => ({
                             ...prev,
@@ -238,9 +244,7 @@ export default function Portfolio() {
                         }
                         onKeyDown={(e) => {
                           if (e.key === "Enter") {
-                            const val = parseFloat(
-                              localEdits[stock.ticker]?.quantity
-                            );
+                            const val = parseFloat(localEdits[stock.ticker]?.quantity);
                             if (!isNaN(val))
                               handleUpdateStock(stock.ticker, "quantity", val);
                             setLocalEdits((prev) => {
