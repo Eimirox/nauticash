@@ -51,7 +51,7 @@ def fetch_from_browser(ticker):
         "low": round(data.get("regularMarketDayLow", 0), 2),
         "volume": int(data.get("regularMarketVolume", 0)),
         "currency": data.get("currency", "USD"),
-        "country": "US"
+        "country": data.get("fullExchangeName") or data.get("exchangeName") or "Unknown"
     }
 
 def upsert_price(rec):
