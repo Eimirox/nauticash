@@ -174,12 +174,6 @@ export default function Portfolio() {
         >
           Ajouter
         </button>
-        <button
-          onClick={fetchPortfolio}
-          className="px-6 py-2 border border-[#1E3A8A] text-[#1E3A8A] rounded-lg hover:bg-[#1E3A8A] hover:text-white transition"
-        >
-          Actualiser
-        </button>
       </div>
 
       {/* Tableau des actions */}
