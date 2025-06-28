@@ -31,20 +31,23 @@ router.get("/portfolio", auth, async (req, res) => {
       { $addFields: { lastPrice: { $arrayElemAt: ["$lastPrice", 0] } } },
       {
         $project: {
-          _id:      0,
-          ticker:   "$portfolio.ticker",
-          quantity: "$portfolio.quantity",
-          pru:      "$portfolio.pru",
-          open:     "$lastPrice.open",
-          close:    "$lastPrice.close",
-          high:     "$lastPrice.high",
-          low:      "$lastPrice.low",
-          volume:   "$lastPrice.volume",
-          date:     "$lastPrice.date",
-          currency: { $ifNull: ["$lastPrice.currency", "USD"] },
-          country:  { $ifNull: ["$lastPrice.country",  "US"] }
+            _id:      0,
+            ticker:   "$portfolio.ticker",
+            quantity: "$portfolio.quantity",
+            pru:      "$portfolio.pru",
+            open:     "$lastPrice.open",
+            close:    "$lastPrice.close",
+            high:     "$lastPrice.high",
+            low:      "$lastPrice.low",
+            volume:   "$lastPrice.volume",
+            date:     "$lastPrice.date",
+            currency: { $ifNull: ["$lastPrice.currency", "USD"] },
+            country:  { $ifNull: ["$lastPrice.country",  "US"] },
+            // Ajout des deux champs :
+            sector:   { $ifNull: ["$lastPrice.sector",   "Unknown"] },
+            industry: { $ifNull: ["$lastPrice.industry",  "Unknown"] }
+          }
         }
-      }
     ]);
     res.json(portfolio);
   } catch (err) {

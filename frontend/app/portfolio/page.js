@@ -15,6 +15,7 @@ export default function Portfolio() {
   const [error, setError]         = useState(null);
   const [sortOrder, setSortOrder] = useState("none");
   const [localEdits, setLocalEdits] = useState({});
+  const [showTotals, setShowTotals] = useState(true);
 
   // 1) Chargement centralisé du portfolio enrichi
   const fetchPortfolio = async () => {
@@ -25,10 +26,7 @@ export default function Portfolio() {
       if (!token) throw new Error("Token manquant");
 
       const res = await fetch("http://localhost:5000/api/user/portfolio", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+        headers: { Authorization: `Bearer ${token}` }
       });
       if (!res.ok) throw new Error(`Status ${res.status}`);
 
@@ -82,8 +80,6 @@ export default function Portfolio() {
         body: JSON.stringify({ ticker: newTicker }),
       });
       if (!res.ok) throw new Error(`Status ${res.status}`);
-
-      // Reconstruire le portfolio enrichi
       await fetchPortfolio();
       setTicker("");
     } catch (err) {
@@ -91,11 +87,10 @@ export default function Portfolio() {
     }
   };
 
-  // 5) Supprimer une action localement et côté serveur
+  // 5) Supprimer une action
   const removeStock = async (tickerToRemove) => {
     const token = localStorage.getItem("token");
     if (!token) return router.push("/login");
-
     try {
       const res = await fetch("http://localhost:5000/api/user/portfolio", {
         method: "DELETE",
@@ -106,7 +101,6 @@ export default function Portfolio() {
         body: JSON.stringify({ ticker: tickerToRemove }),
       });
       if (!res.ok) throw new Error(`Status ${res.status}`);
-
       setStocks((prev) => prev.filter((s) => s.ticker !== tickerToRemove));
     } catch (err) {
       setError(err.message);
@@ -138,11 +132,19 @@ export default function Portfolio() {
     }
   };
 
-  // 7) Déconnexion
+  // Conseil de déconnexion
   const logout = () => {
     localStorage.removeItem("token");
     router.push("/login");
   };
+
+  // Regroupement des totaux par devise
+  const totalsByCurrency = stocks.reduce((acc, s) => {
+    if (typeof s.close === "number" && typeof s.quantity === "number") {
+      acc[s.currency] = (acc[s.currency] || 0) + s.close * s.quantity;
+    }
+    return acc;
+  }, {});
 
   return (
     <main className="flex flex-col min-h-screen bg-gray-100 p-10">
@@ -159,7 +161,7 @@ export default function Portfolio() {
 
       {error && <p className="text-red-500 text-center">{error}</p>}
 
-      {/* Barre d'ajout + actualisation */}
+      {/* Barre d'actions */}
       <div className="flex justify-center gap-4 mb-6">
         <input
           type="text"
@@ -174,12 +176,18 @@ export default function Portfolio() {
         >
           Ajouter
         </button>
-        +       <button
-         onClick={() => router.push("/analytics")}
-         className="px-6 py-2 border border-[#1E3A8A] text-[#1E3A8A] rounded-lg hover:bg-[#1E3A8A] hover:text-white transition"
-       >
-         Visualiser
-       </button>
+        <button
+          onClick={fetchPortfolio}
+          className="px-6 py-2 border border-[#1E3A8A] text-[#1E3A8A] rounded-lg hover:bg-[#1E3A8A] hover:text-white transition"
+        >
+          Actualiser
+        </button>
+        <button
+          onClick={() => router.push("/analytics")}
+          className="px-6 py-2 border border-[#1E3A8A] text-[#1E3A8A] rounded-lg hover:bg-[#1E3A8A] hover:text-white transition"
+        >
+          Visualiser
+        </button>
       </div>
 
       {/* Tableau des actions */}
@@ -206,7 +214,7 @@ export default function Portfolio() {
                   Chargement...
                 </td>
               </tr>
-            ) : stocks.length > 0 ? (
+            ) : stocks.length ? (
               stocks.map((stock) => {
                 const perf =
                   stock.pru > 0 ? ((stock.close - stock.pru) / stock.pru) * 100 : null;
@@ -226,7 +234,11 @@ export default function Portfolio() {
                     <td className="p-3 text-gray-600">
                       <input
                         type="number"
-                        value={localEdits[stock.ticker]?.quantity ?? stock.quantity ?? ""}
+                        value={
+                          localEdits[stock.ticker]?.quantity ??
+                          stock.quantity ??
+                          ""
+                        }
                         onFocus={() =>
                           setLocalEdits((prev) => ({
                             ...prev,
@@ -244,7 +256,9 @@ export default function Portfolio() {
                         }
                         onKeyDown={(e) => {
                           if (e.key === "Enter") {
-                            const val = parseFloat(localEdits[stock.ticker]?.quantity);
+                            const val = parseFloat(
+                              localEdits[stock.ticker]?.quantity
+                            );
                             if (!isNaN(val))
                               handleUpdateStock(stock.ticker, "quantity", val);
                             setLocalEdits((prev) => {
@@ -317,6 +331,27 @@ export default function Portfolio() {
             )}
           </tbody>
         </table>
+
+        {/* Totaux par devise – section déroulante */}
+        <div className="p-4">
+          <button
+            onClick={() => setShowTotals((prev) => !prev)}
+            className="flex justify-end items-center gap-1 text-[#1E3A8A] hover:text-[#3B82F6]"
+          >
+            <span>Totaux par devise</span>
+            <span>{showTotals ? "▲" : "▼"}</span>
+          </button>
+          {showTotals && (
+            <div className="mt-2 text-right font-semibold space-y-1">
+              {Object.entries(totalsByCurrency).map(([cur, tot]) => (
+                <div key={cur}>
+                  {formatCurrencySymbol(cur)}
+                  {tot.toFixed(2)}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </main>
   );

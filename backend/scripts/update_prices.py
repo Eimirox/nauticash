@@ -20,13 +20,13 @@ client = pymongo.MongoClient(MONGO_URI)
 db = client["walletDB"]
 collection = db["prices"]
 
-# 3. Tickeurs passés en argument
+# 3. Tickers passés en argument
 tickers = sys.argv[1:]
 if not tickers:
     print("Usage: python update_prices.py TICKER1 [TICKER2 …]")
     sys.exit(1)
 
-# 4. Configurer Selenium headless
+# 4. Config Selenium headless
 options = Options()
 options.add_argument("--headless")
 options.add_argument("--disable-gpu")
@@ -45,7 +45,7 @@ try:
     btn.click()
     time.sleep(1)
 except:
-    pass  # si pas de bannière, continuer
+    pass  # si pas de bannière, on continue
 
 def fetch_from_browser(ticker):
     rec = {
@@ -89,12 +89,10 @@ def fetch_from_browser(ticker):
         profile = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, 'section[data-testid="asset-profile"]'))
         )
-        # secteur
         sec_el = profile.find_element(
             By.XPATH,
             './/dt[contains(normalize-space(.),"Sector")]/following-sibling::dd//a'
         )
-        # industrie
         ind_el = profile.find_element(
             By.XPATH,
             './/dt[contains(normalize-space(.),"Industry")]/following-sibling::a'
@@ -107,8 +105,9 @@ def fetch_from_browser(ticker):
     return rec
 
 def upsert_price(rec):
+    # --- on ne matche plus que sur "symbol" pour écraser l'ancien document ---
     collection.update_one(
-        {"symbol": rec["symbol"], "date": rec["date"]},
+        {"symbol": rec["symbol"]},
         {"$set": rec},
         upsert=True
     )
