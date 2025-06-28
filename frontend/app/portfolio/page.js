@@ -214,6 +214,8 @@ export default function Portfolio() {
               <th className="p-3">Quantité</th>
               <th className="p-3">PRU</th>
               <th className="p-3">Performance</th>
+              <th className="p-3">Dividende</th>
+              <th className="p-3">Rendement</th>
               <th className="p-3">Total</th>
               <th className="p-3">Actions</th>
             </tr>
@@ -318,6 +320,12 @@ export default function Portfolio() {
                     </td>
                     <td className={`p-3 ${getPerformanceClass(perf)}`}>
                       {perf != null ? perf.toFixed(2) + " %" : "--"}
+                    </td>
+                    <td className="p-3 text-gray-600">
+                      {stock.dividend != null ? stock.dividend.toFixed(2) + " " + formatCurrencySymbol(stock.currency) : "--"}
+                    </td>
+                    <td className="p-3 text-gray-600">
+                        {stock.myDividendYield != null ? stock.myDividendYield.toFixed(2) + " %" : "--"}
                     </td>
                     <td className="p-3 text-gray-600">
                       {total != null ? total.toFixed(2) : "--"}

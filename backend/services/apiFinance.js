@@ -4,7 +4,7 @@ const yf = require("yahoo-finance2").default;
 async function getQuote(ticker) {
   try {
     const data = await yf.quoteSummary(ticker, {
-      modules: [ "price", "summaryProfile", "summaryDetail" ]
+      modules: [ "price", "summaryProfile", "summaryDetail", "defaultKeyStatistics" ]
     });
 
     return {
@@ -15,10 +15,12 @@ async function getQuote(ticker) {
       volume: data.price.regularMarketVolume,
       currency: data.price.currency,
       exchange: data.price.exchangeName,
-      sector: data.summaryProfile?.sector ?? (data.price.quoteType === "CRYPTOCURRENCY" ? "Crypto" : "Unknown"),
-      industry: data.summaryProfile?.industry ?? (data.price.quoteType === "CRYPTOCURRENCY" ? "Crypto" : "Unknown"),
+      sector: data.summaryProfile?.sector ?? "Unknown",
+      industry: data.summaryProfile?.industry ?? "Unknown",
       quoteType: data.price.quoteType,
       longName: data.price.longName,
+      dividendRate: data.summaryDetail?.dividendRate ?? null,  // montant annuel par action
+      dividendYield: data.summaryDetail?.dividendYield ?? null, // % annualisé
     };
   } catch (err) {
     console.error("Erreur getQuote pour", ticker, ":", err.message);

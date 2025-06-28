@@ -37,6 +37,11 @@ router.get("/portfolio", auth, async (req, res) => {
           industry: data.industry || "Unknown",
           performance,
           total,
+          dividend: data.dividendRate ?? null,
+          dividendYield: data.dividendYield ?? null,
+          myDividendYield: stock.pru > 0 && data.dividendRate
+            ? (data.dividendRate / stock.pru) * 100
+            : null,
         };
       })
     );
