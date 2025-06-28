@@ -208,6 +208,7 @@ export default function Portfolio() {
             <tr>
               <th className="p-3">Ticker</th>
               <th className="p-3">Pays</th>
+              <th className="p-3">Type</th>
               <th className="p-3 cursor-pointer" onClick={handleSortByPrice}>
                 Prix Actuel {sortOrder === "asc" ? "↑" : sortOrder === "desc" ? "↓" : ""}
               </th>
@@ -240,6 +241,9 @@ export default function Portfolio() {
                     <td className="p-3 font-semibold">{stock.ticker}</td>
                     <td className="p-3 text-gray-600">
                       {exchangeToCountry[stock.country] || stock.country}
+                    </td>
+                    <td className="p-3 text-gray-600">
+                      {stock.type || "?"}
                     </td>
                     <td className="p-3 text-gray-600">
                       {stock.close} {formatCurrencySymbol(stock.currency)}
@@ -343,7 +347,7 @@ export default function Portfolio() {
               })
             ) : (
               <tr>
-                <td colSpan="8" className="p-10 text-center text-gray-500 text-xl">
+                <td colSpan="11" className="p-10 text-center text-gray-500 text-xl">
                   Aucune action ajoutée
                 </td>
               </tr>

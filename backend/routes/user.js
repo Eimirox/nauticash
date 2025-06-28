@@ -33,8 +33,8 @@ router.get("/portfolio", auth, async (req, res) => {
           date: new Date().toISOString().split("T")[0],
           currency: data.currency || "USD",
           country: data.exchange || "US",
-          sector: data.sector || "Unknown",
-          industry: data.industry || "Unknown",
+          sector: data.quoteType === "CRYPTOCURRENCY" ? "Crypto" : data.sector || "Unknown",
+          industry: data.quoteType === "CRYPTOCURRENCY" ? "Crypto" : data.industry || "Unknown",
           performance,
           total,
           dividend: data.dividendRate ?? null,
@@ -42,6 +42,7 @@ router.get("/portfolio", auth, async (req, res) => {
           myDividendYield: stock.pru > 0 && data.dividendRate
             ? (data.dividendRate / stock.pru) * 100
             : null,
+          type: data.quoteType || "UNKNOWN",
         };
       })
     );
