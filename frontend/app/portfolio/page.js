@@ -63,29 +63,40 @@ export default function Portfolio() {
 
   // 4) Ajouter une action → on recharge tout le portfolio
   const addStock = async () => {
-    if (!ticker.trim()) return;
-    const newTicker = ticker.toUpperCase();
-    if (stocks.some((s) => s.ticker === newTicker)) return;
+  if (!ticker.trim()) return;
+  const newTicker = ticker.toUpperCase();
+  console.log("Tentative d'ajout de :", newTicker); // ← AJOUT ICI
 
-    const token = localStorage.getItem("token");
-    if (!token) return router.push("/login");
+  if (stocks.some((s) => s.ticker === newTicker)) {
+    console.log("Ticker déjà présent :", newTicker);
+    return;
+  }
 
-    try {
-      const res = await fetch("http://localhost:5000/api/user/portfolio", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ ticker: newTicker }),
-      });
-      if (!res.ok) throw new Error(`Status ${res.status}`);
-      await fetchPortfolio();
-      setTicker("");
-    } catch (err) {
-      setError(err.message);
-    }
-  };
+  const token = localStorage.getItem("token");
+  if (!token) return router.push("/login");
+
+  try {
+    const res = await fetch("http://localhost:5000/api/user/portfolio", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ ticker: newTicker }),
+    });
+
+    const data = await res.json();
+    console.log("Réponse POST /portfolio :", data); // ← AJOUT ICI
+
+    if (!res.ok) throw new Error(`Status ${res.status}`);
+
+    await fetchPortfolio();
+    setTicker("");
+  } catch (err) {
+    console.error("Erreur addStock :", err.message);
+    setError(err.message);
+  }
+};
 
   // 5) Supprimer une action
   const removeStock = async (tickerToRemove) => {

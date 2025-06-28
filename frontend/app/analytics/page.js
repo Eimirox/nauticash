@@ -31,28 +31,38 @@ export default function Analytics() {
     fetchPortfolio();
   }, []);
 
-  // Calcul des totaux
+  // Totaux par devise
   const totalsPerCurrency = stocks.reduce((acc, s) => {
     const val = (s.close || 0) * (s.quantity || 0);
     acc[s.currency] = (acc[s.currency] || 0) + val;
     return acc;
   }, {});
+
+  // Totaux par secteur (tenu compte d'une éventuelle composition ETF)
   const totalsPerSector = stocks.reduce((acc, s) => {
     const val = (s.close || 0) * (s.quantity || 0);
-    const sec = s.sector || "Unknown";
-    acc[sec] = (acc[sec] || 0) + val;
+    if (s.composition && typeof s.composition === "object") {
+      // répartir selon la composition { secteur: %, ... }
+      Object.entries(s.composition).forEach(([sect, pct]) => {
+        acc[sect] = (acc[sect] || 0) + (val * pct) / 100;
+      });
+    } else {
+      // action classique
+      const sect = s.sector || "Unknown";
+      acc[sect] = (acc[sect] || 0) + val;
+    }
     return acc;
   }, {});
 
-  // Configuration couleurs
+  // Couleurs
   const currencyColorMap = { USD: "#10B981", EUR: "#3B82F6" };
   const category10 = [
-    "#1F77B4","#FF7F0E","#2CA02C","#D62728",
-    "#9467BD","#8C564B","#E377C2","#7F7F7F",
-    "#BCBD22","#17BECF"
+    "#1F77B4", "#FF7F0E", "#2CA02C", "#D62728",
+    "#9467BD", "#8C564B", "#E377C2", "#7F7F7F",
+    "#BCBD22", "#17BECF"
   ];
 
-  // Données Pie
+  // Données Pie Devise
   const curLabels = Object.keys(totalsPerCurrency);
   const curData   = Object.values(totalsPerCurrency);
   const pieDevise = {
@@ -60,9 +70,10 @@ export default function Analytics() {
     datasets: [{
       data: curData,
       backgroundColor: curLabels.map(c => currencyColorMap[c] || "#9CA3AF"),
-    }]
+    }],
   };
 
+  // Données Pie Secteur
   const secLabels = Object.keys(totalsPerSector);
   const secData   = Object.values(totalsPerSector);
   const pieSecteur = {
@@ -70,15 +81,16 @@ export default function Analytics() {
     datasets: [{
       data: secData,
       backgroundColor: secLabels.map((_, i) => category10[i % category10.length]),
-    }]
+    }],
   };
 
-  // Formatter nombre
+  // Formatage des nombres
   const numberFormatter = new Intl.NumberFormat(undefined, {
-    minimumFractionDigits: 2, maximumFractionDigits: 2
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   });
 
-  // Options communes
+  // Options communes aux graphiques
   const pieOptions = {
     maintainAspectRatio: false,
     plugins: {
@@ -132,7 +144,7 @@ export default function Analytics() {
       {activeTab === "vue" && (
         <section>
           <div className="mb-8">
-            <h2 className="text-2xl font-semibold mb-4">Information générale</h2>
+            <h2 className="text-2xl font-semibold mb-4">Informations générales</h2>
             {loading ? (
               <p>Chargement…</p>
             ) : (

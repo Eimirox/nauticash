@@ -1,131 +1,105 @@
-// backend/routes/user.js
-
 const express   = require("express");
 const auth      = require("../middleware/auth");
 const User      = require("../models/user");
 const mongoose  = require("mongoose");
-const { spawn } = require("child_process");
-const path      = require("path");
+const { getQuote, getETFComposition } = require("../services/apiFinance");
 
 const router = express.Router();
+const Prices = mongoose.connection.collection("prices");
 
 // --- GET /portfolio (inchangé) ---
 router.get("/portfolio", auth, async (req, res) => {
   try {
-    const userId = new mongoose.Types.ObjectId(req.user.userId);
-    const portfolio = await User.aggregate([
-      { $match: { _id: userId } },
-      { $unwind: "$portfolio" },
-      {
-        $lookup: {
-          from: "prices",
-          let: { tick: "$portfolio.ticker" },
-          pipeline: [
-            { $match: { $expr: { $eq: ["$symbol", "$$tick"] } } },
-            { $sort: { date: -1 } },
-            { $limit: 1 }
-          ],
-          as: "lastPrice"
-        }
-      },
-      { $addFields: { lastPrice: { $arrayElemAt: ["$lastPrice", 0] } } },
-      {
-        $project: {
-            _id:      0,
-            ticker:   "$portfolio.ticker",
-            quantity: "$portfolio.quantity",
-            pru:      "$portfolio.pru",
-            open:     "$lastPrice.open",
-            close:    "$lastPrice.close",
-            high:     "$lastPrice.high",
-            low:      "$lastPrice.low",
-            volume:   "$lastPrice.volume",
-            date:     "$lastPrice.date",
-            currency: { $ifNull: ["$lastPrice.currency", "USD"] },
-            country:  { $ifNull: ["$lastPrice.country",  "US"] },
-            // Ajout des deux champs :
-            sector:   { $ifNull: ["$lastPrice.sector",   "Unknown"] },
-            industry: { $ifNull: ["$lastPrice.industry",  "Unknown"] }
-          }
-        }
-    ]);
-    res.json(portfolio);
+    const user = await User.findById(req.user.userId);
+    if (!user || !user.portfolio.length) return res.json([]);
+
+    const enriched = await Promise.all(
+      user.portfolio.map(async (stock) => {
+        const data = await getQuote(stock.ticker);
+        if (!data) return null;
+
+        const performance = ((data.price - stock.pru) / stock.pru) * 100;
+        const total = data.price * stock.quantity;
+
+        return {
+          ticker: stock.ticker,
+          quantity: stock.quantity,
+          pru: stock.pru,
+          close: data.price,
+          open: data.open || null,
+          high: data.high || null,
+          low: data.low || null,
+          volume: data.volume || null,
+          date: new Date().toISOString().split("T")[0],
+          currency: data.currency || "USD",
+          country: data.exchange || "US",
+          sector: data.sector || "Unknown",
+          industry: data.industry || "Unknown",
+          performance,
+          total,
+        };
+      })
+    );
+
+    res.json(enriched.filter(Boolean));
   } catch (err) {
-    console.error("Erreur GET /portfolio :", err);
+    console.error("Erreur GET /portfolio (Yahoo) :", err);
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
 
-// --- POST /portfolio : ajoute ET conditionnellement update_prices.py ---
+// --- POST /portfolio : version avec détection ETF ---
 router.post("/portfolio", auth, async (req, res) => {
   try {
     const { ticker, quantity = 0, pru = 0 } = req.body;
     const user = await User.findById(req.user.userId);
 
-    // 1) on ajoute si absent
-    if (!user.portfolio.find(item => item.ticker === ticker)) {
+    // 1) Ajouter au portefeuille si pas déjà présent
+    const alreadyExists = user.portfolio.find(item => item.ticker === ticker);
+    if (!alreadyExists) {
       user.portfolio.push({ ticker, quantity, pru });
       await user.save();
     }
 
-    // 2) on vérifie dans prices si on a déjà aujourd'hui
+    // 2) Vérifie si on a déjà ce ticker pour aujourd’hui
+    const today = new Date().toISOString().slice(0, 10);
     const Prices = mongoose.connection.collection("prices");
-    const today   = new Date().toISOString().slice(0,10);
-    const exists  = await Prices.findOne({ symbol: ticker, date: today });
+    const exists = await Prices.findOne({ symbol: ticker, date: today });
 
     if (!exists) {
-      // 3) on lance le Python pour ce ticker
-      const script = path.join(__dirname, "../scripts/update_prices.py");
-      await new Promise((resolve, reject) => {
-        const py = spawn("python", [ script, ticker ], { stdio: "inherit" });
-        py.on("close", code => code === 0
-          ? resolve()
-          : reject(new Error(`update_prices.py exited with code ${code}`))
-        );
-      });
+      // 3) Récupération des données
+      const data = await getQuote(ticker);
+      if (!data) return res.status(400).json({ error: "Ticker invalide ou non trouvé." });
+
+      const isETF = data.quoteType === "ETF" || (data.longName && data.longName.toLowerCase().includes("etf"));
+
+      let composition = null;
+      if (isETF) {
+        composition = await getETFComposition(ticker); // <--- nouvelle étape
+      }
+
+      const doc = {
+        symbol: ticker,
+        date: today,
+        close: data.price,
+        open: data.open,
+        high: data.high,
+        low: data.low,
+        volume: data.volume,
+        currency: data.currency,
+        country: data.exchange,
+        sector: data.sector ?? "Unknown",
+        industry: data.industry ?? "Unknown",
+        composition,
+      };
+
+      await Prices.insertOne(doc);
     }
 
-    // 4) on renvoie le portfolio à jour (agrégé) en réutilisant la même pipeline que GET
-    const userId   = new mongoose.Types.ObjectId(req.user.userId);
-    const portfolio = await User.aggregate([
-      { $match: { _id: userId } },
-      { $unwind: "$portfolio" },
-      {
-        $lookup: {
-          from: "prices",
-          let: { tick: "$portfolio.ticker" },
-          pipeline: [
-            { $match: { $expr: { $eq: ["$symbol", "$$tick"] } } },
-            { $sort: { date: -1 } },
-            { $limit: 1 }
-          ],
-          as: "lastPrice"
-        }
-      },
-      { $addFields: { lastPrice: { $arrayElemAt: ["$lastPrice", 0] } } },
-      {
-        $project: {
-          _id:      0,
-          ticker:   "$portfolio.ticker",
-          quantity: "$portfolio.quantity",
-          pru:      "$portfolio.pru",
-          open:     "$lastPrice.open",
-          close:    "$lastPrice.close",
-          high:     "$lastPrice.high",
-          low:      "$lastPrice.low",
-          volume:   "$lastPrice.volume",
-          date:     "$lastPrice.date",
-          currency: { $ifNull: ["$lastPrice.currency", "USD"] },
-          country:  { $ifNull: ["$lastPrice.country",  "US"] }
-        }
-      }
-    ]);
-
-    res.json(portfolio);
-
-  } catch (error) {
-    console.error("Erreur POST /portfolio :", error);
-    res.status(500).json({ error: error.message });
+    res.status(201).json({ message: "Ajout réussi" });
+  } catch (err) {
+    console.error("Erreur POST /portfolio :", err.message);
+    res.status(500).json({ error: "Erreur serveur" });
   }
 });
 
