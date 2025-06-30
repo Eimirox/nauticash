@@ -347,7 +347,7 @@ export default function Portfolio() {
               })
             ) : (
               <tr>
-                <td colSpan="11" className="p-10 text-center text-gray-500 text-xl">
+                <td colSpan="8" className="p-10 text-center text-gray-500 text-xl">
                   Aucune action ajoutée
                 </td>
               </tr>

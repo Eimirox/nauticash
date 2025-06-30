@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Pie } from "react-chartjs-2";
 import Chart from "chart.js/auto";
 import { formatCurrencySymbol } from "../portfolio/utils/formats";
+import PortfolioHistoryChart from "./PortfolioHistoryChart";
 
 export default function Analytics() {
   const router = useRouter();
@@ -171,6 +172,11 @@ export default function Analytics() {
               <h3 className="text-xl mb-2">Répartition Sectorielle</h3>
               <Pie data={pieSecteur} options={pieOptions} height={400} />
             </div>
+          </div>
+
+          <div className="mt-10 bg-white p-4 rounded shadow-md">
+            <h3 className="text-xl mb-4">Évolution de la Valeur du Portefeuille</h3>
+            <PortfolioHistoryChart />
           </div>
         </section>
       )}
