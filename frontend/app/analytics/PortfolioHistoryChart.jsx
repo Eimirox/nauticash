@@ -17,7 +17,6 @@ export default function PortfolioHistoryChart() {
   const [startYear, setStartYear] = useState("");
   const [endYear, setEndYear] = useState("");
 
-  // Chargement des dates sauvegardées
   useEffect(() => {
     const savedStart = localStorage.getItem("historyStartYear");
     const savedEnd = localStorage.getItem("historyEndYear");
@@ -25,7 +24,6 @@ export default function PortfolioHistoryChart() {
     if (savedEnd) setEndYear(savedEnd);
   }, []);
 
-  // Chargement depuis la base de données
   useEffect(() => {
     const fetchHistory = async () => {
       const token = localStorage.getItem("token");
@@ -38,7 +36,6 @@ export default function PortfolioHistoryChart() {
     fetchHistory();
   }, []);
 
-  // Soumission du formulaire
   const handleSubmit = async (e) => {
     e.preventDefault();
     const token = localStorage.getItem("token");
@@ -65,7 +62,6 @@ export default function PortfolioHistoryChart() {
     }
   };
 
-  // Filtrage selon la plage
   const filtered = history.filter(({ year }) => {
     const y = parseInt(year);
     const min = parseInt(startYear) || 0;
@@ -73,7 +69,6 @@ export default function PortfolioHistoryChart() {
     return y >= min && y <= max;
   });
 
-  // Regrouper par année + mois
   const transformed = filtered.map((item) => ({
     date: `${item.year}-${item.month}`,
     value: item.value,
@@ -85,7 +80,7 @@ export default function PortfolioHistoryChart() {
     <div className="p-4 bg-white rounded shadow-md mt-8">
       <h2 className="text-xl font-bold mb-4 text-blue-800">Historique du Portefeuille</h2>
 
-      {/* Formulaire de filtre */}
+      {/* Filtre de plage */}
       <div className="flex gap-4 mb-4 items-end">
         <div>
           <label className="block text-sm">Année de début</label>
@@ -146,21 +141,38 @@ export default function PortfolioHistoryChart() {
         </button>
       </form>
 
-      {transformed.length === 0 ? (
+      {/* Graphique */}
+      {sortedData.length === 0 ? (
         <p className="text-gray-500 italic">Aucune donnée sur la période sélectionnée.</p>
       ) : (
-        <ResponsiveContainer width="100%" height={300}>
+        <ResponsiveContainer width="100%" height={320}>
           <LineChart data={sortedData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="date" />
-            <YAxis />
-            <Tooltip />
+            <CartesianGrid strokeDasharray="3 3" stroke="#D1D5DB" />
+            <XAxis
+              dataKey="date"
+              tickFormatter={(value) => {
+                const [year, month] = value.split("-");
+                return new Date(`${value}-01`).toLocaleString("default", {
+                  month: "short",
+                  year: "2-digit",
+                });
+              }}
+              interval={0}
+              angle={-40}
+              textAnchor="end"
+            />
+            <YAxis
+              tickFormatter={(v) => v.toLocaleString("fr-FR")}
+              domain={['dataMin - 1000', 'dataMax + 1000']}
+            />
+            <Tooltip formatter={(val) => `${val.toLocaleString("fr-FR")} €`} />
             <Line
               type="monotone"
               dataKey="value"
               stroke="#1E3A8A"
               strokeWidth={2}
-              dot={{ r: 3 }}
+              dot={{ r: 4, strokeWidth: 2, stroke: "#1E3A8A", fill: "white" }}
+              activeDot={{ r: 6 }}
             />
           </LineChart>
         </ResponsiveContainer>
