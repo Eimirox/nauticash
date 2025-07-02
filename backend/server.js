@@ -3,8 +3,6 @@ const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
 const historyRoutes = require("./routes/history");
-
-
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -24,7 +22,7 @@ app.use("/api/user", historyRoutes);
 app.use("/api/transactions", require("./routes/transactions"));
 app.use("/api/quotes", require("./api/quote")); // Route des API annexes
 app.use("/api/stocks", require("./routes/stocks")); // Route de mon API
-
+app.use("/api", require("./routes/updatePrices")); // Route Update Price avec API
 
 // Route de test
 app.get("/", (req, res) => {

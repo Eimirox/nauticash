@@ -39,6 +39,23 @@ export default function Portfolio() {
     }
   };
 
+  // 🆕 Fonction pour déclencher la mise à jour des prix
+  const handleUpdatePrices = async () => {
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch("http://localhost:5000/api/update-prices", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Échec de la mise à jour des prix");
+      await fetchPortfolio(); // recharge le portefeuille avec les prix à jour
+      alert("✅ Mise à jour effectuée !");
+    } catch (err) {
+      console.error("Erreur lors de la mise à jour :", err.message);
+      alert("❌ Échec de la mise à jour");
+    }
+  };
+
   // 2) Au montage, on s’assure que l’utilisateur est loggué puis on charge
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -188,7 +205,7 @@ export default function Portfolio() {
           Ajouter
         </button>
         <button
-          onClick={fetchPortfolio}
+          onClick={handleUpdatePrices}
           className="px-6 py-2 border border-[#1E3A8A] text-[#1E3A8A] rounded-lg hover:bg-[#1E3A8A] hover:text-white transition"
         >
           Actualiser
