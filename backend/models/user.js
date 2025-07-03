@@ -10,7 +10,11 @@ const UserSchema = new mongoose.Schema({
       quantity: { type: Number, default: 0 },
       pru: { type: Number, default: 0 }
     }
-  ]
+  ],
+  cash: {
+    amount: { type: Number, default: 0 },
+    currency: { type: String, default: "EUR" }
+  }
 
 }, { timestamps: true });
 

@@ -47,7 +47,15 @@ router.get("/portfolio", auth, async (req, res) => {
       })
     );
 
-    res.json(enriched.filter(Boolean));
+const response = {
+  stocks: enriched.filter(Boolean),
+  cash: {
+    amount: user.cashAmount ?? 0,
+    currency: user.cashCurrency ?? "EUR",
+  },
+};
+res.json(response);
+
   } catch (err) {
     console.error("Erreur GET /portfolio (Yahoo) :", err);
     res.status(500).json({ error: "Erreur serveur" });
@@ -143,6 +151,29 @@ router.patch("/portfolio", auth, async (req, res) => {
   } catch (error) {
     console.error("Erreur PATCH /portfolio :", error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// PATCH /cash : mise à jour du montant ou de la devise du cash
+router.patch("/cash", auth, async (req, res) => {
+  try {
+    const { amount, currency } = req.body;
+
+    if (typeof amount !== "number" || !["EUR", "USD"].includes(currency)) {
+      return res.status(400).json({ error: "Paramètres invalides" });
+    }
+
+    const user = await User.findById(req.user.userId);
+    if (!user) return res.status(404).json({ error: "Utilisateur non trouvé" });
+
+    user.cashAmount = amount;
+    user.cashCurrency = currency;
+    await user.save();
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Erreur PATCH /cash :", err);
+    res.status(500).json({ error: "Erreur serveur" });
   }
 });
 

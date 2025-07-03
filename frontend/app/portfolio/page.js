@@ -16,6 +16,27 @@ export default function Portfolio() {
   const [sortOrder, setSortOrder] = useState("none");
   const [localEdits, setLocalEdits] = useState({});
   const [showTotals, setShowTotals] = useState(true);
+  const [cash, setCash] = useState({ amount: 0, currency: "EUR" });
+
+// Charger cash depuis localStorage au démarrage
+  useEffect(() => {
+    const saved = localStorage.getItem("cashData");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.amount === "number" && typeof parsed.currency === "string") {
+          setCash(parsed);
+        }
+      } catch (err) {
+        console.error("Erreur de parsing cash :", err);
+      }
+    }
+  }, []);
+
+// Sauvegarder le cash à chaque changement
+  useEffect(() => {
+    localStorage.setItem("cashData", JSON.stringify(cash));
+  }, [cash]);
 
   // 1) Chargement centralisé du portfolio enrichi
   const fetchPortfolio = async () => {
@@ -31,7 +52,8 @@ export default function Portfolio() {
       if (!res.ok) throw new Error(`Status ${res.status}`);
 
       const data = await res.json();
-      setStocks(data);
+      setStocks(data.stocks || []);
+      setCash(data.cash || { amount: 0, currency: "EUR" })
     } catch (err) {
       setError(err.message);
     } finally {
@@ -160,6 +182,26 @@ export default function Portfolio() {
     }
   };
 
+  // ✅ Correction du PATCH vers /api/user/cash
+  const syncCashUpdate = async (amount, currency) => {
+    const token = localStorage.getItem("token");
+    if (!token) return router.push("/login");
+
+    try {
+      const res = await fetch("http://localhost:5000/api/user/cash", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ amount, currency }),
+      });
+      if (!res.ok) throw new Error(`Erreur backend cash: ${res.status}`);
+    } catch (err) {
+      console.error("Erreur syncCashUpdate :", err.message);
+    }
+  };
+
   // Conseil de déconnexion
   const logout = () => {
     localStorage.removeItem("token");
@@ -173,6 +215,12 @@ export default function Portfolio() {
     }
     return acc;
   }, {});
+
+// Intégrer le cash ou la dette dans le total par devise
+  if (cash.currency && !isNaN(cash.amount)) {
+    totalsByCurrency[cash.currency] =
+      (totalsByCurrency[cash.currency] || 0) + cash.amount;
+  }
 
   return (
     <main className="flex flex-col min-h-screen bg-gray-100 p-10">
@@ -217,6 +265,48 @@ export default function Portfolio() {
           Visualiser
         </button>
       </div>
+
+    {/* Ligne spéciale pour le cash - visible au-dessus du tableau */}
+    <div className="border border-blue-200 bg-blue-50 p-4 rounded-lg mb-6">
+      <h3 className="text-lg font-bold text-blue-800 mb-3">💼 Cash disponible</h3>
+      <div className="flex gap-4 items-center">
+        <label className="text-sm">
+          Montant :
+          <input
+            type="number"
+            value={cash.amount}
+            onChange={(e) => {
+              const newVal = parseFloat(e.target.value) || 0;
+              const cur = cash.currency;
+              setCash((prev) => ({ ...prev, amount: newVal }));
+              syncCashUpdate(newVal, cur);
+            }}
+            className="ml-2 w-32 border rounded px-2 py-1"
+          />
+        </label>
+        <label className="text-sm">
+        Devise :
+        <select
+          value={cash.currency}
+          onChange={(e) => {
+            const newCurrency = e.target.value;
+            const amt = cash.amount;
+            setCash((prev) => ({ ...prev, currency: newCurrency }));
+            syncCashUpdate(amt, newCurrency);
+          }}
+          className="ml-2 w-24 border rounded px-2 py-1"
+        >
+          <option value="EUR">EUR</option>
+          <option value="USD">USD</option>
+        </select>
+      </label>
+        <span className="text-sm text-gray-600 italic">
+          {cash.amount < 0
+            ? "💸 Dette soustraite du total"
+            : "💰 Ajouté au total"}
+        </span>
+      </div>
+    </div>
 
       {/* Tableau des actions */}
       <div className="bg-white shadow-md rounded-lg overflow-hidden">

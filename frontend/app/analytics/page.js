@@ -13,6 +13,23 @@ export default function Analytics() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("vue");
 
+// Ajouter cash depuis localStorage
+const [cash, setCash] = useState({ amount: 0, currency: "EUR" });
+
+  useEffect(() => {
+    const saved = localStorage.getItem("cashData");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.amount === "number" && typeof parsed.currency === "string") {
+          setCash(parsed);
+        }
+      } catch (err) {
+        console.error("Erreur parsing cash:", err);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     const fetchPortfolio = async () => {
       setLoading(true);
@@ -22,7 +39,9 @@ export default function Analytics() {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) throw new Error(`Status ${res.status}`);
-        setStocks(await res.json());
+        const data = await res.json();
+        setStocks(data.stocks || []);
+        setCash(data.cash || { amount: 0, currency: "EUR" });
       } catch (err) {
         console.error(err);
       } finally {
@@ -47,6 +66,11 @@ export default function Analytics() {
       Object.entries(s.composition).forEach(([sect, pct]) => {
         acc[sect] = (acc[sect] || 0) + (val * pct) / 100;
       });
+    // Ajouter le cash dans un secteur dédié
+    if (!isNaN(cashAmount) && cashCurrency) {
+      const secteurCash = cashAmount < 0 ? "Dette" : "Cash";
+      totalsPerSector[secteurCash] = (totalsPerSector[secteurCash] || 0) + Math.abs(cashAmount);
+    }
     } else {
       // action classique
       const sect = s.sector || "Unknown";
