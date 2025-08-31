@@ -10,25 +10,9 @@ import PortfolioHistoryChart from "./PortfolioHistoryChart";
 export default function Analytics() {
   const router = useRouter();
   const [stocks, setStocks] = useState([]);
+  const [cash, setCash] = useState({ amount: 0, currency: "EUR" });
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("vue");
-
-// Ajouter cash depuis localStorage
-const [cash, setCash] = useState({ amount: 0, currency: "EUR" });
-
-  useEffect(() => {
-    const saved = localStorage.getItem("cashData");
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (typeof parsed.amount === "number" && typeof parsed.currency === "string") {
-          setCash(parsed);
-        }
-      } catch (err) {
-        console.error("Erreur parsing cash:", err);
-      }
-    }
-  }, []);
 
   useEffect(() => {
     const fetchPortfolio = async () => {
@@ -40,6 +24,7 @@ const [cash, setCash] = useState({ amount: 0, currency: "EUR" });
         });
         if (!res.ok) throw new Error(`Status ${res.status}`);
         const data = await res.json();
+        // L’API renvoie { stocks: [...], cash: { amount, currency } }
         setStocks(data.stocks || []);
         setCash(data.cash || { amount: 0, currency: "EUR" });
       } catch (err) {
@@ -51,35 +36,43 @@ const [cash, setCash] = useState({ amount: 0, currency: "EUR" });
     fetchPortfolio();
   }, []);
 
-  // Totaux par devise
+  // ---------- Totaux par devise (incluant le cash) ----------
   const totalsPerCurrency = stocks.reduce((acc, s) => {
     const val = (s.close || 0) * (s.quantity || 0);
+    if (!s.currency) return acc;
     acc[s.currency] = (acc[s.currency] || 0) + val;
     return acc;
   }, {});
 
-  // Totaux par secteur (tenu compte d'une éventuelle composition ETF)
+  if (cash?.currency && !isNaN(cash.amount)) {
+    totalsPerCurrency[cash.currency] =
+      (totalsPerCurrency[cash.currency] || 0) + cash.amount;
+  }
+
+  // ---------- Totaux par secteur (incluant un secteur Cash / Dette) ----------
   const totalsPerSector = stocks.reduce((acc, s) => {
     const val = (s.close || 0) * (s.quantity || 0);
+
     if (s.composition && typeof s.composition === "object") {
-      // répartir selon la composition { secteur: %, ... }
+      // ETF avec composition { secteur: %, ... }
       Object.entries(s.composition).forEach(([sect, pct]) => {
         acc[sect] = (acc[sect] || 0) + (val * pct) / 100;
       });
-    // Ajouter le cash dans un secteur dédié
-    if (!isNaN(cashAmount) && cashCurrency) {
-      const secteurCash = cashAmount < 0 ? "Dette" : "Cash";
-      totalsPerSector[secteurCash] = (totalsPerSector[secteurCash] || 0) + Math.abs(cashAmount);
-    }
     } else {
-      // action classique
       const sect = s.sector || "Unknown";
       acc[sect] = (acc[sect] || 0) + val;
     }
     return acc;
   }, {});
 
-  // Couleurs
+  // Ajout du cash comme secteur dédié
+  if (!isNaN(cash?.amount) && cash?.currency) {
+    const sectorName = cash.amount < 0 ? "Dette" : "Cash";
+    totalsPerSector[sectorName] =
+      (totalsPerSector[sectorName] || 0) + Math.abs(cash.amount);
+  }
+
+  // ---------- Couleurs ----------
   const currencyColorMap = { USD: "#10B981", EUR: "#3B82F6" };
   const category10 = [
     "#1F77B4", "#FF7F0E", "#2CA02C", "#D62728",
@@ -87,7 +80,7 @@ const [cash, setCash] = useState({ amount: 0, currency: "EUR" });
     "#BCBD22", "#17BECF"
   ];
 
-  // Données Pie Devise
+  // ---------- Données Pie Devise ----------
   const curLabels = Object.keys(totalsPerCurrency);
   const curData   = Object.values(totalsPerCurrency);
   const pieDevise = {
@@ -98,7 +91,7 @@ const [cash, setCash] = useState({ amount: 0, currency: "EUR" });
     }],
   };
 
-  // Données Pie Secteur
+  // ---------- Données Pie Secteur ----------
   const secLabels = Object.keys(totalsPerSector);
   const secData   = Object.values(totalsPerSector);
   const pieSecteur = {
@@ -109,13 +102,12 @@ const [cash, setCash] = useState({ amount: 0, currency: "EUR" });
     }],
   };
 
-  // Formatage des nombres
+  // ---------- Formatages ----------
   const numberFormatter = new Intl.NumberFormat(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
 
-  // Options communes aux graphiques
   const pieOptions = {
     maintainAspectRatio: false,
     plugins: {
@@ -174,12 +166,11 @@ const [cash, setCash] = useState({ amount: 0, currency: "EUR" });
               <p>Chargement…</p>
             ) : (
               <ul className="space-y-2">
-                {curLabels.map(cur => (
+                {Object.entries(totalsPerCurrency).map(([cur, tot]) => (
                   <li key={cur}>
                     Total en <strong>{cur}</strong> :{" "}
                     <strong>
-                      {numberFormatter.format(totalsPerCurrency[cur])}{" "}
-                      {formatCurrencySymbol(cur)}
+                      {numberFormatter.format(tot)} {formatCurrencySymbol(cur)}
                     </strong>
                   </li>
                 ))}

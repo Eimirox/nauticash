@@ -158,15 +158,16 @@ router.patch("/portfolio", auth, async (req, res) => {
 router.patch("/cash", auth, async (req, res) => {
   try {
     const { amount, currency } = req.body;
+    const numericAmount = parseFloat(amount);
 
-    if (typeof amount !== "number" || !["EUR", "USD"].includes(currency)) {
+    if (isNaN(numericAmount) || !["EUR", "USD"].includes(currency)) {
       return res.status(400).json({ error: "Paramètres invalides" });
     }
 
     const user = await User.findById(req.user.userId);
     if (!user) return res.status(404).json({ error: "Utilisateur non trouvé" });
 
-    user.cashAmount = amount;
+    user.cashAmount = numericAmount;
     user.cashCurrency = currency;
     await user.save();
 

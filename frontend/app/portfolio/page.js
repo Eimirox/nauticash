@@ -331,7 +331,7 @@ export default function Portfolio() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="8" className="p-10 text-center text-gray-500 text-xl">
+                <td colSpan="10" className="p-10 text-center text-gray-500 text-xl">
                   Chargement...
                 </td>
               </tr>
