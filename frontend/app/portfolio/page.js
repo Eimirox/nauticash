@@ -9,16 +9,17 @@ import { getPerformanceClass } from "./utils/styles";
 
 export default function Portfolio() {
   const router = useRouter();
-  const [ticker, setTicker]       = useState("");
-  const [stocks, setStocks]       = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState(null);
-  const [sortOrder, setSortOrder] = useState("none");
+  const [ticker, setTicker]         = useState("");
+  const [stocks, setStocks]         = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState(null);
+  const [sortOrder, setSortOrder]   = useState("none");
   const [localEdits, setLocalEdits] = useState({});
-  const [showTotals, setShowTotals] = useState(true);
-  const [cash, setCash] = useState({ amount: 0, currency: "EUR" });
+  const [cash, setCash]             = useState({ amount: 0, currency: "EUR" });
 
-// Charger cash depuis localStorage au démarrage
+  const nf2 = new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  // Charger cash depuis localStorage (fallback si pas encore en BDD)
   useEffect(() => {
     const saved = localStorage.getItem("cashData");
     if (saved) {
@@ -27,18 +28,16 @@ export default function Portfolio() {
         if (typeof parsed.amount === "number" && typeof parsed.currency === "string") {
           setCash(parsed);
         }
-      } catch (err) {
-        console.error("Erreur de parsing cash :", err);
-      }
+      } catch {}
     }
   }, []);
 
-// Sauvegarder le cash à chaque changement
+  // Sauvegarde locale du cash (UX) en parallèle de la BDD
   useEffect(() => {
     localStorage.setItem("cashData", JSON.stringify(cash));
   }, [cash]);
 
-  // 1) Chargement centralisé du portfolio enrichi
+  // Charger portefeuille enrichi (stocks + cash)
   const fetchPortfolio = async () => {
     setLoading(true);
     setError(null);
@@ -47,13 +46,13 @@ export default function Portfolio() {
       if (!token) throw new Error("Token manquant");
 
       const res = await fetch("http://localhost:5000/api/user/portfolio", {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error(`Status ${res.status}`);
 
       const data = await res.json();
       setStocks(data.stocks || []);
-      setCash(data.cash || { amount: 0, currency: "EUR" })
+      setCash(data.cash || { amount: 0, currency: "EUR" });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -61,7 +60,7 @@ export default function Portfolio() {
     }
   };
 
-  // 🆕 Fonction pour déclencher la mise à jour des prix
+  // Mettre à jour les prix
   const handleUpdatePrices = async () => {
     const token = localStorage.getItem("token");
     try {
@@ -70,7 +69,7 @@ export default function Portfolio() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error("Échec de la mise à jour des prix");
-      await fetchPortfolio(); // recharge le portefeuille avec les prix à jour
+      await fetchPortfolio();
       alert("✅ Mise à jour effectuée !");
     } catch (err) {
       console.error("Erreur lors de la mise à jour :", err.message);
@@ -78,7 +77,7 @@ export default function Portfolio() {
     }
   };
 
-  // 2) Au montage, on s’assure que l’utilisateur est loggué puis on charge
+  // Au montage : check login + fetch
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) {
@@ -88,56 +87,45 @@ export default function Portfolio() {
     fetchPortfolio();
   }, [router]);
 
-  // 3) Tri par prix
+  // Tri par prix
   const handleSortByPrice = () => {
     const newOrder =
       sortOrder === "asc" ? "desc" :
       sortOrder === "desc" ? "none" :
       "asc";
     setSortOrder(newOrder);
-    if (newOrder !== "none") {
-      setStocks(sortByPrice(stocks, newOrder));
+    if (newOrder !== "none") setStocks(sortByPrice(stocks, newOrder));
+  };
+
+  // Ajouter un ticker
+  const addStock = async () => {
+    if (!ticker.trim()) return;
+    const newTicker = ticker.toUpperCase();
+    if (stocks.some((s) => s.ticker === newTicker)) return;
+
+    const token = localStorage.getItem("token");
+    if (!token) return router.push("/login");
+
+    try {
+      const res = await fetch("http://localhost:5000/api/user/portfolio", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ ticker: newTicker }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(`Status ${res.status}`);
+      await fetchPortfolio();
+      setTicker("");
+    } catch (err) {
+      console.error("Erreur addStock :", err.message);
+      setError(err.message);
     }
   };
 
-  // 4) Ajouter une action → on recharge tout le portfolio
-  const addStock = async () => {
-  if (!ticker.trim()) return;
-  const newTicker = ticker.toUpperCase();
-  console.log("Tentative d'ajout de :", newTicker); // ← AJOUT ICI
-
-  if (stocks.some((s) => s.ticker === newTicker)) {
-    console.log("Ticker déjà présent :", newTicker);
-    return;
-  }
-
-  const token = localStorage.getItem("token");
-  if (!token) return router.push("/login");
-
-  try {
-    const res = await fetch("http://localhost:5000/api/user/portfolio", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ ticker: newTicker }),
-    });
-
-    const data = await res.json();
-    console.log("Réponse POST /portfolio :", data); // ← AJOUT ICI
-
-    if (!res.ok) throw new Error(`Status ${res.status}`);
-
-    await fetchPortfolio();
-    setTicker("");
-  } catch (err) {
-    console.error("Erreur addStock :", err.message);
-    setError(err.message);
-  }
-};
-
-  // 5) Supprimer une action
+  // Supprimer un ticker
   const removeStock = async (tickerToRemove) => {
     const token = localStorage.getItem("token");
     if (!token) return router.push("/login");
@@ -157,7 +145,7 @@ export default function Portfolio() {
     }
   };
 
-  // 6) Mise à jour quantité/PRU
+  // Édition quantité / PRU
   const handleUpdateStock = (ticker, field, value) => {
     setStocks((prev) =>
       prev.map((s) => (s.ticker === ticker ? { ...s, [field]: value } : s))
@@ -182,11 +170,10 @@ export default function Portfolio() {
     }
   };
 
-  // ✅ Correction du PATCH vers /api/user/cash
+  // PATCH cash -> BDD
   const syncCashUpdate = async (amount, currency) => {
     const token = localStorage.getItem("token");
     if (!token) return router.push("/login");
-
     try {
       const res = await fetch("http://localhost:5000/api/user/cash", {
         method: "PATCH",
@@ -202,49 +189,137 @@ export default function Portfolio() {
     }
   };
 
-  // Conseil de déconnexion
+  // Déconnexion
   const logout = () => {
     localStorage.removeItem("token");
     router.push("/login");
   };
 
-  // Regroupement des totaux par devise
+  // Totaux par devise (actions/ETF/crypto)
   const totalsByCurrency = stocks.reduce((acc, s) => {
     if (typeof s.close === "number" && typeof s.quantity === "number") {
       acc[s.currency] = (acc[s.currency] || 0) + s.close * s.quantity;
     }
     return acc;
   }, {});
-
-// Intégrer le cash ou la dette dans le total par devise
+  // Ajout du cash / dette
   if (cash.currency && !isNaN(cash.amount)) {
     totalsByCurrency[cash.currency] =
       (totalsByCurrency[cash.currency] || 0) + cash.amount;
   }
 
+  const typeBadge = (type) => {
+    const t = (type || "UNKNOWN").toUpperCase();
+    const map = {
+      ETF: "bg-purple-100 text-purple-700",
+      CRYPTOCURRENCY: "bg-orange-100 text-orange-700",
+      EQUITY: "bg-blue-100 text-blue-700",
+      UNKNOWN: "bg-gray-100 text-gray-700",
+    };
+    const label = t === "EQUITY" ? "Action" : t === "CRYPTOCURRENCY" ? "Crypto" : t;
+    return (
+      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${map[t] || map.UNKNOWN}`}>
+        {label}
+      </span>
+    );
+  };
+
+  // KPI cards (une par devise)
+  const kpiCards = Object.entries(totalsByCurrency).map(([cur, tot]) => (
+    <div key={cur} className="p-4 bg-white shadow rounded-lg text-center">
+      <p className="text-gray-500">Total en {cur}</p>
+      <p className="text-2xl font-bold text-blue-700">
+        {nf2.format(Number(tot))} {formatCurrencySymbol(cur)}
+      </p>
+    </div>
+  ));
+
   return (
-    <main className="flex flex-col min-h-screen bg-gray-100 p-10">
-      <button
-        onClick={logout}
-        className="absolute top-4 right-4 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
-      >
-        Déconnexion
-      </button>
+    <main className="flex flex-col min-h-screen bg-gray-50 p-8">
+      {/* Top bar */}
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-[#1E3A8A]">
+          Mon Portefeuille
+        </h1>
+        <div className="flex gap-2">
+          <button
+            onClick={() => router.push("/analytics")}
+            className="px-4 py-2 border border-[#1E3A8A] text-[#1E3A8A] rounded-lg hover:bg-[#1E3A8A] hover:text-white transition"
+          >
+            Visualiser
+          </button>
+          <button
+            onClick={handleUpdatePrices}
+            className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition"
+          >
+            Actualiser
+          </button>
+          <button
+            onClick={logout}
+            className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+          >
+            Déconnexion
+          </button>
+        </div>
+      </div>
 
-      <h1 className="text-4xl font-bold text-[#1E3A8A] mb-6 text-center">
-        Mon Portefeuille d'Actions
-      </h1>
+      {error && <p className="text-red-500 mb-4">{error}</p>}
 
-      {error && <p className="text-red-500 text-center">{error}</p>}
+      {/* Bloc CASH (au-dessus, élément clé) */}
+      <div className="border border-blue-200 bg-blue-50 p-4 rounded-lg mb-6">
+        <h3 className="text-lg font-bold text-blue-800 mb-3">💼 Cash disponible</h3>
+        <div className="flex flex-wrap gap-4 items-end">
+          <label className="text-sm">
+            Montant
+            <input
+              type="number"
+              value={cash.amount}
+              onChange={(e) => {
+                const newVal = parseFloat(e.target.value) || 0;
+                const cur = cash.currency;
+                setCash((prev) => ({ ...prev, amount: newVal }));
+                syncCashUpdate(newVal, cur);
+              }}
+              className="ml-2 w-36 border rounded px-3 py-2"
+            />
+          </label>
 
-      {/* Barre d'actions */}
-      <div className="flex justify-center gap-4 mb-6">
+          <label className="text-sm">
+            Devise
+            <select
+              value={cash.currency}
+              onChange={(e) => {
+                const newCurrency = e.target.value;
+                const amt = cash.amount;
+                setCash((prev) => ({ ...prev, currency: newCurrency }));
+                syncCashUpdate(amt, newCurrency);
+              }}
+              className="ml-2 w-28 border rounded px-3 py-2"
+            >
+              <option value="EUR">EUR</option>
+              <option value="USD">USD</option>
+            </select>
+          </label>
+
+          <span className="text-sm text-gray-600 italic">
+            {cash.amount < 0 ? "💸 Dette soustraite du total" : "💰 Ajouté au total"}
+          </span>
+        </div>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        {kpiCards}
+      </div>
+
+      {/* Barre d'ajout de ticker */}
+      <div className="flex flex-wrap gap-3 mb-6">
         <input
           type="text"
           value={ticker}
           onChange={(e) => setTicker(e.target.value)}
           placeholder="Entrez un ticker (ex: AAPL)"
-          className="px-4 py-2 border rounded-lg w-60 focus:ring-2 focus:ring-[#3B82F6]"
+          className="px-4 py-2 border rounded-lg w-60 focus:ring-2 focus:ring-[#3B82F6] bg-white"
         />
         <button
           onClick={addStock}
@@ -253,234 +328,174 @@ export default function Portfolio() {
           Ajouter
         </button>
         <button
-          onClick={handleUpdatePrices}
-          className="px-6 py-2 border border-[#1E3A8A] text-[#1E3A8A] rounded-lg hover:bg-[#1E3A8A] hover:text-white transition"
+          onClick={handleSortByPrice}
+          className="px-6 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition"
         >
-          Actualiser
-        </button>
-        <button
-          onClick={() => router.push("/analytics")}
-          className="px-6 py-2 border border-[#1E3A8A] text-[#1E3A8A] rounded-lg hover:bg-[#1E3A8A] hover:text-white transition"
-        >
-          Visualiser
+          Trier par prix {sortOrder === "asc" ? "↑" : sortOrder === "desc" ? "↓" : ""}
         </button>
       </div>
 
-    {/* Ligne spéciale pour le cash - visible au-dessus du tableau */}
-    <div className="border border-blue-200 bg-blue-50 p-4 rounded-lg mb-6">
-      <h3 className="text-lg font-bold text-blue-800 mb-3">💼 Cash disponible</h3>
-      <div className="flex gap-4 items-center">
-        <label className="text-sm">
-          Montant :
-          <input
-            type="number"
-            value={cash.amount}
-            onChange={(e) => {
-              const newVal = parseFloat(e.target.value) || 0;
-              const cur = cash.currency;
-              setCash((prev) => ({ ...prev, amount: newVal }));
-              syncCashUpdate(newVal, cur);
-            }}
-            className="ml-2 w-32 border rounded px-2 py-1"
-          />
-        </label>
-        <label className="text-sm">
-        Devise :
-        <select
-          value={cash.currency}
-          onChange={(e) => {
-            const newCurrency = e.target.value;
-            const amt = cash.amount;
-            setCash((prev) => ({ ...prev, currency: newCurrency }));
-            syncCashUpdate(amt, newCurrency);
-          }}
-          className="ml-2 w-24 border rounded px-2 py-1"
-        >
-          <option value="EUR">EUR</option>
-          <option value="USD">USD</option>
-        </select>
-      </label>
-        <span className="text-sm text-gray-600 italic">
-          {cash.amount < 0
-            ? "💸 Dette soustraite du total"
-            : "💰 Ajouté au total"}
-        </span>
-      </div>
-    </div>
-
-      {/* Tableau des actions */}
-      <div className="bg-white shadow-md rounded-lg overflow-hidden">
-        <table className="w-full text-left border-collapse">
-          <thead className="bg-[#1E3A8A] text-white">
-            <tr>
-              <th className="p-3">Ticker</th>
-              <th className="p-3">Pays</th>
-              <th className="p-3">Type</th>
-              <th className="p-3 cursor-pointer" onClick={handleSortByPrice}>
-                Prix Actuel {sortOrder === "asc" ? "↑" : sortOrder === "desc" ? "↓" : ""}
-              </th>
-              <th className="p-3">Quantité</th>
-              <th className="p-3">PRU</th>
-              <th className="p-3">Performance</th>
-              <th className="p-3">Dividende</th>
-              <th className="p-3">Rendement</th>
-              <th className="p-3">Total</th>
-              <th className="p-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
+      {/* Tableau dans une Card */}
+      <div className="bg-white shadow-lg rounded-lg overflow-hidden">
+        <div className="px-6 py-3 bg-[#1E3A8A] text-white font-semibold">
+          Détails des positions
+        </div>
+        <div className="overflow-x-auto max-h-[70vh]">
+          <table className="w-full text-left">
+            <thead className="bg-[#1E3A8A]/95 text-white sticky top-0 z-10">
               <tr>
-                <td colSpan="10" className="p-10 text-center text-gray-500 text-xl">
-                  Chargement...
-                </td>
+                <th className="p-3">Ticker</th>
+                <th className="p-3">Pays</th>
+                <th className="p-3">Type</th>
+                <th className="p-3 cursor-pointer text-right" onClick={handleSortByPrice}>
+                  Prix Actuel {sortOrder === "asc" ? "↑" : sortOrder === "desc" ? "↓" : ""}
+                </th>
+                <th className="p-3 text-right">Quantité</th>
+                <th className="p-3 text-right">PRU</th>
+                <th className="p-3 text-right">Performance</th>
+                <th className="p-3 text-right">Dividende</th>
+                <th className="p-3 text-right">Rendement</th>
+                <th className="p-3 text-right">Total</th>
+                <th className="p-3">Actions</th>
               </tr>
-            ) : stocks.length ? (
-              stocks.map((stock) => {
-                const perf =
-                  stock.pru > 0 ? ((stock.close - stock.pru) / stock.pru) * 100 : null;
-                const total =
-                  typeof stock.close === "number" && typeof stock.quantity === "number"
-                    ? stock.close * stock.quantity
-                    : null;
-                return (
-                  <tr key={stock.ticker} className="border-b">
-                    <td className="p-3 font-semibold">{stock.ticker}</td>
-                    <td className="p-3 text-gray-600">
-                      {exchangeToCountry[stock.country] || stock.country}
-                    </td>
-                    <td className="p-3 text-gray-600">
-                      {stock.type || "?"}
-                    </td>
-                    <td className="p-3 text-gray-600">
-                      {stock.close} {formatCurrencySymbol(stock.currency)}
-                    </td>
-                    <td className="p-3 text-gray-600">
-                      <input
-                        type="number"
-                        value={
-                          localEdits[stock.ticker]?.quantity ??
-                          stock.quantity ??
-                          ""
-                        }
-                        onFocus={() =>
-                          setLocalEdits((prev) => ({
-                            ...prev,
-                            [stock.ticker]: { quantity: stock.quantity },
-                          }))
-                        }
-                        onChange={(e) =>
-                          setLocalEdits((prev) => ({
-                            ...prev,
-                            [stock.ticker]: {
-                              ...prev[stock.ticker],
-                              quantity: e.target.value,
-                            },
-                          }))
-                        }
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            const val = parseFloat(
-                              localEdits[stock.ticker]?.quantity
-                            );
-                            if (!isNaN(val))
-                              handleUpdateStock(stock.ticker, "quantity", val);
-                            setLocalEdits((prev) => {
-                              const next = { ...prev };
-                              delete next[stock.ticker];
-                              return next;
-                            });
-                          }
-                        }}
-                        className="w-20 border px-2 py-1 rounded"
-                      />
-                    </td>
-                    <td className="p-3 text-gray-600">
-                      <input
-                        type="number"
-                        value={localEdits[stock.ticker]?.pru ?? stock.pru ?? ""}
-                        onFocus={() =>
-                          setLocalEdits((prev) => ({
-                            ...prev,
-                            [stock.ticker]: { pru: stock.pru },
-                          }))
-                        }
-                        onChange={(e) =>
-                          setLocalEdits((prev) => ({
-                            ...prev,
-                            [stock.ticker]: {
-                              ...prev[stock.ticker],
-                              pru: e.target.value,
-                            },
-                          }))
-                        }
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            const val = parseFloat(localEdits[stock.ticker]?.pru);
-                            if (!isNaN(val))
-                              handleUpdateStock(stock.ticker, "pru", val);
-                            setLocalEdits((prev) => {
-                              const next = { ...prev };
-                              delete next[stock.ticker];
-                              return next;
-                            });
-                          }
-                        }}
-                        className="w-20 border px-2 py-1 rounded"
-                      />
-                    </td>
-                    <td className={`p-3 ${getPerformanceClass(perf)}`}>
-                      {perf != null ? perf.toFixed(2) + " %" : "--"}
-                    </td>
-                    <td className="p-3 text-gray-600">
-                      {stock.dividend != null ? stock.dividend.toFixed(2) + " " + formatCurrencySymbol(stock.currency) : "--"}
-                    </td>
-                    <td className="p-3 text-gray-600">
-                        {stock.myDividendYield != null ? stock.myDividendYield.toFixed(2) + " %" : "--"}
-                    </td>
-                    <td className="p-3 text-gray-600">
-                      {total != null ? total.toFixed(2) : "--"}
-                    </td>
-                    <td className="p-3">
-                      <button
-                        onClick={() => removeStock(stock.ticker)}
-                        className="px-4 py-1 bg-red-500 text-white rounded hover:bg-red-600"
-                      >
-                        Supprimer
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })
-            ) : (
-              <tr>
-                <td colSpan="8" className="p-10 text-center text-gray-500 text-xl">
-                  Aucune action ajoutée
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan="11" className="p-10 text-center text-gray-500 text-xl">
+                    Chargement...
+                  </td>
+                </tr>
+              ) : stocks.length ? (
+                stocks.map((stock) => {
+                  const perf = stock.pru > 0 ? ((stock.close - stock.pru) / stock.pru) * 100 : null;
+                  const total =
+                    typeof stock.close === "number" && typeof stock.quantity === "number"
+                      ? stock.close * stock.quantity
+                      : null;
 
-        {/* Totaux par devise – section déroulante */}
-        <div className="p-4">
-          <button
-            onClick={() => setShowTotals((prev) => !prev)}
-            className="flex justify-end items-center gap-1 text-[#1E3A8A] hover:text-[#3B82F6]"
-          >
-            <span>Totaux par devise</span>
-            <span>{showTotals ? "▲" : "▼"}</span>
-          </button>
-          {showTotals && (
-            <div className="mt-2 text-right font-semibold space-y-1">
-              {Object.entries(totalsByCurrency).map(([cur, tot]) => (
-                <div key={cur}>
-                  {formatCurrencySymbol(cur)}
-                  {tot.toFixed(2)}
-                </div>
-              ))}
-            </div>
-          )}
+                  return (
+                    <tr key={stock.ticker} className="odd:bg-gray-50 hover:bg-gray-100 border-b">
+                      <td className="p-3 font-semibold">{stock.ticker}</td>
+                      <td className="p-3 text-gray-600">{exchangeToCountry[stock.country] || stock.country}</td>
+                      <td className="p-3">{typeBadge(stock.type)}</td>
+                      <td className="p-3 text-right text-gray-700">
+                        {nf2.format(stock.close)} {formatCurrencySymbol(stock.currency)}
+                      </td>
+
+                      {/* Quantité (editable) */}
+                      <td className="p-3 text-right">
+                        <input
+                          type="number"
+                          value={localEdits[stock.ticker]?.quantity ?? stock.quantity ?? ""}
+                          onFocus={() =>
+                            setLocalEdits((prev) => ({
+                              ...prev,
+                              [stock.ticker]: { quantity: stock.quantity },
+                            }))
+                          }
+                          onChange={(e) =>
+                            setLocalEdits((prev) => ({
+                              ...prev,
+                              [stock.ticker]: {
+                                ...prev[stock.ticker],
+                                quantity: e.target.value,
+                              },
+                            }))
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              const val = parseFloat(localEdits[stock.ticker]?.quantity);
+                              if (!isNaN(val)) handleUpdateStock(stock.ticker, "quantity", val);
+                              setLocalEdits((prev) => {
+                                const next = { ...prev };
+                                delete next[stock.ticker];
+                                return next;
+                              });
+                            }
+                          }}
+                          className="w-24 border px-2 py-1 rounded bg-white text-right"
+                        />
+                      </td>
+
+                      {/* PRU (editable) */}
+                      <td className="p-3 text-right">
+                        <input
+                          type="number"
+                          value={localEdits[stock.ticker]?.pru ?? stock.pru ?? ""}
+                          onFocus={() =>
+                            setLocalEdits((prev) => ({
+                              ...prev,
+                              [stock.ticker]: { pru: stock.pru },
+                            }))
+                          }
+                          onChange={(e) =>
+                            setLocalEdits((prev) => ({
+                              ...prev,
+                              [stock.ticker]: {
+                                ...prev[stock.ticker],
+                                pru: e.target.value,
+                              },
+                            }))
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              const val = parseFloat(localEdits[stock.ticker]?.pru);
+                              if (!isNaN(val)) handleUpdateStock(stock.ticker, "pru", val);
+                              setLocalEdits((prev) => {
+                                const next = { ...prev };
+                                delete next[stock.ticker];
+                                return next;
+                              });
+                            }
+                          }}
+                          className="w-24 border px-2 py-1 rounded bg-white text-right"
+                        />
+                      </td>
+
+                      {/* Performance avec flèche */}
+                      <td className={`p-3 text-right font-semibold ${getPerformanceClass(perf)}`}>
+                        {perf != null ? (
+                          <>
+                            {perf > 0 ? "▲ " : perf < 0 ? "▼ " : ""}
+                            {nf2.format(perf)} %
+                          </>
+                        ) : (
+                          "--"
+                        )}
+                      </td>
+
+                      <td className="p-3 text-right text-gray-700">
+                        {stock.dividend != null
+                          ? `${nf2.format(stock.dividend)} ${formatCurrencySymbol(stock.currency)}`
+                          : "--"}
+                      </td>
+                      <td className="p-3 text-right text-gray-700">
+                        {stock.myDividendYield != null ? `${nf2.format(stock.myDividendYield)} %` : "--"}
+                      </td>
+                      <td className="p-3 text-right text-gray-700">
+                        {total != null ? nf2.format(total) : "--"}
+                      </td>
+                      <td className="p-3">
+                        <button
+                          onClick={() => removeStock(stock.ticker)}
+                          className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+                        >
+                          Supprimer
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan="11" className="p-10 text-center text-gray-500 text-xl">
+                    Aucune action ajoutée
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </main>
