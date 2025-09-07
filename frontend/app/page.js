@@ -27,8 +27,10 @@ export default function Home() {
           >
             Connexion
           </button>
+
+          {/* [ALEX-HOME-REGISTER] CTA vers /register (au lieu de /signup) */}
           <button
-            onClick={() => router.push("/signup")}
+            onClick={() => router.push("/register")}
             className="text-sm px-4 py-2 bg-[#1E3A8A] text-white rounded-lg hover:bg-[#3B82F6] transition"
           >
             Créer un compte

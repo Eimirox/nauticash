@@ -76,6 +76,13 @@ export default function Login() {
           Créer un compte
         </Link>
       </div>
+
+      {/* [ALEX-LOGIN-BACK] Lien retour à l’accueil */}
+      <div className="mt-2 text-center">
+        <Link href="/" className="text-sm text-gray-600 hover:underline">
+          ← Retour à l’accueil
+        </Link>
+      </div>
     </main>
   );
 }
