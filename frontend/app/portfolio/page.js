@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { sortByPrice } from "./utils/sort";
 import { formatCurrencySymbol } from "./utils/formats";
 import { exchangeToCountry } from "./utils/exchangeMap";
 import { getPerformanceClass } from "./utils/styles";
@@ -13,11 +12,85 @@ export default function Portfolio() {
   const [stocks, setStocks]         = useState([]);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState(null);
-  const [sortOrder, setSortOrder]   = useState("none");
   const [localEdits, setLocalEdits] = useState({});
   const [cash, setCash]             = useState({ amount: 0, currency: "EUR" });
 
+  // [ALEX-SORT-001] Helpers tri générique
+  const SORT_DIR = { NONE: "none", ASC: "asc", DESC: "desc" };
+  const [sort, setSort] = useState({ key: null, dir: SORT_DIR.NONE });
+
   const nf2 = new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  // [ALEX-SORT-001] calcule les valeurs "dérivées" pour le tri
+  function getSortableValue(stock, key) {
+    switch (key) {
+      case "price":
+        return typeof stock.close === "number" ? stock.close : null;
+      case "performance": {
+        const perf = stock.pru > 0 ? ((stock.close - stock.pru) / stock.pru) * 100 : null;
+        return Number.isFinite(perf) ? perf : null;
+      }
+      case "dividend":
+        return typeof stock.dividend === "number" ? stock.dividend : null;
+      case "yield":
+        return typeof stock.myDividendYield === "number" ? stock.myDividendYield : null;
+      case "total": {
+        const total =
+          typeof stock.close === "number" && typeof stock.quantity === "number"
+            ? stock.close * stock.quantity
+            : null;
+        return Number.isFinite(total) ? total : null;
+      }
+      // Optionnel : d’autres clés si besoin
+      case "ticker": return stock.ticker || "";
+      case "quantity": return typeof stock.quantity === "number" ? stock.quantity : null;
+      case "pru": return typeof stock.pru === "number" ? stock.pru : null;
+      default:
+        return null;
+    }
+  }
+
+  // [ALEX-SORT-001] tri stable + nulls en bas
+  function sortStocksGeneric(list, { key, dir }) {
+    if (!key || dir === SORT_DIR.NONE) return list;
+    const factor = dir === SORT_DIR.ASC ? 1 : -1;
+    return [...list].sort((a, b) => {
+      const va = getSortableValue(a, key);
+      const vb = getSortableValue(b, key);
+      const an = va == null;
+      const bn = vb == null;
+      if (an && bn) return 0;
+      if (an) return 1;   // a après b
+      if (bn) return -1;  // b après a
+
+      if (typeof va === "string" && typeof vb === "string") {
+        return va.localeCompare(vb) * factor;
+      }
+      if (va < vb) return -1 * factor;
+      if (va > vb) return  1 * factor;
+      // tiebreaker : ticker
+      return (a.ticker || "").localeCompare(b.ticker || "");
+    });
+  }
+
+  // [ALEX-SORT-003] toggle tri d’une colonne
+  function toggleSort(columnKey) {
+    setSort((prev) => {
+      if (prev.key !== columnKey) {
+        return { key: columnKey, dir: SORT_DIR.ASC };
+      }
+      const next =
+        prev.dir === SORT_DIR.ASC ? SORT_DIR.DESC :
+        prev.dir === SORT_DIR.DESC ? SORT_DIR.NONE :
+        SORT_DIR.ASC;
+      return { key: columnKey, dir: next };
+    });
+  }
+
+  // [ALEX-SORT-004] Réapplique le tri quand l’état de tri change
+  useEffect(() => {
+    setStocks((prev) => sortStocksGeneric(prev, sort));
+  }, [sort]);
 
   // Charger cash depuis localStorage (fallback si pas encore en BDD)
   useEffect(() => {
@@ -51,7 +124,8 @@ export default function Portfolio() {
       if (!res.ok) throw new Error(`Status ${res.status}`);
 
       const data = await res.json();
-      setStocks(data.stocks || []);
+      const incomingStocks = data.stocks || [];
+      setStocks(sortStocksGeneric(incomingStocks, sort)); // réapplique le tri courant
       setCash(data.cash || { amount: 0, currency: "EUR" });
     } catch (err) {
       setError(err.message);
@@ -85,17 +159,8 @@ export default function Portfolio() {
       return;
     }
     fetchPortfolio();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
-
-  // Tri par prix
-  const handleSortByPrice = () => {
-    const newOrder =
-      sortOrder === "asc" ? "desc" :
-      sortOrder === "desc" ? "none" :
-      "asc";
-    setSortOrder(newOrder);
-    if (newOrder !== "none") setStocks(sortByPrice(stocks, newOrder));
-  };
 
   // Ajouter un ticker
   const addStock = async () => {
@@ -147,9 +212,10 @@ export default function Portfolio() {
 
   // Édition quantité / PRU
   const handleUpdateStock = (ticker, field, value) => {
-    setStocks((prev) =>
-      prev.map((s) => (s.ticker === ticker ? { ...s, [field]: value } : s))
-    );
+    setStocks((prev) => {
+      const updated = prev.map((s) => (s.ticker === ticker ? { ...s, [field]: value } : s));
+      return sortStocksGeneric(updated, sort); // garde l’ordre trié après modification
+    });
     syncStockUpdate(ticker, field, value);
   };
   const syncStockUpdate = async (ticker, field, value) => {
@@ -223,6 +289,9 @@ export default function Portfolio() {
       </span>
     );
   };
+
+  // [ALEX-SORT-UI] helper caret pour l’UI
+  const caret = (k) => sort.key === k ? (sort.dir === "asc" ? " ↑" : sort.dir === "desc" ? " ↓" : "") : "";
 
   // KPI cards (une par devise)
   const kpiCards = Object.entries(totalsByCurrency).map(([cur, tot]) => (
@@ -312,7 +381,7 @@ export default function Portfolio() {
         {kpiCards}
       </div>
 
-      {/* Barre d'ajout de ticker */}
+      {/* Barre d'ajout de ticker + tri rapide prix (optionnel) */}
       <div className="flex flex-wrap gap-3 mb-6">
         <input
           type="text"
@@ -327,14 +396,7 @@ export default function Portfolio() {
         >
           Ajouter
         </button>
-        <button
-          onClick={handleSortByPrice}
-          className="px-6 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition"
-        >
-          Trier par prix {sortOrder === "asc" ? "↑" : sortOrder === "desc" ? "↓" : ""}
-        </button>
       </div>
-
       {/* Tableau dans une Card */}
       <div className="bg-white shadow-lg rounded-lg overflow-hidden">
         <div className="px-6 py-3 bg-[#1E3A8A] text-white font-semibold">
@@ -347,15 +409,50 @@ export default function Portfolio() {
                 <th className="p-3">Ticker</th>
                 <th className="p-3">Pays</th>
                 <th className="p-3">Type</th>
-                <th className="p-3 cursor-pointer text-right" onClick={handleSortByPrice}>
-                  Prix Actuel {sortOrder === "asc" ? "↑" : sortOrder === "desc" ? "↓" : ""}
+
+                <th
+                  className="p-3 cursor-pointer text-right select-none"
+                  onClick={() => toggleSort("price")}
+                  aria-sort={sort.key === "price" ? sort.dir : "none"}
+                >
+                  Prix Actuel{caret("price")}
                 </th>
+
                 <th className="p-3 text-right">Quantité</th>
                 <th className="p-3 text-right">PRU</th>
-                <th className="p-3 text-right">Performance</th>
-                <th className="p-3 text-right">Dividende</th>
-                <th className="p-3 text-right">Rendement</th>
-                <th className="p-3 text-right">Total</th>
+
+                <th
+                  className="p-3 cursor-pointer text-right select-none"
+                  onClick={() => toggleSort("performance")}
+                  aria-sort={sort.key === "performance" ? sort.dir : "none"}
+                >
+                  Performance{caret("performance")}
+                </th>
+
+                <th
+                  className="p-3 cursor-pointer text-right select-none"
+                  onClick={() => toggleSort("dividend")}
+                  aria-sort={sort.key === "dividend" ? sort.dir : "none"}
+                >
+                  Dividende{caret("dividend")}
+                </th>
+
+                <th
+                  className="p-3 cursor-pointer text-right select-none"
+                  onClick={() => toggleSort("yield")}
+                  aria-sort={sort.key === "yield" ? sort.dir : "none"}
+                >
+                  Rendement{caret("yield")}
+                </th>
+
+                <th
+                  className="p-3 cursor-pointer text-right select-none"
+                  onClick={() => toggleSort("total")}
+                  aria-sort={sort.key === "total" ? sort.dir : "none"}
+                >
+                  Total{caret("total")}
+                </th>
+
                 <th className="p-3">Actions</th>
               </tr>
             </thead>
@@ -379,6 +476,7 @@ export default function Portfolio() {
                       <td className="p-3 font-semibold">{stock.ticker}</td>
                       <td className="p-3 text-gray-600">{exchangeToCountry[stock.country] || stock.country}</td>
                       <td className="p-3">{typeBadge(stock.type)}</td>
+
                       <td className="p-3 text-right text-gray-700">
                         {nf2.format(stock.close)} {formatCurrencySymbol(stock.currency)}
                       </td>
