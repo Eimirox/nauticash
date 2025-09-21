@@ -4,17 +4,18 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 /**
- * Page d'accueil "Nauticash"
- * - Header type produit (marque à gauche, actions à droite)
- * - Hero dégradé "océan" + CTA
- * - Onglets de fonctionnalités (2 onglets) avec persistance
- * - CTA final + footer centré
+ * Page d'accueil Nauticash
+ * - Header avec logo + nom
+ * - Hero (océan) avec CTA
+ * - Onglets (2) avec aperçu overview.png
+ * - CTA final
+ * - Footer centré
  */
 export default function Home() {
   const router = useRouter();
   const [language, setLanguage] = useState("FR");
 
-  // === Persistance langue via localStorage ===
+  // Persistance langue dans localStorage
   useEffect(() => {
     const savedLang = localStorage.getItem("lang");
     if (savedLang) setLanguage(savedLang);
@@ -35,15 +36,16 @@ export default function Home() {
         FR: "Suivez, analysez et optimisez en toute simplicité.",
         EN: "Track, analyze and optimize effortlessly.",
       },
-      ctaPrimary: { FR: "Accéder à mon portefeuille 🚀", EN: "Open my portfolio 🚀" },
+      ctaPrimary: {
+        FR: "Accéder à mon portefeuille 🚀",
+        EN: "Open my portfolio 🚀",
+      },
       ctaSecondary: { FR: "Créer un compte", EN: "Create account" },
       login: { FR: "Connexion", EN: "Log in" },
-
       featuresTitle: {
         FR: "Tout pour piloter vos investissements",
         EN: "Everything to pilot your investments",
       },
-
       tabs: [
         {
           key: "efficiency",
@@ -64,7 +66,6 @@ export default function Home() {
           },
         },
       ],
-
       finalCtaTitle: { FR: "Prêt à embarquer ?", EN: "Ready to set sail?" },
       finalCtaDesc: {
         FR: "Créez votre compte et suivez la houle des marchés.",
@@ -78,22 +79,29 @@ export default function Home() {
 
   return (
     <main className="flex flex-col min-h-screen bg-gray-50 text-gray-900">
-      {/* ===== Header produit ===== */}
+      {/* ===== Header ===== */}
       <header className="w-full sticky top-0 z-30 backdrop-blur bg-white/80 border-b border-white/60">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div
-            className="text-[#0b5bd3] font-extrabold tracking-tight text-xl cursor-pointer"
+            className="flex items-center gap-2 cursor-pointer"
             onClick={() => router.push("/")}
           >
-            {i18n.brand[lang]}
+            <img
+              src="/logo_nauticash.webp?v=2"
+              alt="Logo Nauticash"
+              width={28}
+              height={28}
+              className="rounded"
+            />
+            <span className="text-[#0b5bd3] font-extrabold tracking-tight text-xl">
+              {i18n.brand[lang]}
+            </span>
           </div>
 
           <div className="flex items-center gap-3">
             <button
               className="text-gray-700 text-sm px-3 py-1 rounded-lg border border-gray-300 hover:bg-gray-100"
               onClick={() => setLanguage(lang === "FR" ? "EN" : "FR")}
-              aria-label="Changer de langue"
-              title="Changer de langue"
             >
               {lang}
             </button>
@@ -113,7 +121,7 @@ export default function Home() {
         </div>
       </header>
 
-      {/* ===== Hero "Océan" ===== */}
+      {/* ===== Hero ===== */}
       <section className="relative isolate overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-[#0b5bd3] via-[#0e86ff] to-[#7cc6ff]" />
         <div
@@ -157,7 +165,7 @@ export default function Home() {
         <OceanWaves />
       </section>
 
-      {/* ===== Fonctionnalités (onglets) ===== */}
+      {/* ===== Fonctionnalités ===== */}
       <section className="max-w-6xl mx-auto px-4 py-14">
         <h2 className="text-2xl md:text-3xl font-bold text-[#0b5bd3] mb-6">
           {i18n.featuresTitle[lang]}
@@ -190,7 +198,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ===== Footer centré ===== */}
+      {/* ===== Footer ===== */}
       <footer className="border-t bg-white">
         <div className="max-w-6xl mx-auto px-4 py-6 text-sm text-center">
           <p className="text-gray-500">
@@ -203,7 +211,7 @@ export default function Home() {
 }
 
 /**
- * Bloc d’onglets de fonctionnalités (persistance onglet via localStorage)
+ * Onglets de fonctionnalités
  */
 function FeatureTabs({ items, lang }) {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -237,13 +245,11 @@ function FeatureTabs({ items, lang }) {
                   style={{ width: `${progress}%` }}
                 />
               </div>
-
               <div className="flex items-center gap-2 text-xs text-[#0b5bd3] font-medium">
                 <span className="inline-flex px-2 py-0.5 bg-blue-50 border border-blue-100 rounded">
                   {item.badge[lang]}
                 </span>
               </div>
-
               <h3 className="mt-2 text-base md:text-lg font-semibold text-gray-900">
                 {item.title[lang]}
               </h3>
@@ -255,7 +261,15 @@ function FeatureTabs({ items, lang }) {
 
       <div className="rounded-2xl border bg-white shadow-sm p-4 md:p-6">
         <div className="grid lg:grid-cols-2 gap-6 items-center">
-          <MockWindow url={activeIndex === 0 ? "/overview" : "/performance"} />
+          {/* Image fixe overview.png */}
+          <div className="relative rounded-xl overflow-hidden border bg-gray-50">
+            <img
+              src="/overview.png?v=2"
+              alt="Aperçu Nauticash"
+              className="w-full h-auto object-contain"
+            />
+          </div>
+
           <div>
             <h4 className="text-lg md:text-xl font-semibold text-gray-900">
               {items[activeIndex].title[lang]}
@@ -285,42 +299,7 @@ function FeatureTabs({ items, lang }) {
 }
 
 /**
- * Fenêtre de prévisualisation "maquette"
- */
-function MockWindow({ url }) {
-  return (
-    <div className="relative rounded-xl border bg-white shadow overflow-hidden">
-      <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b">
-        <span className="h-2.5 w-2.5 rounded-full bg-red-400" />
-        <span className="h-2.5 w-2.5 rounded-full bg-yellow-400" />
-        <span className="h-2.5 w-2.5 rounded-full bg-green-400" />
-        <span className="ml-2 text-xs text-gray-500">{url}</span>
-      </div>
-      <div className="p-4">
-        <div className="h-7 w-40 bg-blue-100 rounded mb-3" />
-        <div className="grid grid-cols-5 gap-2 text-xs text-gray-500 mb-2">
-          {["Ticker", "Prix", "Quantité", "Perf", "Total"].map((h) => (
-            <div key={h} className="px-2 py-1 bg-gray-50 rounded border">
-              {h}
-            </div>
-          ))}
-        </div>
-        {[...Array(6)].map((_, i) => (
-          <div key={i} className="grid grid-cols-5 gap-2 mb-2">
-            <div className="h-6 bg-gray-100 rounded" />
-            <div className="h-6 bg-gray-100 rounded" />
-            <div className="h-6 bg-gray-100 rounded" />
-            <div className="h-6 bg-gray-100 rounded" />
-            <div className="h-6 bg-gray-100 rounded" />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/**
- * Vague SVG décorative bas du hero
+ * Vague décorative en bas du Hero
  */
 function OceanWaves() {
   return (
