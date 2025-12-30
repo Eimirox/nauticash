@@ -293,8 +293,8 @@ export default function Analytics() {
           {[
             { key: "vue", label: "Vue d'ensemble", icon: "chart" },
             { key: "o1", label: "Performance", icon: "trending", route: "/analytics/performance" },
-            { key: "o2", label: "Dividendes", icon: "cash" },
-            { key: "o3", label: "Risques", icon: "shield" },
+            { key: "o2", label: "Dividendes", icon: "cash", route: "/analytics/dividendes" },
+            { key: "o3", label: "Géographie", icon: "shield", route: "/analytics/geographie" },
           ].map((tab) => (
             <button
               key={tab.key}

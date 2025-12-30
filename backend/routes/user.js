@@ -7,6 +7,62 @@ const { getQuote, getETFComposition } = require("../services/apiFinance");
 const router = express.Router();
 const Prices = mongoose.connection.collection("prices");
 
+function exchangeToCountry(exchange) {
+  if (!exchange) return "Unknown";
+  
+  const mapping = {
+    // États-Unis
+    "NMS": "États-Unis",
+    "NYQ": "États-Unis", 
+    "NGM": "États-Unis",
+    "NASDAQ": "États-Unis",
+    "NYSE": "États-Unis",
+    "NasdaqGS": "États-Unis",
+    "NasdaqCM": "États-Unis",
+    "AMEX": "États-Unis",
+    "BATS": "États-Unis",
+    "NYSEARCA": "États-Unis",
+    "PCX": "États-Unis",
+    
+    // France
+    "PAR": "France",
+    "Paris": "France",
+    "PARIS": "France",
+    "EPA": "France",
+    
+    // Pays-Bas / Amsterdam
+    "AMS": "Amsterdam",
+    "Amsterdam": "Amsterdam",
+    "AMSTERDAM": "Amsterdam",
+    
+    // Allemagne
+    "FRA": "Allemagne",
+    "XETRA": "Allemagne",
+    "GER": "Allemagne",
+    
+    // Royaume-Uni
+    "LSE": "Royaume-Uni",
+    "LON": "Royaume-Uni",
+    
+    // Suisse
+    "VTX": "Suisse",
+    "SWX": "Suisse",
+    
+    // Japon
+    "JPX": "Japon",
+    "TYO": "Japon",
+    
+    // Canada
+    "TOR": "Canada",
+    "TSE": "Canada",
+    
+    // Crypto
+    "CCC": "CCC",
+    "CCY": "CCC",
+  };
+  
+  return mapping[exchange] || exchange;
+}
 // --- GET /portfolio (inchangé) ---
 router.get("/portfolio", auth, async (req, res) => {
   try {
@@ -32,7 +88,7 @@ router.get("/portfolio", auth, async (req, res) => {
           volume: data.volume || null,
           date: new Date().toISOString().split("T")[0],
           currency: data.currency || "USD",
-          country: data.exchange || "US",
+          country: exchangeToCountry(data.exchange),
           sector: data.quoteType === "CRYPTOCURRENCY" ? "Crypto" : data.sector || "Unknown",
           industry: data.quoteType === "CRYPTOCURRENCY" ? "Crypto" : data.industry || "Unknown",
           performance,

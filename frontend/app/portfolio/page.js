@@ -13,10 +13,9 @@ export default function Portfolio() {
   const [stocks, setStocks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [localEdits, setLocalEdits] = useState({});
   const [cash, setCash] = useState({ amount: 0, currency: "EUR" });
   const [showCashSection, setShowCashSection] = useState(false);
-  const [fullscreenTable, setFullscreenTable] = useState(false); // Mode plein écran
+  const [fullscreenTable, setFullscreenTable] = useState(false);
 
   const SORT_DIR = { NONE: "none", ASC: "asc", DESC: "desc" };
   const [sort, setSort] = useState({ key: null, dir: SORT_DIR.NONE });
@@ -311,7 +310,7 @@ export default function Portfolio() {
     return "";
   };
 
-  // Composant Tableau (pour réutiliser en fullscreen)
+  // Composant Tableau
   const TableContent = () => (
     <div className="overflow-x-auto">
       <table className="w-full">
@@ -428,88 +427,49 @@ export default function Portfolio() {
                     {nf2.format(stock.close)}{" "}
                     {formatCurrencySymbol(stock.currency)}
                   </td>
+                  
+                  {/* QUANTITÉ - VERSION SIMPLE AVEC defaultValue */}
                   <td className="px-6 py-4 text-right">
                     <input
                       type="number"
-                      value={
-                        localEdits[stock.ticker]?.quantity ??
-                        stock.quantity ??
-                        ""
-                      }
-                      onFocus={() =>
-                        setLocalEdits((prev) => ({
-                          ...prev,
-                          [stock.ticker]: { quantity: stock.quantity },
-                        }))
-                      }
-                      onChange={(e) =>
-                        setLocalEdits((prev) => ({
-                          ...prev,
-                          [stock.ticker]: {
-                            ...prev[stock.ticker],
-                            quantity: e.target.value,
-                          },
-                        }))
-                      }
+                      key={`qty-${stock.ticker}-${stock.quantity}`}
+                      defaultValue={stock.quantity}
+                      onBlur={(e) => {
+                        const val = parseFloat(e.target.value);
+                        if (!isNaN(val) && val !== stock.quantity) {
+                          handleUpdateStock(stock.ticker, "quantity", val);
+                        }
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
-                          const val = parseFloat(
-                            localEdits[stock.ticker]?.quantity
-                          );
-                          if (!isNaN(val))
-                            handleUpdateStock(
-                              stock.ticker,
-                              "quantity",
-                              val
-                            );
-                          setLocalEdits((prev) => {
-                            const next = { ...prev };
-                            delete next[stock.ticker];
-                            return next;
-                          });
+                          e.target.blur();
                         }
                       }}
                       className="w-24 px-3 py-2 text-right text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                     />
                   </td>
+                  
+                  {/* PRU - VERSION SIMPLE AVEC defaultValue */}
                   <td className="px-6 py-4 text-right">
                     <input
                       type="number"
-                      value={
-                        localEdits[stock.ticker]?.pru ?? stock.pru ?? ""
-                      }
-                      onFocus={() =>
-                        setLocalEdits((prev) => ({
-                          ...prev,
-                          [stock.ticker]: { pru: stock.pru },
-                        }))
-                      }
-                      onChange={(e) =>
-                        setLocalEdits((prev) => ({
-                          ...prev,
-                          [stock.ticker]: {
-                            ...prev[stock.ticker],
-                            pru: e.target.value,
-                          },
-                        }))
-                      }
+                      key={`pru-${stock.ticker}-${stock.pru}`}
+                      defaultValue={stock.pru}
+                      onBlur={(e) => {
+                        const val = parseFloat(e.target.value);
+                        if (!isNaN(val) && val !== stock.pru) {
+                          handleUpdateStock(stock.ticker, "pru", val);
+                        }
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
-                          const val = parseFloat(
-                            localEdits[stock.ticker]?.pru
-                          );
-                          if (!isNaN(val))
-                            handleUpdateStock(stock.ticker, "pru", val);
-                          setLocalEdits((prev) => {
-                            const next = { ...prev };
-                            delete next[stock.ticker];
-                            return next;
-                          });
+                          e.target.blur();
                         }
                       }}
                       className="w-24 px-3 py-2 text-right text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                     />
                   </td>
+                  
                   <td
                     className={`px-6 py-4 text-right font-bold text-base ${getPerformanceClass(
                       perf
@@ -888,7 +848,7 @@ export default function Portfolio() {
           </button>
         </div>
 
-        {/* Table - AGRANDI */}
+        {/* Table */}
         <div className="bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">
           <div className="px-6 py-4 bg-gradient-to-r from-slate-900 to-slate-800 flex items-center justify-between">
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
