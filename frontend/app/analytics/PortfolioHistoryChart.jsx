@@ -12,15 +12,20 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-// CTRL+F: NAUTICASH_API_BASE
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000";
-
 // Mapping mois anglais -> numéro
 const MONTH_MAP = {
-  January: 1, February: 2, March: 3, April: 4,
-  May: 5, June: 6, July: 7, August: 8,
-  September: 9, October: 10, November: 11, December: 12
+  January: 1,
+  February: 2,
+  March: 3,
+  April: 4,
+  May: 5,
+  June: 6,
+  July: 7,
+  August: 8,
+  September: 9,
+  October: 10,
+  November: 11,
+  December: 12,
 };
 
 export default function PortfolioHistoryChart() {
@@ -42,53 +47,16 @@ export default function PortfolioHistoryChart() {
     2028: "#EC4899",
   };
 
-  // Helper fetch JSON avec token + gestion d’erreur propre
-  // CTRL+F: NAUTICASH_API_FETCH
-  const apiFetchJson = async (path, options = {}) => {
-    const token = localStorage.getItem("token");
-
-    const res = await fetch(`${API_BASE}${path}`, {
-      ...options,
-      headers: {
-        ...(options.headers || {}),
-        Authorization: token ? `Bearer ${token}` : "",
-      },
-    });
-
-    // Si backend renvoie HTML (404, 500…), ça évite le crash JSON
-    const contentType = res.headers.get("content-type") || "";
-    const isJson = contentType.includes("application/json");
-
-    if (!res.ok) {
-      const body = isJson ? await res.json().catch(() => null) : await res.text().catch(() => "");
-      const message =
-        (body && (body.message || body.error)) ||
-        (typeof body === "string" && body.slice(0, 120)) ||
-        `HTTP ${res.status}`;
-
-      // Cas fréquent: token invalide / expiré
-      if (res.status === 401) {
-        console.warn("🔒 401 Unauthorized – token invalide/absent");
-      }
-
-      throw new Error(message);
-    }
-
-    if (!isJson) {
-      const text = await res.text().catch(() => "");
-      throw new Error(`Réponse non JSON reçue: ${text.slice(0, 80)}`);
-    }
-
-    return res.json();
-  };
-
   // Convertir mois (string ou number) en numéro
   const getMonthNumber = (month) => {
+    // Si c'est déjà un nombre
     if (typeof month === "number") return month;
 
+    // Si c'est un string numérique "04"
     const parsed = parseInt(month);
     if (!isNaN(parsed) && parsed >= 1 && parsed <= 12) return parsed;
 
+    // Si c'est un nom en anglais "April"
     return MONTH_MAP[month] || null;
   };
 
@@ -108,36 +76,44 @@ export default function PortfolioHistoryChart() {
 
   useEffect(() => {
     fetchHistory();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchHistory = async () => {
     try {
-      const data = await apiFetchJson("/api/user/history");
+      const token = localStorage.getItem("token");
+      // AGI_FIX: correction backtick / guillemets
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"}/api/user/history`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      const data = await res.json();
 
       console.log("📊 Données reçues:", data);
       setHistory(data);
 
-      const years = [...new Set(data.map((item) => parseInt(item.year)))]
-        .filter(Boolean)
-        .sort((a, b) => b - a);
-
+      // Extraire années
+      const years = [...new Set(data.map((item) => parseInt(item.year)))].sort(
+        (a, b) => b - a
+      );
       setAvailableYears(years);
       console.log("📅 Années:", years);
 
+      // Auto-sélection
       if (years.length > 0 && selectedYears.length === 0) {
         const toSelect = years.slice(0, Math.min(2, years.length));
         setSelectedYears(toSelect);
         console.log("✅ Années sélectionnées:", toSelect);
       }
 
+      // Dernier snapshot
       if (data.length > 0) {
         const sorted = [...data].sort((a, b) => {
           const yearDiff = b.year - a.year;
           if (yearDiff !== 0) return yearDiff;
           return getMonthNumber(b.month) - getMonthNumber(a.month);
         });
-
         setLastSnapshot({
           year: sorted[0].year,
           month: sorted[0].month,
@@ -145,7 +121,7 @@ export default function PortfolioHistoryChart() {
         });
       }
     } catch (err) {
-      console.error("❌ Erreur history:", err.message || err);
+      console.error("❌ Erreur:", err);
     }
   };
 
@@ -153,7 +129,7 @@ export default function PortfolioHistoryChart() {
     e.preventDefault();
     try {
       setLoading(true);
-
+      const token = localStorage.getItem("token");
       const [year, month] = manualForm.date.split("-");
       const value = parseFloat(manualForm.value);
 
@@ -162,19 +138,26 @@ export default function PortfolioHistoryChart() {
         return;
       }
 
-      await apiFetchJson("/api/user/history", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: manualForm.date, value }),
-      });
+      // AGI_FIX: correction backtick / guillemets
+      await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"}/api/user/history`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ date: manualForm.date, value }),
+        }
+      );
 
       await fetchHistory();
       setManualForm({ date: "", value: "" });
       setShowManualEdit(false);
       alert(`✅ Sauvegardé : ${value.toFixed(2)}€`);
     } catch (err) {
-      console.error("❌ Erreur save manual:", err.message || err);
-      alert(`❌ Erreur : ${err.message || "inconnue"}`);
+      console.error(err);
+      alert("❌ Erreur");
     } finally {
       setLoading(false);
     }
@@ -183,39 +166,60 @@ export default function PortfolioHistoryChart() {
   const saveSnapshot = async () => {
     try {
       setLoading(true);
+      const token = localStorage.getItem("token");
 
-      // ✅ Remplacement du localhost ici
-      const portfolioData = await apiFetchJson("/api/user/portfolio");
+      // AGI_FIX: correction backtick / guillemets (portfolio)
+      const portfolioRes = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"}/api/user/portfolio`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      const portfolioData = await portfolioRes.json();
 
       let totalValueEUR = 0;
 
       (portfolioData.stocks || []).forEach((stock) => {
         const value = (stock.close || 0) * (stock.quantity || 0);
-        totalValueEUR += stock.currency === "USD" ? value * usdToEur : value;
+        if (stock.currency === "USD") {
+          totalValueEUR += value * usdToEur;
+        } else {
+          totalValueEUR += value;
+        }
       });
 
       const cashValue = portfolioData.cash?.amount || 0;
-      totalValueEUR += portfolioData.cash?.currency === "USD" ? cashValue * usdToEur : cashValue;
+      if (portfolioData.cash?.currency === "USD") {
+        totalValueEUR += cashValue * usdToEur;
+      } else {
+        totalValueEUR += cashValue;
+      }
 
       const now = new Date();
       const year = now.getFullYear();
       const month = String(now.getMonth() + 1).padStart(2, "0");
 
-      // ✅ Remplacement du localhost ici
-      await apiFetchJson("/api/user/history", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date: `${year}-${month}`,
-          value: totalValueEUR,
-        }),
-      });
+      // AGI_FIX: correction backtick / guillemets (history POST)
+      await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"}/api/user/history`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            date: `${year}-${month}`,
+            value: totalValueEUR,
+          }),
+        }
+      );
 
       await fetchHistory();
       alert(`✅ Snapshot : ${totalValueEUR.toFixed(2)}€`);
     } catch (err) {
-      console.error("❌ Erreur snapshot:", err.message || err);
-      alert(`❌ Erreur : ${err.message || "inconnue"}`);
+      console.error(err);
+      alert("❌ Erreur");
     } finally {
       setLoading(false);
     }
@@ -273,11 +277,17 @@ export default function PortfolioHistoryChart() {
           {payload.map((entry, index) => {
             if (entry.value != null) {
               return (
-                <p key={index} className="text-sm" style={{ color: entry.color }}>
-                  {entry.name}: {entry.value.toLocaleString("fr-FR", {
+                <p
+                  key={index}
+                  className="text-sm"
+                  style={{ color: entry.color }}
+                >
+                  {entry.name}:{" "}
+                  {entry.value.toLocaleString("fr-FR", {
                     minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                  })}€
+                    maximumFractionDigits: 2,
+                  })}
+                  €
                 </p>
               );
             }
@@ -296,7 +306,9 @@ export default function PortfolioHistoryChart() {
       {/* Controls */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-slate-700">Comparer :</span>
+          <span className="text-sm font-medium text-slate-700">
+            Comparer :
+          </span>
           {availableYears.map((year) => (
             <button
               key={year}
@@ -325,8 +337,18 @@ export default function PortfolioHistoryChart() {
             onClick={() => setShowManualEdit(!showManualEdit)}
             className="px-4 py-2 bg-white border-2 border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-all flex items-center gap-2"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+              />
             </svg>
             Éditer
           </button>
@@ -337,16 +359,41 @@ export default function PortfolioHistoryChart() {
           >
             {loading ? (
               <>
-                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                <svg
+                  className="animate-spin h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
                 </svg>
                 Sauvegarde...
               </>
             ) : (
               <>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
+                  />
                 </svg>
                 Snapshot auto
               </>
@@ -363,32 +410,46 @@ export default function PortfolioHistoryChart() {
       {/* Édition manuelle */}
       {showManualEdit && (
         <div className="mb-6 p-4 bg-slate-50 border border-slate-200 rounded-lg">
-          <h4 className="text-sm font-semibold text-slate-900 mb-3">Ajouter/Modifier</h4>
+          <h4 className="text-sm font-semibold text-slate-900 mb-3">
+            Ajouter/Modifier
+          </h4>
           <form onSubmit={saveManualSnapshot} className="flex flex-wrap gap-3">
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Date</label>
+              <label className="block text-xs font-medium text-slate-700 mb-1">
+                Date
+              </label>
               <input
                 type="month"
                 value={manualForm.date}
-                onChange={(e) => setManualForm({ ...manualForm, date: e.target.value })}
+                onChange={(e) =>
+                  setManualForm({ ...manualForm, date: e.target.value })
+                }
                 required
                 className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Valeur (€)</label>
+              <label className="block text-xs font-medium text-slate-700 mb-1">
+                Valeur (€)
+              </label>
               <input
                 type="number"
                 step="0.01"
                 value={manualForm.value}
-                onChange={(e) => setManualForm({ ...manualForm, value: e.target.value })}
+                onChange={(e) =>
+                  setManualForm({ ...manualForm, value: e.target.value })
+                }
                 required
                 placeholder="15000.00"
                 className="px-3 py-2 border border-slate-300 rounded-lg text-sm w-32"
               />
             </div>
             <div className="flex items-end gap-2">
-              <button type="submit" disabled={loading} className="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition">
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition"
+              >
                 Sauvegarder
               </button>
               <button
@@ -411,12 +472,22 @@ export default function PortfolioHistoryChart() {
         <div className="mb-6 p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between text-sm">
           <div className="flex items-center gap-2 text-slate-600">
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+                clipRule="evenodd"
+              />
             </svg>
-            <span>Dernier : {lastSnapshot.month} {lastSnapshot.year}</span>
+            <span>
+              Dernier : {lastSnapshot.month} {lastSnapshot.year}
+            </span>
           </div>
           <span className="font-semibold text-slate-900">
-            {lastSnapshot.value.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
+            {lastSnapshot.value.toLocaleString("fr-FR", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
+            €
           </span>
         </div>
       )}
@@ -424,21 +495,38 @@ export default function PortfolioHistoryChart() {
       {/* Chart */}
       {!hasData ? (
         <div className="flex flex-col items-center justify-center py-16 text-slate-500">
-          <svg className="w-16 h-16 mb-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          <svg
+            className="w-16 h-16 mb-4 text-slate-300"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+            />
           </svg>
           <p className="text-lg font-medium mb-1">
-            {history.length === 0 ? "Aucune donnée" : "Sélectionnez une année"}
+            {history.length === 0
+              ? "Aucune donnée"
+              : "Sélectionnez une année"}
           </p>
           <p className="text-sm mb-4">
-            {history.length === 0 ? "Créez votre premier snapshot" : "Cliquez sur une année ci-dessus"}
+            {history.length === 0
+              ? "Créez votre premier snapshot"
+              : "Cliquez sur une année ci-dessus"}
           </p>
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={400}>
           <BarChart data={chartData} barGap={4}>
             <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-            <XAxis dataKey="month" tick={{ fill: "#64748B", fontSize: 12 }} />
+            <XAxis
+              dataKey="month"
+              tick={{ fill: "#64748B", fontSize: 12 }}
+            />
             <YAxis
               tick={{ fill: "#64748B", fontSize: 12 }}
               tickFormatter={(value) => {
@@ -448,7 +536,10 @@ export default function PortfolioHistoryChart() {
               }}
             />
             <Tooltip content={<CustomTooltip />} />
-            <Legend wrapperStyle={{ paddingTop: "20px" }} formatter={(value) => value.replace("year", "")} />
+            <Legend
+              wrapperStyle={{ paddingTop: "20px" }}
+              formatter={(value) => value.replace("year", "")}
+            />
             {selectedYears.map((year) => (
               <Bar
                 key={year}
@@ -465,13 +556,22 @@ export default function PortfolioHistoryChart() {
       {/* Astuce */}
       <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
         <div className="flex items-start gap-2">
-          <svg className="w-5 h-5 text-blue-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+          <svg
+            className="w-5 h-5 text-blue-600 mt-0.5"
+            fill="currentColor"
+            viewBox="0 0 20 20"
+          >
+            <path
+              fillRule="evenodd"
+              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+              clipRule="evenodd"
+            />
           </svg>
           <div className="text-sm text-blue-900">
             <p className="font-semibold mb-1">💡 Snapshot mensuel</p>
             <p className="text-blue-700">
-              Le "Snapshot auto" calcule la valeur totale (stocks + cash) et convertit USD→EUR automatiquement.
+              Le "Snapshot auto" calcule la valeur totale (stocks + cash) et
+              convertit USD→EUR automatiquement.
             </p>
           </div>
         </div>

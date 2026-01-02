@@ -63,6 +63,7 @@ function exchangeToCountry(exchange) {
   
   return mapping[exchange] || exchange;
 }
+
 // --- GET /portfolio (utilise la BDD prices) ---
 router.get("/portfolio", auth, async (req, res) => {
   try {
@@ -160,7 +161,77 @@ router.get("/portfolio", auth, async (req, res) => {
   }
 });
 
-// --- DELETE /portfolio (inchangé) ---
+// --- POST /portfolio : Ajouter une action ---
+router.post("/portfolio", auth, async (req, res) => {
+  try {
+    const { ticker, quantity = 0, pru = 0 } = req.body;
+    const user = await User.findById(req.user.userId);
+
+    // 1) Ajouter au portefeuille si pas déjà présent
+    const alreadyExists = user.portfolio.find(item => item.ticker === ticker);
+    if (!alreadyExists) {
+      user.portfolio.push({ ticker, quantity, pru });
+      await user.save();
+    }
+
+    // 2) Vérifie si on a déjà ce ticker dans prices
+    const today = new Date().toISOString().slice(0, 10);
+    const exists = await Prices.findOne({ symbol: ticker });
+
+    if (!exists) {
+      // 3) Essayer de récupérer depuis Yahoo Finance
+      try {
+        const data = await getQuote(ticker);
+        if (!data) {
+          return res.status(400).json({ error: "Ticker invalide ou non trouvé." });
+        }
+
+        const isETF = data.quoteType === "ETF" || (data.longName && data.longName.toLowerCase().includes("etf"));
+
+        let composition = null;
+        if (isETF) {
+          try {
+            composition = await getETFComposition(ticker);
+          } catch (e) {
+            console.warn(`Composition ETF non disponible pour ${ticker}`);
+          }
+        }
+
+        const doc = {
+          symbol: ticker,
+          date: today,
+          close: data.price,
+          open: data.open,
+          high: data.high,
+          low: data.low,
+          volume: data.volume,
+          currency: data.currency,
+          country: data.exchange,
+          sector: data.sector ?? "Unknown",
+          industry: data.industry ?? "Unknown",
+          composition,
+          dividend: data.dividendRate ?? null,
+          dividendYield: data.dividendYield ?? null,
+          exDividendDate: data.exDividendDate ?? null,
+          type: data.quoteType || "EQUITY",
+          name: data.longName || ticker,
+        };
+
+        await Prices.insertOne(doc);
+      } catch (err) {
+        console.error(`Impossible de récupérer ${ticker} depuis Yahoo:`, err.message);
+        // Continue quand même, l'action est ajoutée au portfolio
+      }
+    }
+
+    res.status(201).json({ message: "Ajout réussi" });
+  } catch (err) {
+    console.error("Erreur POST /portfolio :", err.message);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+// --- DELETE /portfolio ---
 router.delete("/portfolio", auth, async (req, res) => {
   try {
     const { ticker } = req.body;
@@ -176,7 +247,7 @@ router.delete("/portfolio", auth, async (req, res) => {
   }
 });
 
-// --- PATCH /portfolio (inchangé) ---
+// --- PATCH /portfolio ---
 router.patch("/portfolio", auth, async (req, res) => {
   try {
     const { ticker, field, value } = req.body;
@@ -197,7 +268,7 @@ router.patch("/portfolio", auth, async (req, res) => {
   }
 });
 
-// PATCH /cash : mise à jour du montant ou de la devise du cash
+// --- PATCH /cash ---
 router.patch("/cash", auth, async (req, res) => {
   try {
     const { amount, currency } = req.body;
