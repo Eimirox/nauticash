@@ -90,7 +90,7 @@ export default function Analytics() {
       setLoading(true);
       try {
         const token = localStorage.getItem("token");
-        const res = await fetch("http://localhost:5000/api/user/portfolio", {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"}/api/auth/login`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) throw new Error(`Status ${res.status}`);
