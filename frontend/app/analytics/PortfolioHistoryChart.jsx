@@ -12,11 +12,15 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+// CTRL+F: NAUTICASH_API_BASE
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000";
+
 // Mapping mois anglais -> numéro
 const MONTH_MAP = {
-  "January": 1, "February": 2, "March": 3, "April": 4,
-  "May": 5, "June": 6, "July": 7, "August": 8,
-  "September": 9, "October": 10, "November": 11, "December": 12
+  January: 1, February: 2, March: 3, April: 4,
+  May: 5, June: 6, July: 7, August: 8,
+  September: 9, October: 10, November: 11, December: 12
 };
 
 export default function PortfolioHistoryChart() {
@@ -38,16 +42,53 @@ export default function PortfolioHistoryChart() {
     2028: "#EC4899",
   };
 
+  // Helper fetch JSON avec token + gestion d’erreur propre
+  // CTRL+F: NAUTICASH_API_FETCH
+  const apiFetchJson = async (path, options = {}) => {
+    const token = localStorage.getItem("token");
+
+    const res = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers: {
+        ...(options.headers || {}),
+        Authorization: token ? `Bearer ${token}` : "",
+      },
+    });
+
+    // Si backend renvoie HTML (404, 500…), ça évite le crash JSON
+    const contentType = res.headers.get("content-type") || "";
+    const isJson = contentType.includes("application/json");
+
+    if (!res.ok) {
+      const body = isJson ? await res.json().catch(() => null) : await res.text().catch(() => "");
+      const message =
+        (body && (body.message || body.error)) ||
+        (typeof body === "string" && body.slice(0, 120)) ||
+        `HTTP ${res.status}`;
+
+      // Cas fréquent: token invalide / expiré
+      if (res.status === 401) {
+        console.warn("🔒 401 Unauthorized – token invalide/absent");
+      }
+
+      throw new Error(message);
+    }
+
+    if (!isJson) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`Réponse non JSON reçue: ${text.slice(0, 80)}`);
+    }
+
+    return res.json();
+  };
+
   // Convertir mois (string ou number) en numéro
   const getMonthNumber = (month) => {
-    // Si c'est déjà un nombre
-    if (typeof month === 'number') return month;
-    
-    // Si c'est un string numérique "04"
+    if (typeof month === "number") return month;
+
     const parsed = parseInt(month);
     if (!isNaN(parsed) && parsed >= 1 && parsed <= 12) return parsed;
-    
-    // Si c'est un nom en anglais "April"
+
     return MONTH_MAP[month] || null;
   };
 
@@ -67,40 +108,36 @@ export default function PortfolioHistoryChart() {
 
   useEffect(() => {
     fetchHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchHistory = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch("http://localhost:5000/api/user/history", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      
+      const data = await apiFetchJson("/api/user/history");
+
       console.log("📊 Données reçues:", data);
       setHistory(data);
 
-      // Extraire années
-      const years = [...new Set(data.map((item) => parseInt(item.year)))].sort(
-        (a, b) => b - a
-      );
+      const years = [...new Set(data.map((item) => parseInt(item.year)))]
+        .filter(Boolean)
+        .sort((a, b) => b - a);
+
       setAvailableYears(years);
       console.log("📅 Années:", years);
 
-      // Auto-sélection
       if (years.length > 0 && selectedYears.length === 0) {
         const toSelect = years.slice(0, Math.min(2, years.length));
         setSelectedYears(toSelect);
         console.log("✅ Années sélectionnées:", toSelect);
       }
 
-      // Dernier snapshot
       if (data.length > 0) {
         const sorted = [...data].sort((a, b) => {
           const yearDiff = b.year - a.year;
           if (yearDiff !== 0) return yearDiff;
           return getMonthNumber(b.month) - getMonthNumber(a.month);
         });
+
         setLastSnapshot({
           year: sorted[0].year,
           month: sorted[0].month,
@@ -108,7 +145,7 @@ export default function PortfolioHistoryChart() {
         });
       }
     } catch (err) {
-      console.error("❌ Erreur:", err);
+      console.error("❌ Erreur history:", err.message || err);
     }
   };
 
@@ -116,7 +153,7 @@ export default function PortfolioHistoryChart() {
     e.preventDefault();
     try {
       setLoading(true);
-      const token = localStorage.getItem("token");
+
       const [year, month] = manualForm.date.split("-");
       const value = parseFloat(manualForm.value);
 
@@ -125,12 +162,9 @@ export default function PortfolioHistoryChart() {
         return;
       }
 
-      await fetch("http://localhost:5000/api/user/history", {
+      await apiFetchJson("/api/user/history", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ date: manualForm.date, value }),
       });
 
@@ -139,8 +173,8 @@ export default function PortfolioHistoryChart() {
       setShowManualEdit(false);
       alert(`✅ Sauvegardé : ${value.toFixed(2)}€`);
     } catch (err) {
-      console.error(err);
-      alert("❌ Erreur");
+      console.error("❌ Erreur save manual:", err.message || err);
+      alert(`❌ Erreur : ${err.message || "inconnue"}`);
     } finally {
       setLoading(false);
     }
@@ -149,41 +183,28 @@ export default function PortfolioHistoryChart() {
   const saveSnapshot = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("token");
 
-      const portfolioRes = await fetch("http://localhost:5000/api/user/portfolio", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const portfolioData = await portfolioRes.json();
+      // ✅ Remplacement du localhost ici
+      const portfolioData = await apiFetchJson("/api/user/portfolio");
 
       let totalValueEUR = 0;
-      
+
       (portfolioData.stocks || []).forEach((stock) => {
         const value = (stock.close || 0) * (stock.quantity || 0);
-        if (stock.currency === "USD") {
-          totalValueEUR += value * usdToEur;
-        } else {
-          totalValueEUR += value;
-        }
+        totalValueEUR += stock.currency === "USD" ? value * usdToEur : value;
       });
 
       const cashValue = portfolioData.cash?.amount || 0;
-      if (portfolioData.cash?.currency === "USD") {
-        totalValueEUR += cashValue * usdToEur;
-      } else {
-        totalValueEUR += cashValue;
-      }
+      totalValueEUR += portfolioData.cash?.currency === "USD" ? cashValue * usdToEur : cashValue;
 
       const now = new Date();
       const year = now.getFullYear();
       const month = String(now.getMonth() + 1).padStart(2, "0");
 
-      await fetch("http://localhost:5000/api/user/history", {
+      // ✅ Remplacement du localhost ici
+      await apiFetchJson("/api/user/history", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           date: `${year}-${month}`,
           value: totalValueEUR,
@@ -193,8 +214,8 @@ export default function PortfolioHistoryChart() {
       await fetchHistory();
       alert(`✅ Snapshot : ${totalValueEUR.toFixed(2)}€`);
     } catch (err) {
-      console.error(err);
-      alert("❌ Erreur");
+      console.error("❌ Erreur snapshot:", err.message || err);
+      alert(`❌ Erreur : ${err.message || "inconnue"}`);
     } finally {
       setLoading(false);
     }
@@ -232,7 +253,7 @@ export default function PortfolioHistoryChart() {
           const itemMonth = getMonthNumber(item.month);
           return itemYear === year && itemMonth === monthData.monthNum;
         });
-        
+
         if (found) {
           result[`year${year}`] = found.value;
         }
