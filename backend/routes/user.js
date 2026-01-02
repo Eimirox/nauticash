@@ -63,112 +63,99 @@ function exchangeToCountry(exchange) {
   
   return mapping[exchange] || exchange;
 }
-// --- GET /portfolio (inchangé) ---
+// --- GET /portfolio (utilise la BDD prices) ---
 router.get("/portfolio", auth, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId);
-    if (!user || !user.portfolio.length) return res.json([]);
+    if (!user) {
+      return res.status(404).json({ error: "Utilisateur non trouvé" });
+    }
 
-    const enriched = await Promise.all(
-      user.portfolio.map(async (stock) => {
-        const data = await getQuote(stock.ticker);
-        if (!data) return null;
+    // Si portfolio vide, renvoyer structure complète
+    if (!user.portfolio || user.portfolio.length === 0) {
+      return res.json({
+        stocks: [],
+        cash: {
+          amount: user.cashAmount ?? 0,
+          currency: user.cashCurrency ?? "EUR",
+        },
+      });
+    }
 
-        const performance = ((data.price - stock.pru) / stock.pru) * 100;
-        const total = data.price * stock.quantity;
-
+    // Récupérer les tickers du portfolio
+    const tickers = user.portfolio.map(p => p.ticker);
+    
+    // Récupérer les prix depuis la collection prices
+    const pricesData = await Prices.find({ symbol: { $in: tickers } }).toArray();
+    
+    // Enrichir chaque action du portfolio
+    const enriched = user.portfolio.map((stock) => {
+      // Trouver les données de prix correspondantes
+      const priceInfo = pricesData.find(p => p.symbol === stock.ticker);
+      
+      if (!priceInfo) {
+        // Si pas de données, renvoyer avec des valeurs par défaut
         return {
           ticker: stock.ticker,
           quantity: stock.quantity,
           pru: stock.pru,
-          close: data.price,
-          open: data.open || null,
-          high: data.high || null,
-          low: data.low || null,
-          volume: data.volume || null,
-          date: new Date().toISOString().split("T")[0],
-          currency: data.currency || "USD",
-          country: exchangeToCountry(data.exchange),
-          sector: data.quoteType === "CRYPTOCURRENCY" ? "Crypto" : data.sector || "Unknown",
-          industry: data.quoteType === "CRYPTOCURRENCY" ? "Crypto" : data.industry || "Unknown",
-          performance,
-          total,
-          dividend: data.dividendRate ?? null,
-          dividendYield: data.dividendYield ?? null,
-          myDividendYield: stock.pru > 0 && data.dividendRate
-            ? (data.dividendRate / stock.pru) * 100
-            : null,
-          type: data.quoteType || "UNKNOWN",
+          close: 0,
+          currency: "USD",
+          country: "Unknown",
+          sector: "Unknown",
+          industry: "Unknown",
+          type: "UNKNOWN",
+          dividend: null,
+          dividendYield: null,
+          myDividendYield: null,
         };
-      })
-    );
-
-const response = {
-  stocks: enriched.filter(Boolean),
-  cash: {
-    amount: user.cashAmount ?? 0,
-    currency: user.cashCurrency ?? "EUR",
-  },
-};
-res.json(response);
-
-  } catch (err) {
-    console.error("Erreur GET /portfolio (Yahoo) :", err);
-    res.status(500).json({ error: "Erreur serveur" });
-  }
-});
-
-// --- POST /portfolio : version avec détection ETF ---
-router.post("/portfolio", auth, async (req, res) => {
-  try {
-    const { ticker, quantity = 0, pru = 0 } = req.body;
-    const user = await User.findById(req.user.userId);
-
-    // 1) Ajouter au portefeuille si pas déjà présent
-    const alreadyExists = user.portfolio.find(item => item.ticker === ticker);
-    if (!alreadyExists) {
-      user.portfolio.push({ ticker, quantity, pru });
-      await user.save();
-    }
-
-    // 2) Vérifie si on a déjà ce ticker pour aujourd’hui
-    const today = new Date().toISOString().slice(0, 10);
-    const Prices = mongoose.connection.collection("prices");
-    const exists = await Prices.findOne({ symbol: ticker, date: today });
-
-    if (!exists) {
-      // 3) Récupération des données
-      const data = await getQuote(ticker);
-      if (!data) return res.status(400).json({ error: "Ticker invalide ou non trouvé." });
-
-      const isETF = data.quoteType === "ETF" || (data.longName && data.longName.toLowerCase().includes("etf"));
-
-      let composition = null;
-      if (isETF) {
-        composition = await getETFComposition(ticker); // <--- nouvelle étape
       }
 
-      const doc = {
-        symbol: ticker,
-        date: today,
-        close: data.price,
-        open: data.open,
-        high: data.high,
-        low: data.low,
-        volume: data.volume,
-        currency: data.currency,
-        country: data.exchange,
-        sector: data.sector ?? "Unknown",
-        industry: data.industry ?? "Unknown",
-        composition,
+      const performance = stock.pru > 0 
+        ? ((priceInfo.close - stock.pru) / stock.pru) * 100 
+        : 0;
+      const total = priceInfo.close * stock.quantity;
+
+      return {
+        ticker: stock.ticker,
+        quantity: stock.quantity,
+        pru: stock.pru,
+        close: priceInfo.close || 0,
+        open: priceInfo.open || null,
+        high: priceInfo.high || null,
+        low: priceInfo.low || null,
+        volume: priceInfo.volume || null,
+        date: priceInfo.date || new Date().toISOString().split("T")[0],
+        currency: priceInfo.currency || "USD",
+        country: exchangeToCountry(priceInfo.country),
+        sector: priceInfo.sector || "Unknown",
+        industry: priceInfo.industry || "Unknown",
+        composition: priceInfo.composition || null,
+        performance,
+        total,
+        dividend: priceInfo.dividend ?? null,
+        dividendYield: priceInfo.dividendYield ?? null,
+        exDividendDate: priceInfo.exDividendDate ?? null,
+        myDividendYield: stock.pru > 0 && priceInfo.dividend
+          ? (priceInfo.dividend / stock.pru) * 100
+          : null,
+        type: priceInfo.type || "EQUITY",
+        name: priceInfo.name || stock.ticker,
       };
+    });
 
-      await Prices.insertOne(doc);
-    }
+    const response = {
+      stocks: enriched,
+      cash: {
+        amount: user.cashAmount ?? 0,
+        currency: user.cashCurrency ?? "EUR",
+      },
+    };
+    
+    res.json(response);
 
-    res.status(201).json({ message: "Ajout réussi" });
   } catch (err) {
-    console.error("Erreur POST /portfolio :", err.message);
+    console.error("Erreur GET /portfolio :", err);
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
