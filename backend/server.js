@@ -16,7 +16,22 @@ mongoose.connect(process.env.MONGO_URI)
 // Middlewares
 app.use(express.json());
 // CORS ciblé (recommandé)
-app.use(cors({ origin: "http://localhost:3000", credentials: true }));
+// ✅ CORS (dev + prod)
+const allowedOrigins = [
+  process.env.FRONTEND_URL,      // ex: https://nauticash-1hjk.vercel.app
+  "http://localhost:3000",       // dev
+].filter(Boolean);
+
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true); // Postman / server-to-server
+    if (allowedOrigins.includes(origin)) return cb(null, true);
+    return cb(new Error("CORS blocked: " + origin));
+  },
+  credentials: true,
+}));
+
+app.options("*", cors());
 
 // Routes API
 app.use("/api/auth", require("./routes/auth"));           // <= IMPORTANT : routes/auth.js
