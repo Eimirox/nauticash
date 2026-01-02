@@ -35,7 +35,7 @@ export function middleware(request) {
   return new Response('Authentication required', {
     status: 401,
     headers: {
-      'WWW-Authenticate': 'Basic realm="Nauticash - Zone de test privée"',
+      'WWW-Authenticate': 'Basic realm="Nauticash - Private Beta"',
     },
   });
 }
