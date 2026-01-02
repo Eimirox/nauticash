@@ -124,7 +124,7 @@ export default function Portfolio() {
       const token = localStorage.getItem("token");
       if (!token) throw new Error("Token manquant");
 
-      const res = await fetch("http://localhost:5000/api/user/portfolio", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"}/api/user/portfolio`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error(`Status ${res.status}`);
@@ -143,7 +143,7 @@ export default function Portfolio() {
   const handleUpdatePrices = async () => {
     const token = localStorage.getItem("token");
     try {
-      const res = await fetch("http://localhost:5000/api/update-prices", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"}/api/user/portfolio`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -165,7 +165,7 @@ export default function Portfolio() {
     const token = localStorage.getItem("token");
     if (!token) return router.push("/login");
     try {
-      const res = await fetch("http://localhost:5000/api/user/portfolio", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"}/api/user/portfolio`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -185,7 +185,7 @@ export default function Portfolio() {
     const token = localStorage.getItem("token");
     if (!token) return router.push("/login");
     try {
-      const res = await fetch("http://localhost:5000/api/user/portfolio", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"}/api/user/portfolio`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
@@ -214,7 +214,7 @@ export default function Portfolio() {
     const token = localStorage.getItem("token");
     if (!token) return router.push("/login");
     try {
-      const res = await fetch("http://localhost:5000/api/user/portfolio", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"}/api/user/portfolio`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -232,7 +232,7 @@ export default function Portfolio() {
     const token = localStorage.getItem("token");
     if (!token) return router.push("/login");
     try {
-      const res = await fetch("http://localhost:5000/api/user/cash", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"}/api/user/portfolio`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
