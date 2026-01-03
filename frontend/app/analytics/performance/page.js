@@ -15,7 +15,7 @@ export default function PerformancePage() {
       setLoading(true);
       try {
         const token = localStorage.getItem("token");
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"}/api/user/portfolio`, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"}/api/user/history`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();
