@@ -209,6 +209,7 @@ class PriceUpdater {
               exchange: quote.exchange,
               country: quote.country,
               sector: quote.sector,
+              industry: quote.industry,
               type: quote.type,
               dividend: quote.dividend,
               dividendYield: quote.dividendYield,

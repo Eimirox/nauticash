@@ -37,7 +37,23 @@ class FMPProvider {
       }
 
       // Normaliser les données au format standard
-      return this.normalizeQuote(data[0], ticker);
+      const quote = this.normalizeQuote(data[0], ticker);
+
+      // Enrichir avec le profil (secteur, industrie) si c'est un stock
+      if (quote.type === "Stock" || quote.type === "ETF") {
+        try {
+          const profile = await this.getProfile(ticker);
+          if (profile) {
+            quote.sector = profile.sector;
+            quote.industry = profile.industry;
+          }
+        } catch (error) {
+          // Si le profil échoue, on continue quand même
+          console.log(`⚠️ Could not fetch profile for ${ticker}: ${error.message}`);
+        }
+      }
+
+      return quote;
     } catch (error) {
       console.error(`❌ FMP getQuote error for ${ticker}:`, error.message);
       throw error;
@@ -49,11 +65,48 @@ class FMPProvider {
    */
   async getDividends(ticker) {
     try {
+      // FMP a un endpoint dédié pour les dividendes historiques
+      const url = `${this.baseUrl}/historical-price-full/stock_dividend/${ticker}?apikey=${this.apiKey}`;
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        // Si l'endpoint dédié échoue, on essaie de récupérer depuis /quote
+        return await this.getDividendsFromQuote(ticker);
+      }
+
+      const data = await response.json();
+
+      if (!data || !data.historical || data.historical.length === 0) {
+        return await this.getDividendsFromQuote(ticker);
+      }
+
+      // Prendre le dividende le plus récent
+      const latestDividend = data.historical[0];
+
+      return {
+        dividend: latestDividend.dividend || null,
+        annualDividend: latestDividend.adjDividend || null,
+        exDividendDate: latestDividend.date || null,
+        paymentDate: latestDividend.paymentDate || null,
+        recordDate: latestDividend.recordDate || null,
+        dividendYield: null, // Sera calculé par le quote
+      };
+    } catch (error) {
+      console.error(`❌ FMP getDividends error for ${ticker}:`, error.message);
+      return await this.getDividendsFromQuote(ticker);
+    }
+  }
+
+  /**
+   * Récupère les dividendes depuis l'endpoint /quote (fallback)
+   */
+  async getDividendsFromQuote(ticker) {
+    try {
       const url = `${this.baseUrl}/quote?symbol=${ticker}&apikey=${this.apiKey}`;
       const response = await fetch(url);
 
       if (!response.ok) {
-        throw new Error(`FMP API returned ${response.status}`);
+        return null;
       }
 
       const data = await response.json();
@@ -66,12 +119,15 @@ class FMPProvider {
 
       return {
         annualDividend: quote.annualDividend || null,
-        dividendYield: quote.dividendYield || null,
+        dividend: quote.annualDividend || null,
+        dividendYield: quote.dividendYield ? quote.dividendYield * 100 : null, // Convertir en pourcentage
         exDividendDate: quote.exDividendDate || null,
         dividendRate: quote.annualDividend || null,
+        paymentDate: null,
+        recordDate: null,
       };
     } catch (error) {
-      console.error(`❌ FMP getDividends error for ${ticker}:`, error.message);
+      console.error(`❌ FMP getDividendsFromQuote error for ${ticker}:`, error.message);
       return null;
     }
   }
@@ -165,7 +221,8 @@ class FMPProvider {
       currency: this.detectCurrency(fmpData, originalTicker),
       exchange: fmpData.exchange || fmpData.exchangeShortName || "Unknown",
       country: this.detectCountry(fmpData),
-      sector: null, // Nécessite un appel séparé à /profile
+      sector: null, // Sera enrichi par getProfile
+      industry: null, // Sera enrichi par getProfile
       type: this.detectType(originalTicker, fmpData),
       dividend: fmpData.annualDividend || null,
       dividendYield: fmpData.dividendYield || null,
