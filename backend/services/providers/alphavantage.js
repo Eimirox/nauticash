@@ -13,39 +13,201 @@ class AlphaVantageProvider {
     // Mapping manuel des secteurs pour les actions EU (Alpha Vantage gratuit ne les fournit pas)
     this.euSectorMapping = {
       // Actions françaises (Euronext Paris)
-      "GTT.PA": { sector: "Producer Manufacturing", industry: "Trucks/Construction/Farm Machinery", name: "GTT" },
-      "TTE.PA": { sector: "Energy", industry: "Oil & Gas Integrated", name: "TotalEnergies SE" },
-      "AIR.PA": { sector: "Industrials", industry: "Aerospace & Defense", name: "Airbus SE" },
-      "MC.PA": { sector: "Consumer Cyclical", industry: "Luxury Goods", name: "LVMH" },
-      "OR.PA": { sector: "Industrials", industry: "Luxury Goods", name: "L'Oréal" },
-      "SAN.PA": { sector: "Healthcare", industry: "Drug Manufacturers", name: "Sanofi" },
-      "BNP.PA": { sector: "Financial Services", industry: "Banks", name: "BNP Paribas" },
-      "ACA.PA": { sector: "Financial Services", industry: "Insurance", name: "Crédit Agricole" },
-      "ENGI.PA": { sector: "Utilities", industry: "Utilities - Regulated Electric", name: "Engie" },
-      "DG.PA": { sector: "Industrials", industry: "Conglomerates", name: "Vinci" },
-      "CS.PA": { sector: "Financial Services", industry: "Insurance", name: "AXA" },
-      "CAP.PA": { sector: "Technology", industry: "Information Technology Services", name: "Capgemini" },
-      "RMS.PA": { sector: "Consumer Cyclical", industry: "Luxury Goods", name: "Hermès" },
-      "BN.PA": { sector: "Consumer Defensive", industry: "Packaged Foods", name: "Danone" },
-      "RI.PA": { sector: "Consumer Cyclical", industry: "Luxury Goods", name: "Kering" },
+      "GTT.PA": { 
+        sector: "Producer Manufacturing", 
+        industry: "Trucks/Construction/Farm Machinery", 
+        name: "GTT",
+        dividend: 2.56,  // Dividende annuel 2024 en EUR
+        dividendYield: 1.44 // Rendement approximatif en %
+      },
+      "TTE.PA": { 
+        sector: "Energy", 
+        industry: "Oil & Gas Integrated", 
+        name: "TotalEnergies SE",
+        dividend: 2.98,  // Dividende annuel 2024 en EUR
+        dividendYield: 4.76 // Rendement approximatif en %
+      },
+      "AIR.PA": { 
+        sector: "Industrials", 
+        industry: "Aerospace & Defense", 
+        name: "Airbus SE",
+        dividend: 1.80,
+        dividendYield: 1.35
+      },
+      "MC.PA": { 
+        sector: "Consumer Cyclical", 
+        industry: "Luxury Goods", 
+        name: "LVMH",
+        dividend: 12.00,
+        dividendYield: 1.65
+      },
+      "OR.PA": { 
+        sector: "Industrials", 
+        industry: "Luxury Goods", 
+        name: "L'Oréal",
+        dividend: 5.40,
+        dividendYield: 1.25
+      },
+      "SAN.PA": { 
+        sector: "Healthcare", 
+        industry: "Drug Manufacturers", 
+        name: "Sanofi",
+        dividend: 3.70,
+        dividendYield: 4.20
+      },
+      "BNP.PA": { 
+        sector: "Financial Services", 
+        industry: "Banks", 
+        name: "BNP Paribas",
+        dividend: 3.90,
+        dividendYield: 5.80
+      },
+      "ACA.PA": { 
+        sector: "Financial Services", 
+        industry: "Insurance", 
+        name: "Crédit Agricole",
+        dividend: 1.05,
+        dividendYield: 7.50
+      },
+      "ENGI.PA": { 
+        sector: "Utilities", 
+        industry: "Utilities - Regulated Electric", 
+        name: "Engie",
+        dividend: 0.85,
+        dividendYield: 5.80
+      },
+      "DG.PA": { 
+        sector: "Industrials", 
+        industry: "Conglomerates", 
+        name: "Vinci",
+        dividend: 3.70,
+        dividendYield: 3.40
+      },
+      "CS.PA": { 
+        sector: "Financial Services", 
+        industry: "Insurance", 
+        name: "AXA",
+        dividend: 1.54,
+        dividendYield: 4.90
+      },
+      "CAP.PA": { 
+        sector: "Technology", 
+        industry: "Information Technology Services", 
+        name: "Capgemini",
+        dividend: 2.80,
+        dividendYield: 1.45
+      },
+      "RMS.PA": { 
+        sector: "Consumer Cyclical", 
+        industry: "Luxury Goods", 
+        name: "Hermès",
+        dividend: 14.00,
+        dividendYield: 0.65
+      },
+      "BN.PA": { 
+        sector: "Consumer Defensive", 
+        industry: "Packaged Foods", 
+        name: "Danone",
+        dividend: 2.02,
+        dividendYield: 3.50
+      },
+      "RI.PA": { 
+        sector: "Consumer Cyclical", 
+        industry: "Luxury Goods", 
+        name: "Kering",
+        dividend: 14.00,
+        dividendYield: 5.20
+      },
       
-      // ETFs populaires
-      "VUSA.AS": { sector: "ETF", industry: "S&P 500 ETF", name: "Vanguard S&P 500 UCITS ETF" },
-      "IWDA.AS": { sector: "ETF", industry: "World Index ETF", name: "iShares Core MSCI World" },
-      "CSPX.L": { sector: "ETF", industry: "S&P 500 ETF", name: "iShares Core S&P 500" },
-      "VWCE.DE": { sector: "ETF", industry: "World Index ETF", name: "Vanguard FTSE All-World" },
+      // ETFs populaires (pas de dividendes pour les ETFs généralement)
+      "VUSA.AS": { 
+        sector: "ETF", 
+        industry: "S&P 500 ETF", 
+        name: "Vanguard S&P 500 UCITS ETF",
+        dividend: null,
+        dividendYield: null
+      },
+      "IWDA.AS": { 
+        sector: "ETF", 
+        industry: "World Index ETF", 
+        name: "iShares Core MSCI World",
+        dividend: null,
+        dividendYield: null
+      },
+      "CSPX.L": { 
+        sector: "ETF", 
+        industry: "S&P 500 ETF", 
+        name: "iShares Core S&P 500",
+        dividend: null,
+        dividendYield: null
+      },
+      "VWCE.DE": { 
+        sector: "ETF", 
+        industry: "World Index ETF", 
+        name: "Vanguard FTSE All-World",
+        dividend: null,
+        dividendYield: null
+      },
       
       // Actions néerlandaises (Euronext Amsterdam)
-      "ASML.AS": { sector: "Technology", industry: "Semiconductor Equipment", name: "ASML Holding" },
-      "INGA.AS": { sector: "Financial Services", industry: "Banks", name: "ING Group" },
-      "PHIA.AS": { sector: "Healthcare", industry: "Medical Devices", name: "Philips" },
-      "HEIA.AS": { sector: "Consumer Cyclical", industry: "Beverages", name: "Heineken" },
+      "ASML.AS": { 
+        sector: "Technology", 
+        industry: "Semiconductor Equipment", 
+        name: "ASML Holding",
+        dividend: 6.40,
+        dividendYield: 0.85
+      },
+      "INGA.AS": { 
+        sector: "Financial Services", 
+        industry: "Banks", 
+        name: "ING Group",
+        dividend: 0.54,
+        dividendYield: 3.50
+      },
+      "PHIA.AS": { 
+        sector: "Healthcare", 
+        industry: "Medical Devices", 
+        name: "Philips",
+        dividend: 0.85,
+        dividendYield: 3.10
+      },
+      "HEIA.AS": { 
+        sector: "Consumer Cyclical", 
+        industry: "Beverages", 
+        name: "Heineken",
+        dividend: 1.94,
+        dividendYield: 2.40
+      },
       
       // Actions allemandes (XETRA)
-      "SAP.DE": { sector: "Technology", industry: "Software", name: "SAP SE" },
-      "SIE.DE": { sector: "Industrials", industry: "Industrial Equipment", name: "Siemens AG" },
-      "BMW.DE": { sector: "Consumer Cyclical", industry: "Auto Manufacturers", name: "BMW" },
-      "VOW3.DE": { sector: "Consumer Cyclical", industry: "Auto Manufacturers", name: "Volkswagen" },
+      "SAP.DE": { 
+        sector: "Technology", 
+        industry: "Software", 
+        name: "SAP SE",
+        dividend: 2.20,
+        dividendYield: 1.10
+      },
+      "SIE.DE": { 
+        sector: "Industrials", 
+        industry: "Industrial Equipment", 
+        name: "Siemens AG",
+        dividend: 4.70,
+        dividendYield: 2.50
+      },
+      "BMW.DE": { 
+        sector: "Consumer Cyclical", 
+        industry: "Auto Manufacturers", 
+        name: "BMW",
+        dividend: 6.00,
+        dividendYield: 7.20
+      },
+      "VOW3.DE": { 
+        sector: "Consumer Cyclical", 
+        industry: "Auto Manufacturers", 
+        name: "Volkswagen",
+        dividend: 9.06,
+        dividendYield: 8.50
+      },
     };
   }
 
@@ -105,6 +267,13 @@ class AlphaVantageProvider {
           normalized.sector = profile.sector;
           normalized.industry = profile.industry;
           normalized.name = profile.name || normalized.name;
+          
+          // Si le profil contient des dividendes (mapping EU), les utiliser
+          if (profile.dividend !== undefined && profile.dividend !== null) {
+            normalized.dividend = profile.dividend;
+            normalized.dividendYield = profile.dividendYield;
+            console.log(`💰 Using manual dividend mapping: ${profile.dividend} EUR`);
+          }
         }
       } catch (error) {
         console.log(`⚠️ Could not fetch profile for ${ticker}: ${error.message}`);
@@ -184,7 +353,13 @@ class AlphaVantageProvider {
     // Pour les actions EU, utiliser le mapping manuel (Alpha Vantage gratuit ne les fournit pas)
     if (this.euSectorMapping[ticker]) {
       console.log(`📋 Using manual sector mapping for ${ticker}`);
-      return this.euSectorMapping[ticker];
+      return {
+        name: this.euSectorMapping[ticker].name,
+        sector: this.euSectorMapping[ticker].sector,
+        industry: this.euSectorMapping[ticker].industry,
+        dividend: this.euSectorMapping[ticker].dividend,
+        dividendYield: this.euSectorMapping[ticker].dividendYield,
+      };
     }
 
     // Pour les US stocks, essayer l'API (peut échouer avec rate limit)
