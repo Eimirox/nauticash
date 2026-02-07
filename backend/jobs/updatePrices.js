@@ -176,9 +176,11 @@ class PriceUpdater {
   async updatePrices(tickers) {
     const Prices = mongoose.connection.collection("prices");
     const delay = config.cron.updatePrices.delayBetweenRequests;
+    const maxCacheAge = 6 * 60 * 60 * 1000; // 6 heures en millisecondes
 
     let successCount = 0;
     let failCount = 0;
+    let skippedCount = 0;
 
     console.log(`🔄 Updating ${tickers.length} tickers...\n`);
 
@@ -187,10 +189,36 @@ class PriceUpdater {
       const progress = `[${i + 1}/${tickers.length}]`;
 
       try {
-        // Fetch depuis l'API avec le priceService
+        // 1. Vérifier si on a déjà des données récentes en cache
+        const cached = await Prices.findOne({ symbol: ticker });
+        const cacheAge = cached ? Date.now() - new Date(cached.lastUpdate).getTime() : Infinity;
+        
+        // Si les données ont moins de 6h, skip (sauf si pas de secteur/dividende)
+        if (cached && cacheAge < maxCacheAge) {
+          // Vérifier si les données sont complètes (secteur + dividende si applicable)
+          const needsEnrichment = 
+            (cached.sector === null || cached.sector === "Unknown") ||
+            (cached.type === "Stock" && cached.dividend === null && !ticker.includes("BTC"));
+          
+          if (!needsEnrichment) {
+            console.log(`${progress} ⏭️ ${ticker} - Skipped (cache: ${Math.round(cacheAge / 60000)}min old)`);
+            skippedCount++;
+            continue;
+          }
+        }
+
+        // 2. Fetch depuis l'API avec forceRefresh si >6h ou données incomplètes
         const quote = await priceService.getQuote(ticker, { forceRefresh: true });
 
-        // Sauvegarder dans MongoDB
+        // 3. Récupérer les anciennes données pour préserver les dividendes si nécessaire
+        const oldData = await Prices.findOne({ symbol: ticker });
+
+        // 4. Si l'enrichissement dividendes a échoué (null) mais qu'on avait une ancienne valeur, la garder
+        const finalDividend = quote.dividend !== null ? quote.dividend : oldData?.dividend || null;
+        const finalDividendYield = quote.dividendYield !== null ? quote.dividendYield : oldData?.dividendYield || null;
+        const finalExDividendDate = quote.exDividendDate || oldData?.exDividendDate || null;
+
+        // 5. Sauvegarder dans MongoDB
         await Prices.updateOne(
           { symbol: ticker },
           {
@@ -211,10 +239,10 @@ class PriceUpdater {
               sector: quote.sector,
               industry: quote.industry,
               type: quote.type,
-              dividend: quote.dividend,
-              dividendYield: quote.dividendYield,
-              dividendRate: quote.dividendRate,
-              exDividendDate: quote.exDividendDate,
+              dividend: finalDividend,
+              dividendYield: finalDividendYield,
+              dividendRate: finalDividend,
+              exDividendDate: finalExDividendDate,
               paymentDate: quote.paymentDate,
               recordDate: quote.recordDate,
               name: quote.name,
@@ -230,6 +258,13 @@ class PriceUpdater {
         this.stats.successfulUpdates++;
       } catch (error) {
         console.log(`${progress} ❌ ${ticker} - ${error.message}`);
+        
+        // En cas d'erreur (rate limit), garder les données en cache
+        const cached = await Prices.findOne({ symbol: ticker });
+        if (cached) {
+          console.log(`   ℹ️ Keeping cached data from ${new Date(cached.lastUpdate).toLocaleString()}`);
+        }
+        
         failCount++;
         this.stats.failedUpdates++;
       }
@@ -240,7 +275,7 @@ class PriceUpdater {
       }
     }
 
-    console.log(`\n📊 Results: ${successCount} success, ${failCount} failed`);
+    console.log(`\n📊 Results: ${successCount} success, ${failCount} failed, ${skippedCount} skipped (cache)`);
   }
 
   /**
