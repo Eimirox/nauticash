@@ -121,10 +121,35 @@ class PriceService {
     }
 
     // 4. ENRICHISSEMENT : Si on a utilisé FMP et que les dividendes sont null,
-    //    essayer d'enrichir avec Alpha Vantage
+    //    essayer d'enrichir avec Alpha Vantage (US stocks ET EU stocks)
     if (
       usedProvider === "fmp" &&
       !quote.dividend &&
+      quote.type === "Stock" && // Uniquement les stocks (pas crypto, pas ETF)
+      !ticker.includes("BTC") && !ticker.includes("ETH") && // Pas de crypto
+      this.providers.alphavantage &&
+      this.providers.alphavantage.config.enabled
+    ) {
+      try {
+        console.log(`💰 Enriching ${ticker} dividends from Alpha Vantage...`);
+        const dividendInfo = await this.providers.alphavantage.getDividends(ticker);
+        
+        if (dividendInfo && dividendInfo.annualDividend) {
+          quote.dividend = dividendInfo.annualDividend;
+          quote.dividendYield = dividendInfo.dividendYield;
+          quote.exDividendDate = dividendInfo.exDividendDate;
+          console.log(`✅ Dividends enriched: ${dividendInfo.annualDividend}`);
+        }
+      } catch (error) {
+        console.log(`⚠️ Could not enrich dividends: ${error.message}`);
+      }
+    }
+
+    // 5. ENRICHISSEMENT pour EU stocks (quand Alpha Vantage est le provider)
+    if (
+      usedProvider === "alphavantage" &&
+      !quote.dividend &&
+      quote.type === "Stock" &&
       this.providers.alphavantage &&
       this.providers.alphavantage.config.enabled
     ) {
