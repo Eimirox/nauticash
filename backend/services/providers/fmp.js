@@ -51,6 +51,23 @@ class FMPProvider {
           // Si le profil échoue, on continue quand même
           console.log(`⚠️ Could not fetch profile for ${ticker}: ${error.message}`);
         }
+
+        // Enrichir avec les dividendes détaillés si l'action paie des dividendes
+        if (quote.dividend || data[0].annualDividend) {
+          try {
+            const dividendInfo = await this.getDividends(ticker);
+            if (dividendInfo) {
+              quote.dividend = dividendInfo.annualDividend || dividendInfo.dividend || quote.dividend;
+              quote.dividendYield = dividendInfo.dividendYield || quote.dividendYield;
+              quote.exDividendDate = dividendInfo.exDividendDate || quote.exDividendDate;
+              quote.paymentDate = dividendInfo.paymentDate || null;
+              quote.recordDate = dividendInfo.recordDate || null;
+            }
+          } catch (error) {
+            // Si les dividendes échouent, on continue avec les données du quote
+            console.log(`⚠️ Could not fetch dividends for ${ticker}: ${error.message}`);
+          }
+        }
       }
 
       return quote;
@@ -228,6 +245,8 @@ class FMPProvider {
       dividendYield: fmpData.dividendYield || null,
       dividendRate: fmpData.annualDividend || null,
       exDividendDate: fmpData.exDividendDate || null,
+      paymentDate: null, // Sera enrichi par getDividends
+      recordDate: null, // Sera enrichi par getDividends
       lastUpdate: new Date(),
       source: "fmp",
     };

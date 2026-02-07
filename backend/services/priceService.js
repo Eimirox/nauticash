@@ -3,10 +3,10 @@
 
 const config = require("../config/providers");
 const FMPProvider = require("./providers/fmp");
+const AlphaVantageProvider = require("./providers/alphavantage");
 // À ajouter plus tard :
 // const TwelveDataProvider = require("./providers/twelvedata");
 // const PolygonProvider = require("./providers/polygon");
-// const AlphaVantageProvider = require("./providers/alphavantage");
 
 class PriceService {
   constructor() {
@@ -27,6 +27,12 @@ class PriceService {
       console.log("✅ FMP Provider initialized");
     }
 
+    // Alpha Vantage (EU stocks + Dividendes)
+    if (config.alphavantage.enabled) {
+      providers.alphavantage = new AlphaVantageProvider();
+      console.log("✅ Alpha Vantage Provider initialized");
+    }
+
     // Twelve Data (à activer plus tard)
     // if (config.twelvedata.enabled) {
     //   providers.twelvedata = new TwelveDataProvider();
@@ -37,12 +43,6 @@ class PriceService {
     // if (config.polygon.enabled) {
     //   providers.polygon = new PolygonProvider();
     //   console.log("✅ Polygon Provider initialized");
-    // }
-
-    // Alpha Vantage (backup)
-    // if (config.alphavantage.enabled) {
-    //   providers.alphavantage = new AlphaVantageProvider();
-    //   console.log("✅ Alpha Vantage Provider initialized");
     // }
 
     return providers;
@@ -67,6 +67,9 @@ class PriceService {
     const providersToTry = this.getProviderOrder(ticker, preferredProvider);
 
     // 3. Essayer chaque provider dans l'ordre
+    let quote = null;
+    let usedProvider = null;
+
     for (const providerName of providersToTry) {
       const provider = this.providers[providerName];
 
@@ -90,16 +93,14 @@ class PriceService {
       try {
         console.log(`🔄 Fetching ${ticker} from ${providerName}...`);
 
-        const data = await provider.getQuote(ticker);
+        quote = await provider.getQuote(ticker);
+        usedProvider = providerName;
 
         // Incrémenter le compteur de requêtes
         this.incrementRequestCount(providerName);
 
-        // Mettre en cache
-        this.saveToCache(ticker, data);
-
         console.log(`✅ ${ticker} fetched from ${providerName}`);
-        return data;
+        break; // On a réussi, sortir de la boucle
       } catch (error) {
         console.error(`❌ ${providerName} failed for ${ticker}:`, error.message);
 
@@ -115,7 +116,37 @@ class PriceService {
       }
     }
 
-    throw new Error(`No provider available for ${ticker}`);
+    if (!quote) {
+      throw new Error(`No provider available for ${ticker}`);
+    }
+
+    // 4. ENRICHISSEMENT : Si on a utilisé FMP et que les dividendes sont null,
+    //    essayer d'enrichir avec Alpha Vantage
+    if (
+      usedProvider === "fmp" &&
+      !quote.dividend &&
+      this.providers.alphavantage &&
+      this.providers.alphavantage.config.enabled
+    ) {
+      try {
+        console.log(`💰 Enriching ${ticker} dividends from Alpha Vantage...`);
+        const dividendInfo = await this.providers.alphavantage.getDividends(ticker);
+        
+        if (dividendInfo && dividendInfo.annualDividend) {
+          quote.dividend = dividendInfo.annualDividend;
+          quote.dividendYield = dividendInfo.dividendYield;
+          quote.exDividendDate = dividendInfo.exDividendDate;
+          console.log(`✅ Dividends enriched: ${dividendInfo.annualDividend}`);
+        }
+      } catch (error) {
+        console.log(`⚠️ Could not enrich dividends: ${error.message}`);
+      }
+    }
+
+    // 5. Mettre en cache
+    this.saveToCache(ticker, quote);
+
+    return quote;
   }
 
   /**

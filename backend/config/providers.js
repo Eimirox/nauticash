@@ -91,7 +91,7 @@ module.exports = {
   alphavantage: {
     enabled: process.env.ALPHA_VANTAGE_ENABLED === "true",
     apiKey: process.env.ALPHA_VANTAGE_API_KEY || "",
-    baseUrl: "https://www.alphavantage.co/query",
+    baseUrl: "https://www.alphavantage.co",
     limits: {
       free: {
         requestsPerDay: 25,

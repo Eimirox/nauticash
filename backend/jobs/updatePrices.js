@@ -215,6 +215,8 @@ class PriceUpdater {
               dividendYield: quote.dividendYield,
               dividendRate: quote.dividendRate,
               exDividendDate: quote.exDividendDate,
+              paymentDate: quote.paymentDate,
+              recordDate: quote.recordDate,
               name: quote.name,
               lastUpdate: new Date(),
               source: quote.source,
