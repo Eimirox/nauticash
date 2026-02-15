@@ -301,6 +301,35 @@ router.post("/portfolio/force-refresh", auth, async (req, res) => {
 });
 
 // =============================================================================
+// PATCH /api/user/cash - Sauvegarder le cash/dette
+// =============================================================================
+router.patch("/cash", auth, async (req, res) => {
+  try {
+    const { amount, currency } = req.body;
+
+    if (typeof amount !== "number" || !currency) {
+      return res.status(400).json({ error: "Invalid cash data" });
+    }
+
+    const User = mongoose.connection.collection("users");
+
+    await User.updateOne(
+      { _id: new mongoose.Types.ObjectId(req.user.userId) },
+      {
+        $set: {
+          cash: { amount, currency },
+        },
+      }
+    );
+
+    res.json({ success: true, cash: { amount, currency } });
+  } catch (err) {
+    console.error("❌ Error PATCH /cash:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// =============================================================================
 // GET /api/user/portfolio/stats - Stats du portfolio
 // =============================================================================
 router.get("/portfolio/stats", auth, async (req, res) => {
