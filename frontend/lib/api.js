@@ -44,16 +44,29 @@ export async function apiFetch(path, { method = "GET", body, auth = true } = {})
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
-
-  let data = null;
+  let res;
   try {
-    data = await res.json();
-  } catch {}
+    res = await fetch(`${API_BASE}${path}`, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    throw new ApiError("Impossible de joindre le serveur. Vérifiez votre connexion et réessayez.", 0);
+  }
+
+  // Le backend renvoie toujours du JSON : une page HTML signifie qu'il est indisponible
+  // ou pas à jour (route inconnue, déploiement en cours ou en échec).
+  let data = null;
+  const isJson = (res.headers.get("content-type") || "").includes("application/json");
+  if (isJson) {
+    try {
+      data = await res.json();
+    } catch {}
+  } else if (res.status !== 204) {
+    console.error(`Réponse non-JSON de ${API_BASE}${path} (HTTP ${res.status})`);
+    throw new ApiError("Le serveur est momentanément indisponible. Réessayez dans quelques minutes.", res.status);
+  }
 
   if (res.status === 401 && auth) {
     logout();

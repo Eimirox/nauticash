@@ -3,8 +3,8 @@
 import { Suspense, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { apiFetch } from "@/lib/api";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000";
 
 // Mêmes règles que le backend (routes/auth.js)
 const RULES = [
@@ -35,13 +35,7 @@ function ResetPasswordForm() {
 
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/auth/reset-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, password }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.details?.[0]?.msg || data.message || "Erreur");
+      const data = await apiFetch("/api/auth/reset-password", { method: "POST", body: { token, password }, auth: false });
       setDone(data.message);
       setTimeout(() => router.push("/login"), 3000);
     } catch (err) {

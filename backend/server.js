@@ -114,6 +114,26 @@ app.post("/api/admin/update-prices", async (req, res) => {
 });
 
 // =============================================================================
+// ERREURS : toujours répondre en JSON (jamais la page HTML par défaut d'Express)
+// =============================================================================
+
+app.use((req, res) => {
+  res.status(404).json({ message: `Route introuvable : ${req.method} ${req.path}` });
+});
+
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  if (err.type === "entity.parse.failed") {
+    return res.status(400).json({ message: "Requête invalide (JSON mal formé)." });
+  }
+  if (err.type === "entity.too.large") {
+    return res.status(413).json({ message: "Requête trop volumineuse." });
+  }
+  console.error("❌ Unhandled error:", err);
+  res.status(500).json({ message: "Erreur serveur" });
+});
+
+// =============================================================================
 // MONGODB CONNECTION
 // =============================================================================
 
@@ -238,31 +258,35 @@ const startServer = async () => {
   }
 };
 
-// Gestion des erreurs non catchées
-process.on("unhandledRejection", (err) => {
-  console.error("❌ Unhandled Rejection:", err);
-});
+// Démarrage uniquement quand le fichier est lancé directement (node server.js).
+// Les tests importent `app` sans connexion MongoDB ni cron.
+if (require.main === module) {
+  // Gestion des erreurs non catchées
+  process.on("unhandledRejection", (err) => {
+    console.error("❌ Unhandled Rejection:", err);
+  });
 
-process.on("uncaughtException", (err) => {
-  console.error("❌ Uncaught Exception:", err);
-  process.exit(1);
-});
-
-// Graceful shutdown
-process.on("SIGINT", async () => {
-  console.log("\n🛑 Shutting down gracefully...");
-  
-  try {
-    await mongoose.connection.close();
-    console.log("✅ MongoDB connection closed");
-    process.exit(0);
-  } catch (error) {
-    console.error("❌ Error during shutdown:", error);
+  process.on("uncaughtException", (err) => {
+    console.error("❌ Uncaught Exception:", err);
     process.exit(1);
-  }
-});
+  });
 
-// Démarrer le serveur
-startServer();
+  // Graceful shutdown
+  process.on("SIGINT", async () => {
+    console.log("\n🛑 Shutting down gracefully...");
+
+    try {
+      await mongoose.connection.close();
+      console.log("✅ MongoDB connection closed");
+      process.exit(0);
+    } catch (error) {
+      console.error("❌ Error during shutdown:", error);
+      process.exit(1);
+    }
+  });
+
+  // Démarrer le serveur
+  startServer();
+}
 
 module.exports = app;

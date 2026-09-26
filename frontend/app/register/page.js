@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { apiFetch } from "@/lib/api";
 
 const passwordRules = [
   { id: "len", test: (s) => s.length >= 10, label: "Au moins 10 caractères" },
@@ -48,17 +49,7 @@ export default function Register() {
 
     try {
       setLoading(true);
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"}/api/auth/register`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password }),
-        }
-      );
-      const data = await res.json();
-
-      if (!res.ok) throw new Error(data.message || "Impossible de créer le compte");
+      const data = await apiFetch("/api/auth/register", { method: "POST", body: { email, password }, auth: false });
 
       localStorage.setItem("token", data.token);
       router.push("/portfolio");
