@@ -2,6 +2,12 @@
 // Provider pour Alpha Vantage (EU stocks + Dividendes)
 
 const config = require("../../config/providers");
+const { trackedFetchJson } = require("../apiUsage");
+
+const DAY = 24 * 60 * 60 * 1000;
+const PROFILE_TTL = 30 * DAY;
+const DIVIDENDS_TTL = 7 * DAY;
+const isStale = (date, ttl) => !date || Date.now() - new Date(date).getTime() > ttl;
 
 class AlphaVantageProvider {
   constructor() {
@@ -212,32 +218,28 @@ class AlphaVantageProvider {
   }
 
   /**
-   * Récupère le quote d'une action
+   * Appel HTTP compté dans le quota. Alpha Vantage renvoie ses erreurs
+   * (y compris "limite atteinte") avec un statut 200 : on les transforme en exceptions.
    */
-  async getQuote(ticker) {
+  async request(params) {
+    const query = new URLSearchParams({ ...params, apikey: this.apiKey }).toString();
+    const data = await trackedFetchJson("alphavantage", `${this.baseUrl}/query?${query}`);
+    if (data["Error Message"]) throw new Error(data["Error Message"]);
+    if (data["Note"] || data["Information"]) throw new Error("Alpha Vantage rate limit reached");
+    return data;
+  }
+
+  /**
+   * Récupère le quote d'une action (profil et dividendes seulement s'ils sont périmés)
+   */
+  async getQuote(ticker, { previous = null } = {}) {
     if (!this.config.enabled || !this.apiKey) {
       throw new Error("Alpha Vantage provider not configured");
     }
 
     try {
       // Alpha Vantage utilise GLOBAL_QUOTE
-      const url = `${this.baseUrl}/query?function=GLOBAL_QUOTE&symbol=${ticker}&apikey=${this.apiKey}`;
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        throw new Error(`Alpha Vantage API returned ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      // Alpha Vantage renvoie les erreurs dans le JSON
-      if (data["Error Message"]) {
-        throw new Error(data["Error Message"]);
-      }
-
-      if (data["Note"]) {
-        throw new Error("API rate limit reached");
-      }
+      const data = await this.request({ function: "GLOBAL_QUOTE", symbol: ticker });
 
       if (!data["Global Quote"] || Object.keys(data["Global Quote"]).length === 0) {
         throw new Error(`No data found for ${ticker}`);
@@ -248,21 +250,23 @@ class AlphaVantageProvider {
       // Normaliser les données
       const normalized = this.normalizeQuote(quote, ticker);
 
-      // Enrichir avec les dividendes
-      try {
+      // Enrichir avec les dividendes (au plus une fois par semaine)
+      if (isStale(previous?.dividendsUpdatedAt, DIVIDENDS_TTL)) {
         const dividendInfo = await this.getDividends(ticker);
         if (dividendInfo) {
           normalized.dividend = dividendInfo.annualDividend;
           normalized.dividendYield = dividendInfo.dividendYield;
           normalized.exDividendDate = dividendInfo.exDividendDate;
+          normalized.dividendsUpdatedAt = new Date();
         }
-      } catch (error) {
-        console.log(`⚠️ Could not fetch dividends for ${ticker}: ${error.message}`);
       }
 
-      // Enrichir avec le profil pour secteur/industrie
+      // Enrichir avec le profil pour secteur/industrie (au plus une fois par mois)
       try {
-        const profile = await this.getProfile(ticker);
+        const profile = isStale(previous?.profileUpdatedAt, PROFILE_TTL) || !previous?.sector
+          ? await this.getProfile(ticker)
+          : null;
+        if (profile) normalized.profileUpdatedAt = new Date();
         if (profile) {
           normalized.sector = profile.sector;
           normalized.industry = profile.industry;
@@ -292,18 +296,7 @@ class AlphaVantageProvider {
   async getDividends(ticker) {
     try {
       // Utiliser TIME_SERIES_MONTHLY_ADJUSTED pour avoir les dividendes
-      const url = `${this.baseUrl}/query?function=TIME_SERIES_MONTHLY_ADJUSTED&symbol=${ticker}&apikey=${this.apiKey}`;
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        throw new Error(`Alpha Vantage API returned ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      if (data["Error Message"] || data["Note"]) {
-        throw new Error("Could not fetch dividends");
-      }
+      const data = await this.request({ function: "TIME_SERIES_MONTHLY_ADJUSTED", symbol: ticker });
 
       const timeSeries = data["Monthly Adjusted Time Series"];
       if (!timeSeries) {
@@ -364,18 +357,8 @@ class AlphaVantageProvider {
 
     // Pour les US stocks, essayer l'API (peut échouer avec rate limit)
     try {
-      const url = `${this.baseUrl}/query?function=OVERVIEW&symbol=${ticker}&apikey=${this.apiKey}`;
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        throw new Error(`Alpha Vantage API returned ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      if (data["Error Message"] || data["Note"] || Object.keys(data).length === 0) {
-        return null;
-      }
+      const data = await this.request({ function: "OVERVIEW", symbol: ticker });
+      if (Object.keys(data).length === 0) return null;
 
       return {
         name: data.Name || ticker,
@@ -514,18 +497,8 @@ class AlphaVantageProvider {
    */
   async healthCheck() {
     try {
-      const url = `${this.baseUrl}/query?function=GLOBAL_QUOTE&symbol=AAPL&apikey=${this.apiKey}`;
-      const response = await fetch(url);
-
-      const data = await response.json();
-      const healthy = response.ok && !data["Error Message"] && !data["Note"];
-
-      return {
-        provider: this.name,
-        healthy,
-        status: response.status,
-        timestamp: new Date(),
-      };
+      await this.request({ function: "GLOBAL_QUOTE", symbol: "AAPL" });
+      return { provider: this.name, healthy: true, timestamp: new Date() };
     } catch (error) {
       return {
         provider: this.name,

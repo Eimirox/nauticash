@@ -2,6 +2,7 @@
 // Service principal pour gérer les prix - Multi-provider avec fallback
 
 const config = require("../config/providers");
+const apiUsage = require("./apiUsage");
 const FMPProvider = require("./providers/fmp");
 const AlphaVantageProvider = require("./providers/alphavantage");
 // À ajouter plus tard :
@@ -12,7 +13,6 @@ class PriceService {
   constructor() {
     this.providers = this.initializeProviders();
     this.cache = new Map(); // Cache en mémoire (sera remplacé par Redis si nécessaire)
-    this.requestCounts = new Map(); // Rate limiting
   }
 
   /**
@@ -52,7 +52,7 @@ class PriceService {
    * Récupère le quote d'un ticker avec fallback intelligent
    */
   async getQuote(ticker, options = {}) {
-    const { forceRefresh = false, preferredProvider = null } = options;
+    const { forceRefresh = false, preferredProvider = null, previous = null } = options;
 
     // 1. Vérifier le cache d'abord (sauf si forceRefresh)
     if (!forceRefresh) {
@@ -93,11 +93,8 @@ class PriceService {
       try {
         console.log(`🔄 Fetching ${ticker} from ${providerName}...`);
 
-        quote = await provider.getQuote(ticker);
+        quote = await provider.getQuote(ticker, { previous });
         usedProvider = providerName;
-
-        // Incrémenter le compteur de requêtes
-        this.incrementRequestCount(providerName);
 
         console.log(`✅ ${ticker} fetched from ${providerName}`);
         break; // On a réussi, sortir de la boucle
@@ -120,51 +117,31 @@ class PriceService {
       throw new Error(`No provider available for ${ticker}`);
     }
 
-    // 4. ENRICHISSEMENT : Si on a utilisé FMP et que les dividendes sont null,
-    //    essayer d'enrichir avec Alpha Vantage (US stocks ET EU stocks)
+    // 4. ENRICHISSEMENT : FMP n'a pas pu vérifier les dividendes d'une action
+    //    → on tente Alpha Vantage, sauf si on a déjà une donnée de moins de 7 jours.
+    //    (Quand Alpha Vantage est le provider, il récupère déjà les dividendes lui-même.)
+    const dividendsChecked =
+      quote.dividendsUpdatedAt ||
+      (previous?.dividendsUpdatedAt && Date.now() - new Date(previous.dividendsUpdatedAt).getTime() < 7 * 86400000);
+
     if (
       usedProvider === "fmp" &&
       !quote.dividend &&
-      quote.type === "Stock" && // Uniquement les stocks (pas crypto, pas ETF)
-      !ticker.includes("BTC") && !ticker.includes("ETH") && // Pas de crypto
-      this.providers.alphavantage &&
-      this.providers.alphavantage.config.enabled
-    ) {
-      try {
-        console.log(`💰 Enriching ${ticker} dividends from Alpha Vantage...`);
-        const dividendInfo = await this.providers.alphavantage.getDividends(ticker);
-        
-        if (dividendInfo && dividendInfo.annualDividend) {
-          quote.dividend = dividendInfo.annualDividend;
-          quote.dividendYield = dividendInfo.dividendYield;
-          quote.exDividendDate = dividendInfo.exDividendDate;
-          console.log(`✅ Dividends enriched: ${dividendInfo.annualDividend}`);
-        }
-      } catch (error) {
-        console.log(`⚠️ Could not enrich dividends: ${error.message}`);
-      }
-    }
-
-    // 5. ENRICHISSEMENT pour EU stocks (quand Alpha Vantage est le provider)
-    if (
-      usedProvider === "alphavantage" &&
-      !quote.dividend &&
+      !dividendsChecked &&
       quote.type === "Stock" &&
-      this.providers.alphavantage &&
-      this.providers.alphavantage.config.enabled
+      this.providers.alphavantage?.config.enabled &&
+      apiUsage.canCall("alphavantage")
     ) {
       try {
-        console.log(`💰 Enriching ${ticker} dividends from Alpha Vantage...`);
         const dividendInfo = await this.providers.alphavantage.getDividends(ticker);
-        
         if (dividendInfo && dividendInfo.annualDividend) {
           quote.dividend = dividendInfo.annualDividend;
           quote.dividendYield = dividendInfo.dividendYield;
           quote.exDividendDate = dividendInfo.exDividendDate;
-          console.log(`✅ Dividends enriched: ${dividendInfo.annualDividend}`);
+          quote.dividendsUpdatedAt = new Date();
         }
       } catch (error) {
-        console.log(`⚠️ Could not enrich dividends: ${error.message}`);
+        console.log(`⚠️ Could not enrich dividends for ${ticker}: ${error.message}`);
       }
     }
 
@@ -221,7 +198,6 @@ class PriceService {
             this.saveToCache(quote.symbol, quote);
           });
 
-          this.incrementRequestCount(providerName); // 1 seule requête pour le batch
         } else {
           // Requêtes individuelles
           for (const ticker of tickerGroup) {
@@ -356,28 +332,7 @@ class PriceService {
    * Rate limiting
    */
   checkRateLimit(providerName) {
-    if (!config.rateLimiting.enabled) return true;
-
-    const now = Date.now();
-    const window = config.rateLimiting.window;
-    const counts = this.requestCounts.get(providerName) || [];
-
-    // Nettoyer les anciennes entrées
-    const recentCounts = counts.filter((timestamp) => now - timestamp < window);
-
-    const providerConfig = config[providerName];
-    if (!providerConfig || !providerConfig.limits) return true;
-
-    const limit = providerConfig.limits.free.requestsPerMinute;
-    if (!limit) return true; // Pas de limite
-
-    return recentCounts.length < limit;
-  }
-
-  incrementRequestCount(providerName) {
-    const counts = this.requestCounts.get(providerName) || [];
-    counts.push(Date.now());
-    this.requestCounts.set(providerName, counts);
+    return apiUsage.canCall(providerName);
   }
 
   /**
@@ -391,23 +346,8 @@ class PriceService {
    * Stats d'utilisation
    */
   getUsageStats() {
-    const stats = {};
-
-    for (const [providerName, timestamps] of this.requestCounts.entries()) {
-      const now = Date.now();
-      const last24h = timestamps.filter((t) => now - t < 86400000);
-
-      stats[providerName] = {
-        total: timestamps.length,
-        last24h: last24h.length,
-        lastRequest: timestamps[timestamps.length - 1]
-          ? new Date(timestamps[timestamps.length - 1])
-          : null,
-      };
-    }
-
     return {
-      providers: stats,
+      providers: apiUsage.stats(),
       cacheSize: this.cache.size,
       cacheEntries: Array.from(this.cache.keys()),
     };

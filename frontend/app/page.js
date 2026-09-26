@@ -354,8 +354,8 @@ export default function Home() {
                 {lang === "FR" ? "Légal" : "Legal"}
               </h4>
               <ul className="space-y-2 text-sm text-slate-600">
-                <li><a href="#" className="hover:text-emerald-600 transition">Conditions d'utilisation</a></li>
-                <li><a href="#" className="hover:text-emerald-600 transition">Politique de confidentialité</a></li>
+                <li><a href="/cgu" className="hover:text-emerald-600 transition">Conditions d'utilisation</a></li>
+                <li><a href="/confidentialite" className="hover:text-emerald-600 transition">Politique de confidentialité</a></li>
               </ul>
             </div>
           </div>

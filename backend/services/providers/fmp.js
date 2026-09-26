@@ -2,6 +2,19 @@
 // Provider pour Financial Modeling Prep (FMP)
 
 const config = require("../../config/providers");
+const { trackedFetchJson } = require("../apiUsage");
+
+const DAY = 24 * 60 * 60 * 1000;
+const PROFILE_TTL = 30 * DAY;
+const DIVIDENDS_TTL = 7 * DAY;
+const isStale = (date, ttl) => !date || Date.now() - new Date(date).getTime() > ttl;
+
+// Pays renvoyé par le profil FMP (code ISO) → libellé utilisé par l'app
+const ISO_TO_COUNTRY = {
+  US: "États-Unis", FR: "France", NL: "Pays-Bas", GB: "Royaume-Uni", DE: "Allemagne",
+  CH: "Suisse", IE: "Irlande", LU: "Luxembourg", BE: "Belgique", ES: "Espagne",
+  IT: "Italie", CA: "Canada", JP: "Japon", CN: "Chine", DK: "Danemark", SE: "Suède",
+};
 
 class FMPProvider {
   constructor() {
@@ -12,174 +25,120 @@ class FMPProvider {
   }
 
   /**
-   * Récupère le quote d'une action
+   * Appel HTTP compté dans le quota (voir services/apiUsage.js)
    */
-  async getQuote(ticker) {
+  async request(path, params) {
+    const query = new URLSearchParams({ ...params, apikey: this.apiKey }).toString();
+    return trackedFetchJson("fmp", `${this.baseUrl}/${path}?${query}`);
+  }
+
+  /**
+   * Récupère le quote d'une action.
+   * `previous` = données déjà en base : le profil (30 j) et les dividendes (7 j)
+   * ne sont re-téléchargés que s'ils sont périmés → 1 seul appel API dans la plupart des cas.
+   */
+  async getQuote(ticker, { previous = null } = {}) {
     if (!this.config.enabled || !this.apiKey) {
       throw new Error("FMP provider not configured");
     }
 
-    // Mapping des tickers spéciaux (ex: BTC-USD → BTCUSD)
     const mappedTicker = this.config.tickerMapping[ticker] || ticker;
 
-    try {
-      const url = `${this.baseUrl}/quote?symbol=${mappedTicker}&apikey=${this.apiKey}`;
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        throw new Error(`FMP API returned ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      if (!data || data.length === 0) {
-        throw new Error(`No data found for ${ticker}`);
-      }
-
-      // Normaliser les données au format standard
-      const quote = this.normalizeQuote(data[0], ticker);
-
-      // Enrichir avec le profil (secteur, industrie) si c'est un stock
-      if (quote.type === "Stock" || quote.type === "ETF") {
-        try {
-          const profile = await this.getProfile(ticker);
-          if (profile) {
-            quote.sector = profile.sector;
-            quote.industry = profile.industry;
-          }
-        } catch (error) {
-          // Si le profil échoue, on continue quand même
-          console.log(`⚠️ Could not fetch profile for ${ticker}: ${error.message}`);
-        }
-
-        // Enrichir avec les dividendes détaillés si l'action paie des dividendes
-        if (quote.dividend || data[0].annualDividend) {
-          try {
-            const dividendInfo = await this.getDividends(ticker);
-            if (dividendInfo) {
-              quote.dividend = dividendInfo.annualDividend || dividendInfo.dividend || quote.dividend;
-              quote.dividendYield = dividendInfo.dividendYield || quote.dividendYield;
-              quote.exDividendDate = dividendInfo.exDividendDate || quote.exDividendDate;
-              quote.paymentDate = dividendInfo.paymentDate || null;
-              quote.recordDate = dividendInfo.recordDate || null;
-            }
-          } catch (error) {
-            // Si les dividendes échouent, on continue avec les données du quote
-            console.log(`⚠️ Could not fetch dividends for ${ticker}: ${error.message}`);
-          }
-        }
-      }
-
-      return quote;
-    } catch (error) {
-      console.error(`❌ FMP getQuote error for ${ticker}:`, error.message);
-      throw error;
+    const data = await this.request("quote", { symbol: mappedTicker });
+    if (!Array.isArray(data) || data.length === 0) {
+      throw new Error(`No data found for ${ticker}`);
     }
+
+    const quote = this.normalizeQuote(data[0], ticker);
+    if (quote.type === "Crypto") return quote;
+
+    // Profil (nom, secteur, industrie, type ETF) : rarement modifié
+    if (isStale(previous?.profileUpdatedAt, PROFILE_TTL) || !previous?.sector || previous.sector === "Unknown") {
+      const profile = await this.getProfile(mappedTicker);
+      if (profile) {
+        quote.name = profile.name || quote.name;
+        quote.sector = profile.sector;
+        quote.industry = profile.industry;
+        if (profile.isEtf || profile.isFund) quote.type = "ETF";
+        if (quote.country === "Unknown" && profile.country) quote.country = profile.country;
+        if (!data[0].currency && profile.currency) quote.currency = profile.currency;
+        if (!quote.dividend && profile.lastDividend) quote.dividend = profile.lastDividend;
+        quote.profileUpdatedAt = new Date();
+      }
+    } else if (previous) {
+      quote.name = previous.name || quote.name;
+      quote.sector = previous.sector;
+      quote.industry = previous.industry;
+      quote.type = previous.type || quote.type;
+      if (quote.country === "Unknown") quote.country = previous.country || quote.country;
+    }
+
+    // Dividendes : un changement par trimestre au plus
+    if (quote.type !== "ETF" && isStale(previous?.dividendsUpdatedAt, DIVIDENDS_TTL)) {
+      const div = await this.getDividends(mappedTicker, quote.price);
+      if (div) {
+        Object.assign(quote, div);
+        quote.dividendsUpdatedAt = new Date();
+      }
+    }
+
+    return quote;
   }
 
   /**
-   * Récupère les dividendes d'une action
+   * Dividendes des 12 derniers mois (endpoint /stable/dividends)
    */
-  async getDividends(ticker) {
+  async getDividends(ticker, price = null) {
     try {
-      // FMP a un endpoint dédié pour les dividendes historiques
-      const url = `${this.baseUrl}/historical-price-full/stock_dividend/${ticker}?apikey=${this.apiKey}`;
-      const response = await fetch(url);
+      const data = await this.request("dividends", { symbol: ticker });
+      if (!Array.isArray(data)) return null;
 
-      if (!response.ok) {
-        // Si l'endpoint dédié échoue, on essaie de récupérer depuis /quote
-        return await this.getDividendsFromQuote(ticker);
+      if (data.length === 0) {
+        // Action sans dividende : on le mémorise pour ne pas redemander avant 7 jours
+        return { dividend: null, dividendYield: null, exDividendDate: null, paymentDate: null, recordDate: null };
       }
 
-      const data = await response.json();
-
-      if (!data || !data.historical || data.historical.length === 0) {
-        return await this.getDividendsFromQuote(ticker);
-      }
-
-      // Prendre le dividende le plus récent
-      const latestDividend = data.historical[0];
+      const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
+      const lastYear = data.filter((d) => new Date(d.date).getTime() >= oneYearAgo);
+      const annual = lastYear.reduce((sum, d) => sum + (Number(d.adjDividend ?? d.dividend) || 0), 0);
+      const latest = data[0];
 
       return {
-        dividend: latestDividend.dividend || null,
-        annualDividend: latestDividend.adjDividend || null,
-        exDividendDate: latestDividend.date || null,
-        paymentDate: latestDividend.paymentDate || null,
-        recordDate: latestDividend.recordDate || null,
-        dividendYield: null, // Sera calculé par le quote
+        dividend: annual > 0 ? annual : null,
+        dividendRate: annual > 0 ? annual : null,
+        dividendYield: annual > 0 && price > 0 ? (annual / price) * 100 : null,
+        exDividendDate: latest.date || null,
+        paymentDate: latest.paymentDate || null,
+        recordDate: latest.recordDate || null,
       };
     } catch (error) {
+      if (error.code === "QUOTA_EXCEEDED") throw error;
       console.error(`❌ FMP getDividends error for ${ticker}:`, error.message);
-      return await this.getDividendsFromQuote(ticker);
-    }
-  }
-
-  /**
-   * Récupère les dividendes depuis l'endpoint /quote (fallback)
-   */
-  async getDividendsFromQuote(ticker) {
-    try {
-      const url = `${this.baseUrl}/quote?symbol=${ticker}&apikey=${this.apiKey}`;
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        return null;
-      }
-
-      const data = await response.json();
-
-      if (!data || data.length === 0) {
-        return null;
-      }
-
-      const quote = data[0];
-
-      return {
-        annualDividend: quote.annualDividend || null,
-        dividend: quote.annualDividend || null,
-        dividendYield: quote.dividendYield ? quote.dividendYield * 100 : null, // Convertir en pourcentage
-        exDividendDate: quote.exDividendDate || null,
-        dividendRate: quote.annualDividend || null,
-        paymentDate: null,
-        recordDate: null,
-      };
-    } catch (error) {
-      console.error(`❌ FMP getDividendsFromQuote error for ${ticker}:`, error.message);
       return null;
     }
   }
 
   /**
-   * Récupère les infos d'un profil d'entreprise
+   * Profil d'entreprise (endpoint /stable/profile)
    */
   async getProfile(ticker) {
     try {
-      const url = `${this.baseUrl}/profile?symbol=${ticker}&apikey=${this.apiKey}`;
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        throw new Error(`FMP API returned ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      if (!data || data.length === 0) {
-        return null;
-      }
+      const data = await this.request("profile", { symbol: ticker });
+      if (!Array.isArray(data) || data.length === 0) return null;
 
       const profile = data[0];
-
       return {
         name: profile.companyName || ticker,
         sector: profile.sector || "Unknown",
         industry: profile.industry || "Unknown",
-        country: profile.country || "Unknown",
-        exchange: profile.exchangeShortName || "Unknown",
-        currency: profile.currency || "USD",
-        website: profile.website || null,
-        description: profile.description || null,
+        country: ISO_TO_COUNTRY[profile.country] || null,
+        currency: profile.currency || null,
+        isEtf: Boolean(profile.isEtf),
+        isFund: Boolean(profile.isFund),
+        lastDividend: Number(profile.lastDividend) || null,
       };
     } catch (error) {
+      if (error.code === "QUOTA_EXCEEDED") throw error;
       console.error(`❌ FMP getProfile error for ${ticker}:`, error.message);
       return null;
     }
@@ -195,16 +154,7 @@ class FMPProvider {
 
     try {
       // FMP supporte jusqu'à ~50 tickers par requête
-      const tickerList = tickers.join(",");
-      const url = `${this.baseUrl}/quote?symbol=${tickerList}&apikey=${this.apiKey}`;
-
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        throw new Error(`FMP API returned ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await this.request("quote", { symbol: tickers.join(",") });
 
       if (!data || data.length === 0) {
         return [];
@@ -233,7 +183,7 @@ class FMPProvider {
       volume: fmpData.volume || null,
       previousClose: fmpData.previousClose || null,
       change: fmpData.change || null,
-      changePercent: fmpData.changesPercentage || null,
+      changePercent: fmpData.changePercentage ?? fmpData.changesPercentage ?? null,
       marketCap: fmpData.marketCap || null,
       currency: this.detectCurrency(fmpData, originalTicker),
       exchange: fmpData.exchange || fmpData.exchangeShortName || "Unknown",
@@ -367,15 +317,8 @@ class FMPProvider {
    */
   async healthCheck() {
     try {
-      const url = `${this.baseUrl}/quote?symbol=AAPL&apikey=${this.apiKey}`;
-      const response = await fetch(url);
-
-      return {
-        provider: this.name,
-        healthy: response.ok,
-        status: response.status,
-        timestamp: new Date(),
-      };
+      await this.request("quote", { symbol: "AAPL" });
+      return { provider: this.name, healthy: true, timestamp: new Date() };
     } catch (error) {
       return {
         provider: this.name,

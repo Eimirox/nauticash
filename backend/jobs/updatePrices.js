@@ -6,7 +6,7 @@ require("dotenv").config();
 
 const cron = require("node-cron");
 const mongoose = require("mongoose");
-const priceService = require("../services/priceService");
+const priceStore = require("../services/priceStore");
 const config = require("../config/providers");
 
 class PriceUpdater {
@@ -174,9 +174,10 @@ class PriceUpdater {
    * Actualise les prix de tous les tickers
    */
   async updatePrices(tickers) {
-    const Prices = mongoose.connection.collection("prices");
     const delay = config.cron.updatePrices.delayBetweenRequests;
-    const maxCacheAge = 6 * 60 * 60 * 1000; // 6 heures en millisecondes
+    // Un peu moins que l'intervalle du cron, pour ne pas sauter un run sur deux
+    const maxAgeMs = Math.round(config.cache.maxAge * 0.8);
+    const isWeekend = [0, 6].includes(new Date().getUTCDay());
 
     let successCount = 0;
     let failCount = 0;
@@ -189,93 +190,42 @@ class PriceUpdater {
       const progress = `[${i + 1}/${tickers.length}]`;
 
       try {
-        // 1. Vérifier si on a déjà des données récentes en cache
-        const cached = await Prices.findOne({ symbol: ticker });
-        const cacheAge = cached ? Date.now() - new Date(cached.lastUpdate).getTime() : Infinity;
-        
-        // Si les données ont moins de 6h, skip (sauf si pas de secteur/dividende)
-        if (cached && cacheAge < maxCacheAge) {
-          // Vérifier si les données sont complètes (secteur + dividende si applicable)
-          const needsEnrichment = 
-            (cached.sector === null || cached.sector === "Unknown") ||
-            (cached.type === "Stock" && cached.dividend === null && !ticker.includes("BTC"));
-          
-          if (!needsEnrichment) {
-            console.log(`${progress} ⏭️ ${ticker} - Skipped (cache: ${Math.round(cacheAge / 60000)}min old)`);
+        // Le week-end, seules les cryptos bougent : inutile de consommer du quota pour les actions
+        if (isWeekend) {
+          const cached = await priceStore.getCached(ticker);
+          if (cached && cached.type !== "Crypto") {
             skippedCount++;
             continue;
           }
         }
 
-        // 2. Fetch depuis l'API avec forceRefresh si >6h ou données incomplètes
-        const quote = await priceService.getQuote(ticker, { forceRefresh: true });
+        const { doc, fromCache } = await priceStore.refreshTicker(ticker, { maxAgeMs });
+        if (fromCache) {
+          skippedCount++;
+          continue;
+        }
 
-        // 3. Récupérer les anciennes données pour préserver les dividendes si nécessaire
-        const oldData = await Prices.findOne({ symbol: ticker });
-
-        // 4. Si l'enrichissement dividendes a échoué (null) mais qu'on avait une ancienne valeur, la garder
-        const finalDividend = quote.dividend !== null ? quote.dividend : oldData?.dividend || null;
-        const finalDividendYield = quote.dividendYield !== null ? quote.dividendYield : oldData?.dividendYield || null;
-        const finalExDividendDate = quote.exDividendDate || oldData?.exDividendDate || null;
-
-        // 5. Sauvegarder dans MongoDB
-        await Prices.updateOne(
-          { symbol: ticker },
-          {
-            $set: {
-              symbol: ticker,
-              close: quote.price || quote.close,
-              open: quote.open,
-              high: quote.high,
-              low: quote.low,
-              volume: quote.volume,
-              previousClose: quote.previousClose,
-              change: quote.change,
-              changePercent: quote.changePercent,
-              marketCap: quote.marketCap,
-              currency: quote.currency,
-              exchange: quote.exchange,
-              country: quote.country,
-              sector: quote.sector,
-              industry: quote.industry,
-              type: quote.type,
-              dividend: finalDividend,
-              dividendYield: finalDividendYield,
-              dividendRate: finalDividend,
-              exDividendDate: finalExDividendDate,
-              paymentDate: quote.paymentDate,
-              recordDate: quote.recordDate,
-              name: quote.name,
-              lastUpdate: new Date(),
-              source: quote.source,
-            },
-          },
-          { upsert: true }
-        );
-
-        console.log(`${progress} ✅ ${ticker} - ${quote.price} ${quote.currency}`);
+        console.log(`${progress} ✅ ${ticker} - ${doc.close} ${doc.currency}`);
         successCount++;
         this.stats.successfulUpdates++;
       } catch (error) {
         console.log(`${progress} ❌ ${ticker} - ${error.message}`);
-        
-        // En cas d'erreur (rate limit), garder les données en cache
-        const cached = await Prices.findOne({ symbol: ticker });
-        if (cached) {
-          console.log(`   ℹ️ Keeping cached data from ${new Date(cached.lastUpdate).toLocaleString()}`);
-        }
-        
         failCount++;
         this.stats.failedUpdates++;
+
+        // Quota atteint sur tous les providers : inutile de continuer, les anciens prix restent en base
+        if (/quota|rate limit/i.test(error.message)) {
+          console.log("⏸️ Quota atteint, arrêt de l'actualisation (les prix en cache sont conservés).");
+          break;
+        }
       }
 
-      // Attendre entre chaque requête pour respecter les rate limits
       if (i < tickers.length - 1) {
         await this.sleep(delay);
       }
     }
 
-    console.log(`\n📊 Results: ${successCount} success, ${failCount} failed, ${skippedCount} skipped (cache)`);
+    console.log(`\n📊 Results: ${successCount} updated, ${failCount} failed, ${skippedCount} skipped (still fresh)`);
   }
 
   /**

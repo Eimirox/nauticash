@@ -346,11 +346,11 @@ export default function Register() {
               />
               <label htmlFor="accept" className="text-sm text-slate-700">
                 J'accepte les{" "}
-                <a href="#" className="text-emerald-600 hover:text-emerald-700 font-medium">
+                <a href="/cgu" target="_blank" className="text-emerald-600 hover:text-emerald-700 font-medium">
                   conditions d'utilisation
                 </a>{" "}
                 et la{" "}
-                <a href="#" className="text-emerald-600 hover:text-emerald-700 font-medium">
+                <a href="/confidentialite" target="_blank" className="text-emerald-600 hover:text-emerald-700 font-medium">
                   politique de confidentialité
                 </a>
               </label>

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { formatCurrencySymbol } from "./utils/formats";
 import { exchangeToCountry } from "./utils/exchangeMap";
 import { getPerformanceClass } from "./utils/styles";
+import { apiFetch, logout as apiLogout } from "@/lib/api";
 
 export default function Portfolio() {
   const router = useRouter();
@@ -98,40 +99,12 @@ export default function Portfolio() {
     setStocks((prev) => sortStocksGeneric(prev, sort));
   }, [sort]);
 
-  useEffect(() => {
-    const saved = localStorage.getItem("cashData");
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (
-          typeof parsed.amount === "number" &&
-          typeof parsed.currency === "string"
-        ) {
-          setCash(parsed);
-        }
-      } catch {}
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem("cashData", JSON.stringify(cash));
-  }, [cash]);
-
   const fetchPortfolio = async () => {
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem("token");
-      if (!token) throw new Error("Token manquant");
-
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"}/api/user/portfolio`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error(`Status ${res.status}`);
-
-      const data = await res.json();
-      const incomingStocks = data.stocks || [];
-      setStocks(sortStocksGeneric(incomingStocks, sort));
+      const data = await apiFetch("/api/user/portfolio");
+      setStocks(sortStocksGeneric(data.stocks || [], sort));
       setCash(data.cash || { amount: 0, currency: "EUR" });
     } catch (err) {
       setError(err.message);
@@ -140,19 +113,25 @@ export default function Portfolio() {
     }
   };
 
+  const [refreshing, setRefreshing] = useState(false);
+  const [notice, setNotice] = useState(null);
+
   const handleUpdatePrices = async () => {
-    const token = localStorage.getItem("token");
+    setError(null);
+    setNotice(null);
+    setRefreshing(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"}/api/user/portfolio`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error("Échec de la mise à jour des prix");
+      const r = await apiFetch("/api/user/portfolio/force-refresh", { method: "POST" });
       await fetchPortfolio();
-      alert("✅ Mise à jour effectuée !");
+      setNotice(
+        r.failed
+          ? `Prix actualisés (${r.failed} ticker(s) en échec).`
+          : "Prix actualisés."
+      );
     } catch (err) {
-      console.error("Erreur lors de la mise à jour :", err.message);
-      alert("❌ Échec de la mise à jour");
+      setError(err.message);
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -160,40 +139,29 @@ export default function Portfolio() {
     fetchPortfolio();
   }, []);
 
+  const [adding, setAdding] = useState(false);
+
   const addStock = async () => {
-    if (!ticker.trim()) return;
-    const token = localStorage.getItem("token");
-    if (!token) return router.push("/login");
+    const t = ticker.trim().toUpperCase();
+    if (!t || adding) return;
+    setError(null);
+    setAdding(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"}/api/user/portfolio`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ ticker: ticker.toUpperCase() }),
-      });
-      if (!res.ok) throw new Error(`Status ${res.status}`);
+      await apiFetch("/api/user/portfolio", { method: "POST", body: { ticker: t } });
       await fetchPortfolio();
       setTicker("");
     } catch (err) {
       setError(err.message);
+    } finally {
+      setAdding(false);
     }
   };
 
   const removeStock = async (tickerToRemove) => {
-    const token = localStorage.getItem("token");
-    if (!token) return router.push("/login");
+    if (!window.confirm(`Supprimer ${tickerToRemove} du portefeuille ?`)) return;
+    setError(null);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"}/api/user/portfolio`, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ ticker: tickerToRemove }),
-      });
-      if (!res.ok) throw new Error(`Status ${res.status}`);
+      await apiFetch(`/api/user/portfolio/${encodeURIComponent(tickerToRemove)}`, { method: "DELETE" });
       setStocks((prev) => prev.filter((s) => s.ticker !== tickerToRemove));
     } catch (err) {
       setError(err.message);
@@ -201,6 +169,10 @@ export default function Portfolio() {
   };
 
   const handleUpdateStock = (ticker, field, value) => {
+    if (!Number.isFinite(value) || value < 0) {
+      setError("La quantité et le PRU doivent être des nombres positifs.");
+      return;
+    }
     setStocks((prev) => {
       const updated = prev.map((s) =>
         s.ticker === ticker ? { ...s, [field]: value } : s
@@ -211,45 +183,27 @@ export default function Portfolio() {
   };
 
   const syncStockUpdate = async (ticker, field, value) => {
-    const token = localStorage.getItem("token");
-    if (!token) return router.push("/login");
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"}/api/user/portfolio`, {
+      await apiFetch(`/api/user/portfolio/${encodeURIComponent(ticker)}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ ticker, field, value }),
+        body: { [field]: value },
       });
-      if (!res.ok) throw new Error(`Status ${res.status}`);
     } catch (err) {
-      console.error("Sync backend failed:", err.message);
+      setError(`Modification non enregistrée : ${err.message}`);
+      fetchPortfolio();
     }
   };
 
   const syncCashUpdate = async (amount, currency) => {
-    const token = localStorage.getItem("token");
-    if (!token) return router.push("/login");
+    if (!Number.isFinite(amount)) return;
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"}/api/user/portfolio`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ amount, currency }),
-      });
-      if (!res.ok) throw new Error(`Erreur backend cash: ${res.status}`);
+      await apiFetch("/api/user/cash", { method: "PATCH", body: { amount, currency } });
     } catch (err) {
-      console.error("Erreur syncCashUpdate :", err.message);
+      setError(`Cash non enregistré : ${err.message}`);
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem("token");
-    router.push("/login");
-  };
+  const logout = () => apiLogout();
 
   const portfolioTotalsByCurrency = stocks.reduce((acc, s) => {
     if (typeof s.close === "number" && typeof s.quantity === "number") {
@@ -623,7 +577,8 @@ export default function Portfolio() {
               </button>
               <button
                 onClick={handleUpdatePrices}
-                className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-all"
+                disabled={refreshing}
+                className="disabled:opacity-50 disabled:cursor-wait px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-all"
               >
                 <svg
                   className="w-4 h-4 sm:hidden"
@@ -679,6 +634,12 @@ export default function Portfolio() {
               />
             </svg>
             <p className="text-sm text-red-700">{error}</p>
+          </div>
+        )}
+
+        {notice && (
+          <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-800">
+            {notice}
           </div>
         )}
 
@@ -766,8 +727,9 @@ export default function Portfolio() {
                   onChange={(e) => {
                     const newVal = parseFloat(e.target.value) || 0;
                     setCash((prev) => ({ ...prev, amount: newVal }));
-                    syncCashUpdate(newVal, cash.currency);
                   }}
+                  onBlur={() => syncCashUpdate(cash.amount, cash.currency)}
+                  onKeyDown={(e) => e.key === "Enter" && e.target.blur()}
                   className="w-32 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                 />
               </div>
@@ -786,6 +748,8 @@ export default function Portfolio() {
                 >
                   <option value="EUR">EUR</option>
                   <option value="USD">USD</option>
+                  <option value="GBP">GBP</option>
+                  <option value="CHF">CHF</option>
                 </select>
               </div>
               <div className="flex items-end">
@@ -827,7 +791,8 @@ export default function Portfolio() {
           </div>
           <button
             onClick={addStock}
-            className="px-5 py-2 bg-gradient-to-r from-emerald-600 to-blue-600 text-white text-sm font-semibold rounded-lg hover:shadow-lg hover:scale-105 transition-all"
+            disabled={adding}
+            className="disabled:opacity-50 disabled:cursor-wait px-5 py-2 bg-gradient-to-r from-emerald-600 to-blue-600 text-white text-sm font-semibold rounded-lg hover:shadow-lg hover:scale-105 transition-all"
           >
             <span className="flex items-center gap-2">
               <svg
