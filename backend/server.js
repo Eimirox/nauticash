@@ -114,6 +114,26 @@ app.post("/api/admin/update-prices", async (req, res) => {
 });
 
 // =============================================================================
+// ERREURS : toujours répondre en JSON (jamais la page HTML par défaut d'Express)
+// =============================================================================
+
+app.use((req, res) => {
+  res.status(404).json({ message: `Route introuvable : ${req.method} ${req.path}` });
+});
+
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  if (err.type === "entity.parse.failed") {
+    return res.status(400).json({ message: "Requête invalide (JSON mal formé)." });
+  }
+  if (err.type === "entity.too.large") {
+    return res.status(413).json({ message: "Requête trop volumineuse." });
+  }
+  console.error("❌ Unhandled error:", err);
+  res.status(500).json({ message: "Erreur serveur" });
+});
+
+// =============================================================================
 // MONGODB CONNECTION
 // =============================================================================
 

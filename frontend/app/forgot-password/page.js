@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { apiFetch } from "@/lib/api";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -17,13 +17,7 @@ export default function ForgotPassword() {
     setLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE}/api/auth/forgot-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.details?.[0]?.msg || data.message || "Erreur");
+      const data = await apiFetch("/api/auth/forgot-password", { method: "POST", body: { email }, auth: false });
       setSent(data.message);
     } catch (err) {
       setError(err.message);
