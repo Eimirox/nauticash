@@ -1,92 +1,94 @@
 // backend/routes/user.js
-// Routes utilisateur - Version optimisée avec cache
+// Routes utilisateur : portefeuille, cash, statistiques
 
 const express = require("express");
-const auth = require("../middleware/auth");
 const mongoose = require("mongoose");
-const priceService = require("../services/priceService");
+const auth = require("../middleware/auth");
+const priceStore = require("../services/priceStore");
 
 const router = express.Router();
 
+const users = () => mongoose.connection.collection("users");
+const userFilter = (req) => ({ _id: new mongoose.Types.ObjectId(req.user.userId) });
+
+// Un ticker = lettres/chiffres et . - ^ = (ex : AAPL, MC.PA, BTC-USD, ^GSPC)
+const TICKER_RE = /^[A-Z0-9.\-^=]{1,20}$/;
+const normalizeTicker = (t) => (typeof t === "string" ? t.trim().toUpperCase() : "");
+
+const toNumber = (v) => (v === "" || v === null || v === undefined ? NaN : Number(v));
+const isValidAmount = (n) => Number.isFinite(n) && n >= 0 && n < 1e12;
+
+const CURRENCIES = ["EUR", "USD", "GBP", "CHF", "CAD", "JPY"];
+
+// Données de prix réutilisées si elles ont moins de 15 min (ajout d'une action déjà suivie)
+const FRESH_PRICE_MS = 15 * 60 * 1000;
+// Actualisation manuelle : au plus une toutes les 15 min par utilisateur
+const FORCE_REFRESH_COOLDOWN_MS = 15 * 60 * 1000;
+
+// Cash : format cashAmount/cashCurrency. L'ancien champ "cash" (écrit par l'ancienne
+// route) reste prioritaire s'il existe encore ; il est supprimé à la prochaine sauvegarde.
+function readCash(user) {
+  if (user.cash && typeof user.cash.amount === "number") {
+    return { amount: user.cash.amount, currency: user.cash.currency || "EUR" };
+  }
+  return { amount: user.cashAmount ?? 0, currency: user.cashCurrency ?? "EUR" };
+}
+
+function enrich(position, priceInfo) {
+  if (!priceInfo) {
+    return {
+      ticker: position.ticker,
+      name: position.ticker,
+      quantity: position.quantity,
+      pru: position.pru,
+      close: 0,
+      currency: "USD",
+      performance: 0,
+      total: 0,
+      error: "Price not available",
+    };
+  }
+
+  const close = priceInfo.close || 0;
+  return {
+    ticker: position.ticker,
+    name: priceInfo.name || position.ticker,
+    quantity: position.quantity,
+    pru: position.pru,
+    close,
+    currency: priceInfo.currency || "USD",
+    performance: position.pru > 0 ? ((close - position.pru) / position.pru) * 100 : 0,
+    total: close * position.quantity,
+    dividend: priceInfo.dividend ?? null,
+    dividendYield: priceInfo.dividendYield ?? null,
+    myDividendYield: priceInfo.dividend && close > 0 ? (priceInfo.dividend / close) * 100 : null,
+    exDividendDate: priceInfo.exDividendDate || null,
+    paymentDate: priceInfo.paymentDate || null,
+    recordDate: priceInfo.recordDate || null,
+    country: priceInfo.country || "Unknown",
+    sector: priceInfo.sector || null,
+    industry: priceInfo.industry || null,
+    type: priceInfo.type || "Stock",
+    lastUpdate: priceInfo.lastUpdate,
+    source: priceInfo.source,
+  };
+}
+
 // =============================================================================
-// GET /api/user/portfolio - Récupère le portfolio de l'utilisateur
+// GET /api/user/portfolio
 // =============================================================================
 router.get("/portfolio", auth, async (req, res) => {
   try {
-    const User = mongoose.connection.collection("users");
-    const Prices = mongoose.connection.collection("prices");
+    const user = await users().findOne(userFilter(req));
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-    const user = await User.findOne({ _id: new mongoose.Types.ObjectId(req.user.userId) });
-
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    // Récupérer les tickers du portfolio
-    const tickers = user.portfolio.map((p) => p.ticker);
-
-    if (tickers.length === 0) {
-      return res.json({
-        stocks: [],
-        cash: user.cash || { amount: 0, currency: "EUR" },
-      });
-    }
-
-    // Lire depuis le cache MongoDB (actualisé par le cron job)
-    const pricesData = await Prices.find({ symbol: { $in: tickers } }).toArray();
-
-    // Enrichir les données du portfolio avec les prix
-    const stocks = user.portfolio.map((stock) => {
-      const priceInfo = pricesData.find((p) => p.symbol === stock.ticker);
-
-      if (!priceInfo) {
-        // Prix non trouvé dans le cache
-        return {
-          ticker: stock.ticker,
-          quantity: stock.quantity,
-          pru: stock.pru,
-          close: 0,
-          currency: "USD",
-          performance: 0,
-          total: 0,
-          error: "Price not available",
-        };
-      }
-
-      const close = priceInfo.close || 0;
-      const performance = stock.pru > 0 ? ((close - stock.pru) / stock.pru) * 100 : 0;
-      const total = close * stock.quantity;
-      const myDividendYield = priceInfo.dividend && close > 0
-        ? (priceInfo.dividend / close) * 100
-        : null;
-
-      return {
-        ticker: stock.ticker,
-        name: priceInfo.name || stock.ticker,
-        quantity: stock.quantity,
-        pru: stock.pru,
-        close,
-        currency: priceInfo.currency || "USD",
-        performance,
-        total,
-        dividend: priceInfo.dividend || null,
-        dividendYield: priceInfo.dividendYield || null,
-        myDividendYield,
-        exDividendDate: priceInfo.exDividendDate || null,
-        paymentDate: priceInfo.paymentDate || null,
-        recordDate: priceInfo.recordDate || null,
-        country: priceInfo.country || "Unknown",
-        sector: priceInfo.sector || null,
-        industry: priceInfo.industry || null,
-        type: priceInfo.type || "Stock",
-        lastUpdate: priceInfo.lastUpdate,
-        source: priceInfo.source,
-      };
-    });
+    const portfolio = user.portfolio || [];
+    const pricesData = await priceStore.getCachedMany(portfolio.map((p) => p.ticker));
+    const bySymbol = new Map(pricesData.map((p) => [p.symbol, p]));
 
     res.json({
-      stocks,
-      cash: user.cash || { amount: 0, currency: "EUR" },
+      stocks: portfolio.map((p) => enrich(p, bySymbol.get(p.ticker))),
+      cash: readCash(user),
     });
   } catch (err) {
     console.error("❌ Error GET /portfolio:", err);
@@ -95,97 +97,39 @@ router.get("/portfolio", auth, async (req, res) => {
 });
 
 // =============================================================================
-// POST /api/user/portfolio - Ajoute une action au portfolio
+// POST /api/user/portfolio  { ticker, quantity?, pru? }
 // =============================================================================
 router.post("/portfolio", auth, async (req, res) => {
   try {
-    const { ticker, quantity, pru } = req.body;
+    const ticker = normalizeTicker(req.body.ticker);
+    const quantity = req.body.quantity === undefined ? 0 : toNumber(req.body.quantity);
+    const pru = req.body.pru === undefined ? 0 : toNumber(req.body.pru);
 
-    if (!ticker || !quantity || quantity <= 0) {
-      return res.status(400).json({ error: "Invalid input" });
+    if (!TICKER_RE.test(ticker)) return res.status(400).json({ error: "Ticker invalide." });
+    if (!isValidAmount(quantity) || !isValidAmount(pru)) {
+      return res.status(400).json({ error: "Quantité ou PRU invalide." });
     }
 
-    const User = mongoose.connection.collection("users");
-    const Prices = mongoose.connection.collection("prices");
+    const user = await users().findOne(userFilter(req), { projection: { portfolio: 1 } });
+    if (!user) return res.status(404).json({ error: "User not found" });
+    if ((user.portfolio || []).some((p) => p.ticker === ticker)) {
+      return res.status(409).json({ error: `${ticker} est déjà dans votre portefeuille.` });
+    }
 
-    // 1. Récupérer les données de l'action via priceService
-    console.log(`🔄 Fetching data for ${ticker}...`);
-    
-    let quote;
+    let doc;
     try {
-      quote = await priceService.getQuote(ticker, { forceRefresh: true });
+      ({ doc } = await priceStore.refreshTicker(ticker, { maxAgeMs: FRESH_PRICE_MS }));
     } catch (error) {
-      return res.status(404).json({
-        error: `Could not fetch data for ${ticker}`,
-        details: error.message,
-      });
+      return res.status(404).json({ error: `Ticker introuvable : ${ticker}`, details: error.message });
     }
 
-    // 2. Sauvegarder dans la collection prices (cache)
-    await Prices.updateOne(
-      { symbol: ticker },
-      {
-        $set: {
-          symbol: ticker,
-          close: quote.price || quote.close,
-          open: quote.open,
-          high: quote.high,
-          low: quote.low,
-          volume: quote.volume,
-          previousClose: quote.previousClose,
-          change: quote.change,
-          changePercent: quote.changePercent,
-          marketCap: quote.marketCap,
-          currency: quote.currency,
-          exchange: quote.exchange,
-          country: quote.country,
-          sector: quote.sector,
-          industry: quote.industry,
-          type: quote.type,
-          dividend: quote.dividend,
-          dividendYield: quote.dividendYield,
-          dividendRate: quote.dividendRate,
-          exDividendDate: quote.exDividendDate,
-          paymentDate: quote.paymentDate,
-          recordDate: quote.recordDate,
-          name: quote.name,
-          lastUpdate: new Date(),
-          source: quote.source,
-        },
-      },
-      { upsert: true }
-    );
-
-    // 3. Ajouter au portfolio de l'utilisateur
-    const result = await User.updateOne(
-      { _id: new mongoose.Types.ObjectId(req.user.userId) },
-      {
-        $push: {
-          portfolio: {
-            ticker,
-            quantity: parseFloat(quantity),
-            pru: parseFloat(pru) || 0,
-            _id: new mongoose.Types.ObjectId(),
-          },
-        },
-      }
-    );
-
-    if (result.modifiedCount === 0) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    console.log(`✅ Added ${ticker} to portfolio`);
+    await users().updateOne(userFilter(req), {
+      $push: { portfolio: { _id: new mongoose.Types.ObjectId(), ticker, quantity, pru } },
+    });
 
     res.status(201).json({
       message: "Stock added successfully",
-      stock: {
-        ticker,
-        quantity,
-        pru,
-        price: quote.price || quote.close,
-        currency: quote.currency,
-      },
+      stock: enrich({ ticker, quantity, pru }, doc),
     });
   } catch (err) {
     console.error("❌ Error POST /portfolio:", err);
@@ -194,25 +138,40 @@ router.post("/portfolio", auth, async (req, res) => {
 });
 
 // =============================================================================
-// DELETE /api/user/portfolio/:ticker - Supprime une action
+// PATCH /api/user/portfolio/:ticker  { quantity?, pru? }
+// =============================================================================
+router.patch("/portfolio/:ticker", auth, async (req, res) => {
+  try {
+    const ticker = normalizeTicker(req.params.ticker);
+    const $set = {};
+
+    for (const field of ["quantity", "pru"]) {
+      if (req.body[field] === undefined) continue;
+      const value = toNumber(req.body[field]);
+      if (!isValidAmount(value)) return res.status(400).json({ error: `${field} invalide.` });
+      $set[`portfolio.$.${field}`] = value;
+    }
+    if (!Object.keys($set).length) return res.status(400).json({ error: "Rien à mettre à jour." });
+
+    const result = await users().updateOne({ ...userFilter(req), "portfolio.ticker": ticker }, { $set });
+    if (result.matchedCount === 0) return res.status(404).json({ error: "Stock not found in portfolio" });
+
+    res.json({ message: "Stock updated" });
+  } catch (err) {
+    console.error("❌ Error PATCH /portfolio:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// =============================================================================
+// DELETE /api/user/portfolio/:ticker
 // =============================================================================
 router.delete("/portfolio/:ticker", auth, async (req, res) => {
   try {
-    const { ticker } = req.params;
+    const ticker = normalizeTicker(req.params.ticker);
+    const result = await users().updateOne(userFilter(req), { $pull: { portfolio: { ticker } } });
 
-    const User = mongoose.connection.collection("users");
-
-    const result = await User.updateOne(
-      { _id: new mongoose.Types.ObjectId(req.user.userId) },
-      { $pull: { portfolio: { ticker } } }
-    );
-
-    if (result.modifiedCount === 0) {
-      return res.status(404).json({ error: "Stock not found in portfolio" });
-    }
-
-    console.log(`🗑️ Removed ${ticker} from portfolio`);
-
+    if (result.modifiedCount === 0) return res.status(404).json({ error: "Stock not found in portfolio" });
     res.json({ message: "Stock removed successfully" });
   } catch (err) {
     console.error("❌ Error DELETE /portfolio:", err);
@@ -221,79 +180,38 @@ router.delete("/portfolio/:ticker", auth, async (req, res) => {
 });
 
 // =============================================================================
-// POST /api/user/portfolio/force-refresh - Force l'actualisation (premium)
+// POST /api/user/portfolio/force-refresh
+// Actualise les prix du portefeuille. Limité à une fois toutes les 15 min.
 // =============================================================================
 router.post("/portfolio/force-refresh", auth, async (req, res) => {
   try {
-    const User = mongoose.connection.collection("users");
-    const Prices = mongoose.connection.collection("prices");
+    const user = await users().findOne(userFilter(req), { projection: { portfolio: 1, lastForceRefresh: 1 } });
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-    const user = await User.findOne({ _id: new mongoose.Types.ObjectId(req.user.userId) });
-
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
+    const since = user.lastForceRefresh ? Date.now() - new Date(user.lastForceRefresh).getTime() : Infinity;
+    if (since < FORCE_REFRESH_COOLDOWN_MS) {
+      const waitMin = Math.ceil((FORCE_REFRESH_COOLDOWN_MS - since) / 60000);
+      return res.status(429).json({ error: `Prix déjà actualisés récemment. Réessayez dans ${waitMin} min.` });
     }
 
-    const tickers = user.portfolio.map((p) => p.ticker);
+    const tickers = (user.portfolio || []).map((p) => p.ticker);
+    if (!tickers.length) return res.json({ message: "No stocks to refresh", success: 0, failed: 0, skipped: 0, total: 0 });
 
-    if (tickers.length === 0) {
-      return res.json({ message: "No stocks to refresh" });
-    }
+    await users().updateOne(userFilter(req), { $set: { lastForceRefresh: new Date() } });
 
-    // Vérifier quota (max 3 refresh forcés par jour)
-    const today = new Date().toDateString();
-    const refreshKey = `refresh_${req.user.userId}_${today}`;
-    
-    // TODO: Implémenter un vrai système de quota avec Redis
-    // Pour l'instant, on autorise
-    
-    console.log(`🔄 Force refreshing ${tickers.length} stocks for user ${req.user.userId}...`);
-
-    let successCount = 0;
-    let failCount = 0;
-
-    // Actualiser chaque ticker
+    let success = 0, failed = 0, skipped = 0;
     for (const ticker of tickers) {
       try {
-        const quote = await priceService.getQuote(ticker, { forceRefresh: true });
-
-        await Prices.updateOne(
-          { symbol: ticker },
-          {
-            $set: {
-              symbol: ticker,
-              close: quote.price || quote.close,
-              currency: quote.currency,
-              sector: quote.sector,
-              industry: quote.industry,
-              dividend: quote.dividend,
-              dividendYield: quote.dividendYield,
-              exDividendDate: quote.exDividendDate,
-              paymentDate: quote.paymentDate,
-              recordDate: quote.recordDate,
-              lastUpdate: new Date(),
-              source: quote.source,
-            },
-          },
-          { upsert: true }
-        );
-
-        successCount++;
-        
-        // Petit délai pour respecter les rate limits
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Les tickers actualisés il y a moins de 15 min (par le cron ou un autre utilisateur) ne coûtent pas d'appel API
+        const { fromCache } = await priceStore.refreshTicker(ticker, { maxAgeMs: FRESH_PRICE_MS });
+        fromCache ? skipped++ : success++;
       } catch (error) {
         console.error(`❌ Failed to refresh ${ticker}:`, error.message);
-        failCount++;
+        failed++;
       }
     }
 
-    res.json({
-      message: "Portfolio refreshed",
-      success: successCount,
-      failed: failCount,
-      total: tickers.length,
-    });
+    res.json({ message: "Portfolio refreshed", success, failed, skipped, total: tickers.length });
   } catch (err) {
     console.error("❌ Error force-refresh:", err);
     res.status(500).json({ error: "Server error" });
@@ -301,26 +219,21 @@ router.post("/portfolio/force-refresh", auth, async (req, res) => {
 });
 
 // =============================================================================
-// PATCH /api/user/cash - Sauvegarder le cash/dette
+// PATCH /api/user/cash  { amount, currency }
 // =============================================================================
 router.patch("/cash", auth, async (req, res) => {
   try {
-    const { amount, currency } = req.body;
+    const amount = toNumber(req.body.amount);
+    const currency = typeof req.body.currency === "string" ? req.body.currency.toUpperCase() : "";
 
-    if (typeof amount !== "number" || !currency) {
+    if (!Number.isFinite(amount) || Math.abs(amount) >= 1e12 || !CURRENCIES.includes(currency)) {
       return res.status(400).json({ error: "Invalid cash data" });
     }
 
-    const User = mongoose.connection.collection("users");
-
-    await User.updateOne(
-      { _id: new mongoose.Types.ObjectId(req.user.userId) },
-      {
-        $set: {
-          cash: { amount, currency },
-        },
-      }
-    );
+    await users().updateOne(userFilter(req), {
+      $set: { cashAmount: amount, cashCurrency: currency },
+      $unset: { cash: "" },
+    });
 
     res.json({ success: true, cash: { amount, currency } });
   } catch (err) {
@@ -330,38 +243,25 @@ router.patch("/cash", auth, async (req, res) => {
 });
 
 // =============================================================================
-// GET /api/user/portfolio/stats - Stats du portfolio
+// GET /api/user/portfolio/stats
 // =============================================================================
 router.get("/portfolio/stats", auth, async (req, res) => {
   try {
-    const User = mongoose.connection.collection("users");
-    const Prices = mongoose.connection.collection("prices");
+    const user = await users().findOne(userFilter(req), { projection: { portfolio: 1 } });
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-    const user = await User.findOne({ _id: new mongoose.Types.ObjectId(req.user.userId) });
-
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    const tickers = user.portfolio.map((p) => p.ticker);
-    const pricesData = await Prices.find({ symbol: { $in: tickers } }).toArray();
-
-    // Calculer les stats
-    const totalStocks = user.portfolio.length;
-    const oldestPrice = pricesData.reduce((oldest, p) => {
-      return !oldest || p.lastUpdate < oldest ? p.lastUpdate : oldest;
-    }, null);
-
-    const newestPrice = pricesData.reduce((newest, p) => {
-      return !newest || p.lastUpdate > newest ? p.lastUpdate : newest;
-    }, null);
+    const portfolio = user.portfolio || [];
+    const pricesData = await priceStore.getCachedMany(portfolio.map((p) => p.ticker));
+    const dates = pricesData.map((p) => new Date(p.lastUpdate).getTime()).filter(Number.isFinite);
+    const oldest = dates.length ? new Date(Math.min(...dates)) : null;
+    const newest = dates.length ? new Date(Math.max(...dates)) : null;
 
     res.json({
-      totalStocks,
+      totalStocks: portfolio.length,
       cachedPrices: pricesData.length,
-      oldestPriceUpdate: oldestPrice,
-      newestPriceUpdate: newestPrice,
-      cacheAge: oldestPrice ? Date.now() - new Date(oldestPrice).getTime() : null,
+      oldestPriceUpdate: oldest,
+      newestPriceUpdate: newest,
+      cacheAge: oldest ? Date.now() - oldest.getTime() : null,
     });
   } catch (err) {
     console.error("❌ Error GET /portfolio/stats:", err);

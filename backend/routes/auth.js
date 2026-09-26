@@ -6,6 +6,7 @@ const { body, validationResult } = require("express-validator");
 const crypto = require("crypto");
 const User = require("../models/user");
 const { sendPasswordResetEmail } = require("../services/emailService");
+const rateLimit = require("../middleware/rateLimit");
 
 const router = express.Router();
 
@@ -26,13 +27,20 @@ const emailValidators = [
     .customSanitizer((v) => (typeof v === "string" ? v.toLowerCase() : v)),
 ];
 
+// Limites anti-brute-force (par IP)
+const MIN = 60 * 1000;
+const loginLimiter = rateLimit({ windowMs: 15 * MIN, max: 10, message: "Trop de tentatives de connexion. Réessayez dans 15 minutes." });
+const registerLimiter = rateLimit({ windowMs: 60 * MIN, max: 5, message: "Trop de créations de compte. Réessayez plus tard." });
+const forgotLimiter = rateLimit({ windowMs: 60 * MIN, max: 5, message: "Trop de demandes. Réessayez dans une heure." });
+const resetLimiter = rateLimit({ windowMs: 15 * MIN, max: 10 });
+
 const formatErrors = (errors) => ({
   message: "Validation error",
   details: errors.array().map(e => ({ field: e.path, msg: e.msg })),
 });
 
 // POST /api/auth/register
-router.post("/register", [...emailValidators, ...pwValidators], async (req, res) => {
+router.post("/register", registerLimiter, [...emailValidators, ...pwValidators], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json(formatErrors(errors));
@@ -66,7 +74,7 @@ router.post("/register", [...emailValidators, ...pwValidators], async (req, res)
 });
 
 // POST /api/auth/login
-router.post("/login", [...emailValidators, body("password").notEmpty().withMessage("Mot de passe requis.")], async (req, res) => {
+router.post("/login", loginLimiter, [...emailValidators, body("password").notEmpty().withMessage("Mot de passe requis.")], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json(formatErrors(errors));
@@ -124,7 +132,7 @@ const hashToken = (token) => crypto.createHash("sha256").update(token).digest("h
 
 // POST /api/auth/forgot-password  { email }
 // Répond toujours la même chose pour ne pas révéler si un compte existe.
-router.post("/forgot-password", emailValidators, async (req, res) => {
+router.post("/forgot-password", forgotLimiter, emailValidators, async (req, res) => {
   const genericResponse = {
     message: "Si un compte existe pour cet email, un lien de réinitialisation vient d'être envoyé.",
   };
@@ -173,6 +181,7 @@ router.post("/forgot-password", emailValidators, async (req, res) => {
 // POST /api/auth/reset-password  { token, password }
 router.post(
   "/reset-password",
+  resetLimiter,
   [body("token").isString().isLength({ min: 64, max: 64 }).withMessage("Lien invalide."), ...pwValidators],
   async (req, res) => {
     try {

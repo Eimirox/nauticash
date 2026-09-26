@@ -13,3 +13,8 @@ dist/
 
 # Ignorer les fichiers de cache
 .cache/
+
+# Fichiers système Windows / macOS
+desktop.ini
+Thumbs.db
+.DS_Store

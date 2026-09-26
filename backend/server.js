@@ -5,6 +5,17 @@ require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const auth = require("./middleware/auth");
+const requireAdmin = require("./middleware/requireAdmin");
+
+// Refuse de démarrer sans secret JWT : sinon les tokens seraient signés avec "undefined"
+if (!process.env.JWT_SECRET) {
+  console.error("❌ JWT_SECRET manquant. Arrêt du serveur.");
+  process.exit(1);
+}
+if (process.env.JWT_SECRET.length < 32) {
+  console.warn("⚠️ JWT_SECRET court : utilisez au moins 32 caractères aléatoires.");
+}
 
 // Routes
 const authRoutes = require("./routes/auth");
@@ -18,6 +29,10 @@ const priceUpdater = require("./jobs/updatePrices");
 
 const app = express();
 
+// Derrière un hébergeur (Railway, Render...) : récupérer la vraie IP du client pour le rate limiting
+app.set("trust proxy", 1);
+app.disable("x-powered-by");
+
 // =============================================================================
 // MIDDLEWARE
 // =============================================================================
@@ -27,7 +42,7 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: "100kb" }));
 
 // =============================================================================
 // ROUTES
@@ -51,10 +66,12 @@ app.get("/health", (req, res) => {
 // ROUTES ADMIN (pour monitoring)
 // =============================================================================
 
+// Toutes les routes /api/admin exigent un compte listé dans ADMIN_EMAILS
+app.use("/api/admin", auth, requireAdmin);
+
 // Stats d'utilisation des APIs
 app.get("/api/admin/stats", async (req, res) => {
   try {
-    // TODO: Ajouter auth admin
     const stats = priceService.getUsageStats();
     const cronStats = priceUpdater.getStats();
 
@@ -81,7 +98,6 @@ app.get("/api/admin/health", async (req, res) => {
 // Forcer une actualisation manuelle (admin uniquement)
 app.post("/api/admin/update-prices", async (req, res) => {
   try {
-    // TODO: Ajouter auth admin
 
     // Lancer l'update en arrière-plan
     priceUpdater.runManual().catch((err) => {
@@ -155,18 +171,20 @@ const startServer = async () => {
 
     console.log("=".repeat(60) + "\n");
 
-    // 3. Health check des providers
-    console.log("🏥 Running health checks...");
-    const health = await priceService.healthCheckAll();
-    
-    for (const [name, status] of Object.entries(health)) {
-      if (status.healthy) {
-        console.log(`✅ ${name} - OK`);
-      } else {
-        console.warn(`❌ ${name} - ${status.error || 'Failed'}`);
+    // 3. Health check des providers : consomme 1 appel API par provider à chaque démarrage,
+    //    donc désactivé par défaut (HEALTHCHECK_ON_START=true pour l'activer).
+    if (process.env.HEALTHCHECK_ON_START === "true") {
+      console.log("🏥 Running health checks...");
+      const health = await priceService.healthCheckAll();
+      for (const [name, status] of Object.entries(health)) {
+        if (status.healthy) {
+          console.log(`✅ ${name} - OK`);
+        } else {
+          console.warn(`❌ ${name} - ${status.error || 'Failed'}`);
+        }
       }
+      console.log("");
     }
-    console.log("");
 
     // 4. Démarrer le cron job
     if (config.cron.updatePrices.enabled) {
@@ -193,7 +211,9 @@ const startServer = async () => {
       console.log("   POST   /api/auth/reset-password");
       console.log("   GET    /api/user/portfolio");
       console.log("   POST   /api/user/portfolio");
+      console.log("   PATCH  /api/user/portfolio/:ticker");
       console.log("   DELETE /api/user/portfolio/:ticker");
+      console.log("   PATCH  /api/user/cash");
       console.log("   POST   /api/user/portfolio/force-refresh");
       console.log("   GET    /api/user/portfolio/stats");
       console.log("   GET    /api/user/history");

@@ -1,37 +1,40 @@
 // frontend/middleware.js
-// Place ce fichier à la RACINE du dossier frontend (à côté de app/)
+// Protection "bêta privée" par Basic Auth.
+// Active uniquement si BASIC_AUTH_USER et BASIC_AUTH_PASSWORD sont définis
+// (plus d'identifiants par défaut : admin/changeme était devinable).
 
 import { NextResponse } from 'next/server';
 
 export function middleware(request) {
-  // 🔓 DÉSACTIVE la protection en développement local
   if (process.env.NODE_ENV === 'development') {
     return NextResponse.next();
   }
 
-  // 🔒 ACTIVE la protection en production
-  const ALLOWED_USER = process.env.BASIC_AUTH_USER || 'admin';
-  const ALLOWED_PASSWORD = process.env.BASIC_AUTH_PASSWORD || 'changeme';
+  const ALLOWED_USER = process.env.BASIC_AUTH_USER;
+  const ALLOWED_PASSWORD = process.env.BASIC_AUTH_PASSWORD;
 
-  // Vérifie si l'en-tête Authorization est présent
+  // Variables absentes : le site est public
+  if (!ALLOWED_USER || !ALLOWED_PASSWORD) {
+    return NextResponse.next();
+  }
+
   const basicAuth = request.headers.get('authorization');
 
-  if (basicAuth) {
-    const authValue = basicAuth.split(' ')[1];
-    
+  if (basicAuth?.startsWith('Basic ')) {
     try {
-      const [user, pwd] = atob(authValue).split(':');
+      const decoded = atob(basicAuth.slice(6));
+      const sep = decoded.indexOf(':');
+      const user = decoded.slice(0, sep);
+      const pwd = decoded.slice(sep + 1); // le mot de passe peut contenir ":"
 
-      // Vérifie les credentials
-      if (user === ALLOWED_USER && pwd === ALLOWED_PASSWORD) {
+      if (sep > -1 && user === ALLOWED_USER && pwd === ALLOWED_PASSWORD) {
         return NextResponse.next();
       }
-    } catch (error) {
-      // En cas d'erreur de décodage, demande l'authentification
+    } catch {
+      // en-tête mal formé : on redemande l'authentification
     }
   }
 
-  // Si pas d'auth ou mauvais credentials, demande l'authentification
   return new Response('Authentication required', {
     status: 401,
     headers: {
@@ -40,16 +43,9 @@ export function middleware(request) {
   });
 }
 
-// Configuration : protège toutes les routes
+// Protège toutes les routes sauf les fichiers statiques
 export const config = {
   matcher: [
-    /*
-     * Match toutes les routes sauf :
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|logo_nauticash.webp).*)',
   ],
 };

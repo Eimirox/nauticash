@@ -1,19 +1,35 @@
-const express  = require("express");
-const auth     = require("../middleware/auth");
+const express = require("express");
+const auth = require("../middleware/auth");
 const mongoose = require("mongoose");
 
 const router = express.Router();
 
-// --- POST /api/user/history ---
+// Les mois sont stockés en toutes lettres ("June") : on les trie dans l'ordre du calendrier
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+const history = () => mongoose.connection.collection("history");
+
+// --- POST /api/user/history  { date, value } ---
 router.post("/history", auth, async (req, res) => {
   try {
-    const { date, value } = req.body;
+    const { date } = req.body;
+    const value = Number(req.body.value);
     const parsedDate = new Date(date);
 
-    const year = parsedDate.getFullYear();
-    const month = parsedDate.toLocaleString("en-US", { month: "long" });
+    if (Number.isNaN(parsedDate.getTime())) {
+      return res.status(400).json({ error: "Date invalide" });
+    }
+    if (!Number.isFinite(value)) {
+      return res.status(400).json({ error: "Valeur invalide" });
+    }
 
-    await mongoose.connection.collection("history").updateOne(
+    const year = parsedDate.getFullYear();
+    const month = MONTHS[parsedDate.getMonth()];
+
+    await history().updateOne(
       { userId: req.user.userId, year, month },
       { $set: { value } },
       { upsert: true }
@@ -29,13 +45,11 @@ router.post("/history", auth, async (req, res) => {
 // --- GET /api/user/history ---
 router.get("/history", auth, async (req, res) => {
   try {
-    const history = await mongoose.connection
-      .collection("history")
-      .find({ userId: req.user.userId })
-      .sort({ year: 1, month: 1 })
-      .toArray();
+    const rows = await history().find({ userId: req.user.userId }).toArray();
 
-    res.json(history);
+    rows.sort((a, b) => a.year - b.year || MONTHS.indexOf(a.month) - MONTHS.indexOf(b.month));
+
+    res.json(rows);
   } catch (err) {
     console.error("Erreur GET /history:", err.message);
     res.status(500).json({ error: "Erreur serveur" });
