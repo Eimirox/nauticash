@@ -13,7 +13,11 @@ const UserSchema = new mongoose.Schema({
   ],
 
   cashAmount:   { type: Number, default: 0 },       
-  cashCurrency: { type: String, default: "EUR" },    
+  cashCurrency: { type: String, default: "EUR" },
+
+  // Réinitialisation du mot de passe (le token est stocké hashé en SHA-256)
+  resetPasswordToken:   { type: String, default: null, index: true },
+  resetPasswordExpires: { type: Date,   default: null },
 
 }, { timestamps: true });
 

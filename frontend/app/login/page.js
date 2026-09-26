@@ -140,9 +140,9 @@ export default function Login() {
 
             {/* Forgot password */}
             <div className="flex items-center justify-end">
-              <button type="button" className="text-sm font-medium text-emerald-600 hover:text-emerald-700 transition">
+              <Link href="/forgot-password" className="text-sm font-medium text-emerald-600 hover:text-emerald-700 transition">
                 Mot de passe oublié ?
-              </button>
+              </Link>
             </div>
 
             {/* Error Message */}

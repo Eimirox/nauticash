@@ -189,6 +189,8 @@ const startServer = async () => {
       console.log("📡 Available routes:");
       console.log("   POST   /api/auth/register");
       console.log("   POST   /api/auth/login");
+      console.log("   POST   /api/auth/forgot-password");
+      console.log("   POST   /api/auth/reset-password");
       console.log("   GET    /api/user/portfolio");
       console.log("   POST   /api/user/portfolio");
       console.log("   DELETE /api/user/portfolio/:ticker");
