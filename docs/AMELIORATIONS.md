@@ -15,7 +15,7 @@ Chaque session : prend **la première tâche non cochée**, la réalise, vérifi
 
 ## Tâches
 
-- [ ] Ajouter une suite de tests backend exécutable par `npm test` (node:test, base MongoDB simulée en mémoire, API FMP simulée) couvrant auth, reset mot de passe, portefeuille, cash, historique, admin, quotas
+- [x] Ajouter une suite de tests backend exécutable par `npm test` (node:test, base MongoDB simulée en mémoire, API FMP simulée) couvrant auth, reset mot de passe, portefeuille, cash, historique, admin, quotas
 - [ ] Migrer les pages analytics (`app/analytics/**`, `PortfolioHistoryChart.jsx`) vers `lib/api.js` (gestion session expirée et erreurs)
 - [ ] Remplacer les `alert()` / `window.confirm()` par des notifications et une fenêtre de confirmation intégrées au design
 - [ ] Créer un composant d'en-tête / navigation commun (portefeuille, analytics) au lieu des en-têtes dupliqués
@@ -36,3 +36,4 @@ Chaque session : prend **la première tâche non cochée**, la réalise, vérifi
 
 <!-- Une ligne par session : date – tâche – résultat (commit) -->
 - 2026-09-26 – Pages d'authentification robustes (message clair si le serveur renvoie du HTML) + réponses 404/erreurs en JSON côté backend
+- 2026-09-26 – Suite de tests backend (`npm test`, node:test, MongoDB et API FMP/Resend simulées, 69 tests : auth, reset mot de passe, portefeuille, cash, historique, admin, quotas) – OK ; `server.js` ne démarre plus le serveur quand il est importé ; Node >= 18 requis

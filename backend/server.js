@@ -258,31 +258,35 @@ const startServer = async () => {
   }
 };
 
-// Gestion des erreurs non catchées
-process.on("unhandledRejection", (err) => {
-  console.error("❌ Unhandled Rejection:", err);
-});
+// Démarrage uniquement quand le fichier est lancé directement (node server.js).
+// Les tests importent `app` sans connexion MongoDB ni cron.
+if (require.main === module) {
+  // Gestion des erreurs non catchées
+  process.on("unhandledRejection", (err) => {
+    console.error("❌ Unhandled Rejection:", err);
+  });
 
-process.on("uncaughtException", (err) => {
-  console.error("❌ Uncaught Exception:", err);
-  process.exit(1);
-});
-
-// Graceful shutdown
-process.on("SIGINT", async () => {
-  console.log("\n🛑 Shutting down gracefully...");
-  
-  try {
-    await mongoose.connection.close();
-    console.log("✅ MongoDB connection closed");
-    process.exit(0);
-  } catch (error) {
-    console.error("❌ Error during shutdown:", error);
+  process.on("uncaughtException", (err) => {
+    console.error("❌ Uncaught Exception:", err);
     process.exit(1);
-  }
-});
+  });
 
-// Démarrer le serveur
-startServer();
+  // Graceful shutdown
+  process.on("SIGINT", async () => {
+    console.log("\n🛑 Shutting down gracefully...");
+
+    try {
+      await mongoose.connection.close();
+      console.log("✅ MongoDB connection closed");
+      process.exit(0);
+    } catch (error) {
+      console.error("❌ Error during shutdown:", error);
+      process.exit(1);
+    }
+  });
+
+  // Démarrer le serveur
+  startServer();
+}
 
 module.exports = app;
