@@ -64,6 +64,10 @@ function enrich(position, priceInfo) {
   }
 
   const close = priceInfo.close || 0;
+  const previousClose = priceInfo.previousClose > 0 ? priceInfo.previousClose : null;
+  // Variation du jour : écart au cours de clôture de la veille (même devise que le prix)
+  const dayChange = previousClose ? close - previousClose : Number.isFinite(priceInfo.change) ? priceInfo.change : null;
+  const dayChangePercent = previousClose ? (dayChange / previousClose) * 100 : priceInfo.changePercent ?? null;
   return {
     ticker: position.ticker,
     name: priceInfo.name || position.ticker,
@@ -73,6 +77,11 @@ function enrich(position, priceInfo) {
     currency: priceInfo.currency || "USD",
     performance: position.pru > 0 ? ((close - position.pru) / position.pru) * 100 : 0,
     total: close * position.quantity,
+    previousClose,
+    dayChange,
+    dayChangePercent,
+    dayChangeValue: dayChange !== null ? dayChange * position.quantity : null,
+    priceTime: priceInfo.marketTime || priceInfo.lastUpdate || null,
     dividend: priceInfo.dividend ?? null,
     dividendYield: priceInfo.dividendYield ?? null,
     myDividendYield: priceInfo.dividend && close > 0 ? (priceInfo.dividend / close) * 100 : null,

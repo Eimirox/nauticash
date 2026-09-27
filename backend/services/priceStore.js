@@ -27,6 +27,8 @@ function buildDoc(ticker, quote, previous = {}) {
     changePercent: pick(quote.changePercent, previous.changePercent),
     marketCap: pick(quote.marketCap, previous.marketCap),
     currency: pick(quote.currency, previous.currency),
+    quoteCurrency: pick(quote.quoteCurrency, previous.quoteCurrency),
+    marketTime: pick(quote.marketTime, previous.marketTime),
     exchange: pick(quote.exchange, previous.exchange),
     country: quote.country && quote.country !== "Unknown" ? quote.country : pick(previous.country, quote.country),
     countryCode: pick(quote.countryCode, previous.countryCode),

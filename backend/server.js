@@ -65,6 +65,19 @@ app.use("/api/user", userRoutes);
 app.use("/api/user", historyRoutes);
 app.use("/api/transactions", transactionRoutes);
 
+// Taux de change (public, mis en cache côté serveur) : base EUR
+const fx = require("./services/fx");
+app.get("/api/fx", async (req, res) => {
+  try {
+    const data = await fx.getRates();
+    res.set("Cache-Control", "public, max-age=3600");
+    res.json(data);
+  } catch (err) {
+    console.error("❌ Error GET /api/fx:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 // Health check
 app.get("/health", (req, res) => {
   res.json({

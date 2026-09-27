@@ -62,6 +62,12 @@ const fmp = {
   failWith: null,   // code HTTP à renvoyer pour tous les appels (ex. 500)
 };
 
+const fx = {
+  calls: 0,
+  failWith: null,
+  body: { amount: 1, base: "EUR", date: "2026-09-25", rates: { USD: 1.14, GBP: 0.86, CHF: 0.94, JPY: 180 } },
+};
+
 const mail = {
   sent: [],         // corps JSON envoyés à Resend
   failWith: null,   // code HTTP à renvoyer (ex. 500)
@@ -89,6 +95,12 @@ globalThis.fetch = async (input, init = {}) => {
     if (endpoint === "profile") return jsonResponse(200, fmp.profiles[symbol] ? [fmp.profiles[symbol]] : []);
     if (endpoint === "dividends") return jsonResponse(200, fmp.dividends[symbol] || []);
     return jsonResponse(404, { error: "unknown endpoint" });
+  }
+
+  if (url.hostname === "api.frankfurter.dev") {
+    fx.calls++;
+    if (fx.failWith) return jsonResponse(fx.failWith, { message: "simulated failure" });
+    return jsonResponse(200, fx.body);
   }
 
   if (url.hostname === "api.resend.com") {
@@ -244,6 +256,9 @@ function resetState() {
   fmp.failWith = null;
   mail.sent.length = 0;
   mail.failWith = null;
+  fx.calls = 0;
+  fx.failWith = null;
+  require("../../services/fx")._reset();
   require("../../services/priceService").clearCache();
   seedMarket();
 }
@@ -252,6 +267,7 @@ module.exports = {
   app,
   db,
   fmp,
+  fx,
   mail,
   start,
   stop,
