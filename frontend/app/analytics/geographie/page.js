@@ -13,7 +13,8 @@ import {
 } from "react-simple-maps";
 
 // URL de la carte du monde (TopoJSON)
-const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
+// Fond de carte servi par le site (world-atlas 2.0.2, Natural Earth) : pas de dépendance à un CDN externe
+const geoUrl = "/maps/countries-110m.json";
 
 // Mapping pays français → ISO codes NUMÉRIQUES (ISO 3166-1 numeric)
 const COUNTRY_CODES = {
@@ -39,6 +40,18 @@ const COUNTRY_CODES = {
   "Finlande": "246",
   "Autriche": "040",
   "CCC": "CRYPTO", // Crypto
+};
+
+// Code ISO2 (renvoyé par le backend) → continent
+const CONTINENTS = {
+  ...Object.fromEntries(["US", "CA", "MX", "BR", "AR", "UY", "BM", "KY"].map((c) => [c, "Amérique"])),
+  ...Object.fromEntries(
+    ["FR", "DE", "GB", "NL", "BE", "LU", "IE", "CH", "IT", "ES", "PT", "AT", "SE", "NO", "DK", "FI", "PL", "GR", "JE", "CY"].map((c) => [c, "Europe"])
+  ),
+  ...Object.fromEntries(["JP", "CN", "HK", "TW", "KR", "IN", "SG", "IL"].map((c) => [c, "Asie"])),
+  AU: "Océanie",
+  NZ: "Océanie",
+  ZA: "Afrique",
 };
 
 export default function GeographiePage() {
@@ -97,8 +110,9 @@ export default function GeographiePage() {
     let total = 0;
 
     stocks.forEach(s => {
-      const country = s.country || "Unknown";
-      console.log(`📍 ${s.ticker}: country="${country}", ISO: ${COUNTRY_CODES[country]}`);
+      // Pays normalisé par le backend (nom + code ISO numérique utilisé par la carte)
+      const country = s.country || "Inconnu";
+      const isoCode = s.countryNumeric || COUNTRY_CODES[country] || (country === "Crypto" ? "CRYPTO" : null);
       
       const value = (s.close || 0) * (s.quantity || 0);
       const valueEUR = s.currency === "USD" ? value * usdToEur : value;
@@ -108,7 +122,8 @@ export default function GeographiePage() {
       if (!byCountry[country]) {
         byCountry[country] = {
           country,
-          isoCode: COUNTRY_CODES[country] || null,
+          isoCode,
+          countryCode: s.countryCode || null,
           valueEUR: 0,
           valueOriginal: 0,
           currency: s.currency,
@@ -133,11 +148,14 @@ export default function GeographiePage() {
     const maxValue = Math.max(...countryList.map(c => c.valueEUR));
 
     // Continent principal (simplifié)
-    const topCountry = countryList[0]?.country || "N/A";
-    let topContinent = "N/A";
-    if (["États-Unis", "Canada"].includes(topCountry)) topContinent = "Amérique";
-    else if (["France", "Allemagne", "Royaume-Uni", "Pays-Bas", "Amsterdam", "Belgique", "Suisse", "Italie", "Espagne"].includes(topCountry)) topContinent = "Europe";
-    else if (["Chine", "Japon"].includes(topCountry)) topContinent = "Asie";
+    // Continent principal : somme des valeurs par continent
+    const byContinent = {};
+    for (const c of countryList) {
+      const continent = CONTINENTS[c.countryCode];
+      if (continent) byContinent[continent] = (byContinent[continent] || 0) + c.valueEUR;
+    }
+    const topContinent =
+      Object.entries(byContinent).sort((a, b) => b[1] - a[1])[0]?.[0] || "N/A";
 
     return {
       byCountry,
@@ -322,11 +340,6 @@ export default function GeographiePage() {
                   <ZoomableGroup center={[0, 20]} zoom={1}>
                     <Geographies geography={geoUrl}>
                       {({ geographies }) => {
-                        console.log("🗺️ PREMIERS PAYS DE LA CARTE:");
-                        geographies.slice(0, 15).forEach(g => {
-                          console.log(`  - ${g.properties?.name || "?"} → ID: "${g.id}"`);
-                        });
-                        
                         return geographies.map((geo) => {
                           const isoCode = geo.id;
                           const countryData = geoData.countryList.find(c => c.isoCode === isoCode);

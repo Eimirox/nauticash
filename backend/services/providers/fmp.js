@@ -53,14 +53,20 @@ class FMPProvider {
     if (quote.type === "Crypto") return quote;
 
     // Profil (nom, secteur, industrie, type ETF) : rarement modifié
-    if (isStale(previous?.profileUpdatedAt, PROFILE_TTL) || !previous?.sector || previous.sector === "Unknown") {
+    if (
+      isStale(previous?.profileUpdatedAt, PROFILE_TTL) ||
+      !previous?.sector ||
+      previous.sector === "Unknown" ||
+      !previous?.countryCode // pays du siège jamais récupéré (données antérieures)
+    ) {
       const profile = await this.getProfile(mappedTicker);
       if (profile) {
         quote.name = profile.name || quote.name;
         quote.sector = profile.sector;
         quote.industry = profile.industry;
         if (profile.isEtf || profile.isFund) quote.type = "ETF";
-        if (quote.country === "Unknown" && profile.country) quote.country = profile.country;
+        if (profile.countryCode) quote.countryCode = profile.countryCode;
+        if (profile.country) quote.country = profile.country;
         if (!data[0].currency && profile.currency) quote.currency = profile.currency;
         if (!quote.dividend && profile.lastDividend) quote.dividend = profile.lastDividend;
         quote.profileUpdatedAt = new Date();
@@ -70,6 +76,7 @@ class FMPProvider {
       quote.sector = previous.sector;
       quote.industry = previous.industry;
       quote.type = previous.type || quote.type;
+      if (previous.countryCode) quote.countryCode = previous.countryCode;
       if (quote.country === "Unknown") quote.country = previous.country || quote.country;
     }
 
@@ -132,6 +139,7 @@ class FMPProvider {
         sector: profile.sector || "Unknown",
         industry: profile.industry || "Unknown",
         country: ISO_TO_COUNTRY[profile.country] || null,
+        countryCode: typeof profile.country === "string" && /^[A-Z]{2}$/i.test(profile.country) ? profile.country.toUpperCase() : null,
         currency: profile.currency || null,
         isEtf: Boolean(profile.isEtf),
         isFund: Boolean(profile.isFund),
