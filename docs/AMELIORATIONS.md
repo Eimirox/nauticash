@@ -19,7 +19,7 @@ Chaque session : prend **la première tâche non cochée**, la réalise, vérifi
 
 - [x] Ajouter une suite de tests backend exécutable par `npm test` (node:test, base MongoDB simulée en mémoire, API FMP simulée) couvrant auth, reset mot de passe, portefeuille, cash, historique, admin, quotas
 - [x] Mise en place : `docs/DESIGN.md` (direction artistique), `docs/API.md` (comparatif des API), backlog réordonné
-- [ ] Design system selon DESIGN.md : tokens Tailwind/globals.css, mode sombre, composants de base (Card, Button, Stat, Badge, Modal, Toast) dans app/components/ui
+- [x] Design system selon DESIGN.md : tokens Tailwind/globals.css, mode sombre, composants de base (Card, Button, Stat, Badge, Modal, Toast) dans app/components/ui
 - [ ] Migrer les pages analytics (`app/analytics/**`, `PortfolioHistoryChart.jsx`) vers `lib/api.js`
 - [ ] Remplacer `alert()` / `window.confirm()` par les Toast / Modal du design system
 - [ ] En-tête / navigation commune (portefeuille, analytics, compte) aux couleurs du design system
@@ -48,3 +48,4 @@ Chaque session : prend **la première tâche non cochée**, la réalise, vérifi
 - 2026-09-26 – Pages d'authentification robustes (message clair si le serveur renvoie du HTML) + réponses 404/erreurs en JSON côté backend
 - 2026-09-26 – Suite de tests backend (`npm test`, node:test, MongoDB et API FMP/Resend simulées, 69 tests : auth, reset mot de passe, portefeuille, cash, historique, admin, quotas) – OK ; `server.js` ne démarre plus le serveur quand il est importé ; Node >= 18 requis
 - 2026-09-27 – Mise en place : DESIGN.md (identité « abysse / lagon », tokens, composants, accessibilité), API.md (comparatif FMP, Alpha Vantage, Finnhub, Twelve Data, Frankfurter, Yahoo ; quotas à re-vérifier), backlog réordonné (22 tâches) – OK
+- 2026-09-27 – Design system : jetons de couleur (clair/sombre) dans globals.css + Tailwind, composants Card, Button, Badge, Stat/Delta, Modal/ConfirmModal, Toast, ThemeToggle et formats FR dans app/components/ui ; mode sombre par classe (clair par défaut tant que les pages ne sont pas migrées) – OK (build + 69 tests)
