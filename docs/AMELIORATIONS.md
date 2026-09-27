@@ -26,7 +26,7 @@ Chaque session : prend **la première tâche non cochée**, la réalise, vérifi
 
 ### Avant le lancement au cercle proche (prioritaire)
 
-- [ ] Supprimer les onglets internes des pages analytics, devenus redondants avec la navigation de l'en-tête
+- [x] Supprimer les onglets internes des pages analytics, devenus redondants avec la navigation de l'en-tête
 - [ ] Pages 404 (`app/not-found.js`) et erreur (`app/error.js`) avec l'identité Nauticash
 - [ ] Vue mobile du tableau des positions (cartes empilées sous 768 px)
 - [ ] Page « Mon compte » : changer son mot de passe et supprimer son compte (RGPD)
@@ -61,3 +61,4 @@ Chaque session : prend **la première tâche non cochée**, la réalise, vérifi
 - 2026-09-27 – Fin des alert()/confirm() : suppression d'une position via fenêtre de confirmation (ConfirmModal), actualisation des prix et historique via notifications (Toast) ; vérifié dans le navigateur avec API simulée – OK (build + 69 tests)
 - 2026-09-27 – En-tête commun (app/components/AppHeader.js) sur portefeuille et les 4 pages analytics : navigation avec page active, défilante sur mobile, bouton Actualiser intégré, Déconnexion partout (avant : absente des pages analytics) ; lien « Mon compte » à ajouter avec la page correspondante ; vérifié en capture bureau + mobile – OK (build + 69 tests)
 - 2026-09-27 – [Demande d'Alex] Pays et carte du monde corrigés : normalisation des pays côté backend (services/countries.js : siège de l'entreprise via le profil FMP, suffixe du ticker, place de cotation, anciennes valeurs comme « NasdaqGS » ou « Amsterdam »), code ISO numérique renvoyé au frontend, profil re-téléchargé une fois pour les titres sans code pays, fond de carte servi par le site au lieu du CDN, continent principal calculé par valeur ; 14 nouveaux tests – OK (build + 83 tests)
+- 2026-09-27 – Onglets internes des pages analytics supprimés (doublon avec l'en-tête) ; chaque page a son propre titre et sa description (Vue d'ensemble, Performance, Dividendes, Géographie) – OK (build + 83 tests)

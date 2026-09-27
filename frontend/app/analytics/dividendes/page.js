@@ -171,44 +171,13 @@ export default function DividendesPage() {
         {/* Title */}
         <div className="mb-8">
           <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-2">
-            Analytics du Portefeuille
+            Dividendes
           </h1>
           <p className="text-slate-600">
-            Visualisez la répartition et l'évolution de vos investissements
+            Revenus versés par vos positions et rendement de votre portefeuille.
           </p>
         </div>
 
-        {/* Tabs */}
-        <nav className="mb-8 border-b border-slate-200">
-          {[
-            { key: "vue", label: "Vue d'ensemble", route: "/analytics" },
-            { key: "performance", label: "Performance", route: "/analytics/performance" },
-            { key: "dividendes", label: "Dividendes", route: "/analytics/dividendes" },
-            { key: "geographie", label: "Géographie", route: "/analytics/geographie" },
-          ].map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => {
-                if (tab.route) {
-                  router.push(tab.route);
-                }
-              }}
-              disabled={!tab.route}
-              className={`relative px-6 py-3 text-sm font-medium transition-all ${
-                tab.key === "dividendes"
-                  ? "text-emerald-600"
-                  : tab.route 
-                    ? "text-slate-600 hover:text-slate-900 cursor-pointer"
-                    : "text-slate-400 cursor-not-allowed"
-              }`}
-            >
-              {tab.label}
-              {tab.key === "dividendes" && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-600 to-blue-600" />
-              )}
-            </button>
-          ))}
-        </nav>
 
         {loading ? (
           <div className="flex justify-center py-20">

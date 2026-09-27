@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { apiFetch } from "@/lib/api";
 import AppHeader from "../components/AppHeader";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Pie } from "react-chartjs-2";
 import Chart from "chart.js/auto";
@@ -65,7 +64,6 @@ const SECTOR_COLORS = {
 };
 
 export default function Analytics() {
-  const router = useRouter();
   const [loadError, setLoadError] = useState(null);
   const [stocks, setStocks] = useState([]);
   const [cash, setCash] = useState({ amount: 0, currency: "EUR" });
@@ -237,43 +235,13 @@ export default function Analytics() {
         {/* Title */}
         <div className="mb-8">
           <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-2">
-            Analytics du Portefeuille
+            Vue d'ensemble
           </h1>
           <p className="text-slate-600">
-            Visualisez la répartition et l'évolution de vos investissements
+            Répartition de votre patrimoine par devise, type d'actif et secteur.
           </p>
         </div>
 
-        {/* Tabs */}
-        <nav className="mb-8 border-b border-slate-200">
-          {[
-            { key: "vue", label: "Vue d'ensemble", icon: "chart" },
-            { key: "o1", label: "Performance", icon: "trending", route: "/analytics/performance" },
-            { key: "o2", label: "Dividendes", icon: "cash", route: "/analytics/dividendes" },
-            { key: "o3", label: "Géographie", icon: "shield", route: "/analytics/geographie" },
-          ].map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => {
-                if (tab.route) {
-                  router.push(tab.route);
-                } else {
-                  setActiveTab(tab.key);
-                }
-              }}
-              className={`relative px-6 py-3 text-sm font-medium transition-all ${
-                activeTab === tab.key
-                  ? "text-emerald-600"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              {tab.label}
-              {activeTab === tab.key && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-600 to-blue-600" />
-              )}
-            </button>
-          ))}
-        </nav>
 
         {activeTab === "vue" && (
           <section>
