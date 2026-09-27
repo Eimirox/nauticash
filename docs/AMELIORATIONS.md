@@ -23,25 +23,32 @@ Chaque session : prend **la première tâche non cochée**, la réalise, vérifi
 - [x] Migrer les pages analytics (`app/analytics/**`, `PortfolioHistoryChart.jsx`) vers `lib/api.js`
 - [x] Remplacer `alert()` / `window.confirm()` par les Toast / Modal du design system
 - [x] En-tête / navigation commune (portefeuille, analytics, compte) aux couleurs du design system
+
+### Avant le lancement au cercle proche (prioritaire)
+
 - [ ] Supprimer les onglets internes des pages analytics, devenus redondants avec la navigation de l'en-tête
-- [ ] Tableau de bord patrimoine : valeur totale en grand, variation du jour et depuis l'achat, courbe d'évolution, répartition par type d'actif / secteur / pays
 - [ ] Pages 404 (`app/not-found.js`) et erreur (`app/error.js`) avec l'identité Nauticash
 - [ ] Vue mobile du tableau des positions (cartes empilées sous 768 px)
+- [ ] Page « Mon compte » : changer son mot de passe et supprimer son compte (RGPD)
+- [ ] En-têtes de sécurité dans `next.config.mjs`
+- [ ] Vulnérabilités `npm audit` backend et frontend (sans --force ; tests et build doivent passer)
+- [ ] Refonte visuelle de l'accueil selon DESIGN.md + relecture des textes (ton professionnel, appel à l'action clair)
+- [ ] Page « Bêta » : bandeau discret « Version bêta » dans l'en-tête + lien « Donner mon avis » (mailto vers l'adresse de contact) pour recueillir les retours du cercle proche
+
+### Après le lancement
+
+- [ ] Tableau de bord patrimoine : valeur totale en grand, variation du jour et depuis l'achat, courbe d'évolution, répartition par type d'actif / secteur / pays
 - [ ] Taux de change servis par le backend via Frankfurter avec cache (fin des appels navigateur à exchangerate-api)
 - [ ] Dividendes : calendrier des prochains versements et revenu annuel estimé
 - [ ] Route admin qui mesure la couverture des tickers des portefeuilles par chaque provider ; résultats dans docs/API.md
 - [ ] Provider Finnhub optionnel (variable FINNHUB_API_KEY) en fallback US, désactivé sans clé
-- [ ] Page « Mon compte » : changer son mot de passe et supprimer son compte (RGPD)
 - [ ] Export des données du compte en JSON/CSV (RGPD)
-- [ ] En-têtes de sécurité dans `next.config.mjs`
 - [ ] SEO : robots, sitemap (pages publiques), Open Graph, icônes
 - [ ] Accessibilité : libellés, aria-*, focus visibles, contrastes
 - [ ] États de chargement (squelettes) sur portefeuille et analytics
 - [ ] Une seule librairie de graphiques au lieu de chart.js + echarts + recharts
-- [ ] Vulnérabilités `npm audit` backend et frontend (sans --force ; tests et build doivent passer)
 - [ ] Tests : renommer le test « quota atteint pendant l'enrichissement » (il vérifie que rien n'est enregistré) et faire que FMP_DAILY_LIMIT=0 bloque les appels au lieu de supprimer la limite
 - [ ] ESLint (`npm run lint`) sans avertissement
-- [ ] Refonte visuelle de l'accueil selon DESIGN.md + relecture des textes (ton professionnel, appel à l'action clair)
 
 ## Journal
 
