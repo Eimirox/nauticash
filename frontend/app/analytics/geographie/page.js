@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { apiFetch } from "@/lib/api";
+import AppHeader from "../../components/AppHeader";
 import Link from "next/link";
 import {
   ComposableMap,
@@ -11,7 +12,8 @@ import {
 } from "react-simple-maps";
 
 // URL de la carte du monde (TopoJSON)
-const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
+// Fond de carte servi par le site (world-atlas 2.0.2, Natural Earth) : pas de dépendance à un CDN externe
+const geoUrl = "/maps/countries-110m.json";
 
 // Mapping pays français → ISO codes NUMÉRIQUES (ISO 3166-1 numeric)
 const COUNTRY_CODES = {
@@ -39,8 +41,20 @@ const COUNTRY_CODES = {
   "CCC": "CRYPTO", // Crypto
 };
 
+// Code ISO2 (renvoyé par le backend) → continent
+const CONTINENTS = {
+  ...Object.fromEntries(["US", "CA", "MX", "BR", "AR", "UY", "BM", "KY"].map((c) => [c, "Amérique"])),
+  ...Object.fromEntries(
+    ["FR", "DE", "GB", "NL", "BE", "LU", "IE", "CH", "IT", "ES", "PT", "AT", "SE", "NO", "DK", "FI", "PL", "GR", "JE", "CY"].map((c) => [c, "Europe"])
+  ),
+  ...Object.fromEntries(["JP", "CN", "HK", "TW", "KR", "IN", "SG", "IL"].map((c) => [c, "Asie"])),
+  AU: "Océanie",
+  NZ: "Océanie",
+  ZA: "Afrique",
+};
+
 export default function GeographiePage() {
-  const router = useRouter();
+  const [loadError, setLoadError] = useState(null);
   const [stocks, setStocks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [usdToEur, setUsdToEur] = useState(0.92);
@@ -65,15 +79,11 @@ export default function GeographiePage() {
     const fetchPortfolio = async () => {
       setLoading(true);
       try {
-        const token = localStorage.getItem("token");
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"}/api/user/portfolio`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error(`Status ${res.status}`);
-        const data = await res.json();
+        const data = await apiFetch("/api/user/portfolio");
         setStocks(data.stocks || []);
       } catch (err) {
         console.error(err);
+        setLoadError(`Impossible de charger vos données : ${err.message}`);
       } finally {
         setLoading(false);
       }
@@ -98,8 +108,9 @@ export default function GeographiePage() {
     let total = 0;
 
     stocks.forEach(s => {
-      const country = s.country || "Unknown";
-      console.log(`📍 ${s.ticker}: country="${country}", ISO: ${COUNTRY_CODES[country]}`);
+      // Pays normalisé par le backend (nom + code ISO numérique utilisé par la carte)
+      const country = s.country || "Inconnu";
+      const isoCode = s.countryNumeric || COUNTRY_CODES[country] || (country === "Crypto" ? "CRYPTO" : null);
       
       const value = (s.close || 0) * (s.quantity || 0);
       const valueEUR = s.currency === "USD" ? value * usdToEur : value;
@@ -109,7 +120,8 @@ export default function GeographiePage() {
       if (!byCountry[country]) {
         byCountry[country] = {
           country,
-          isoCode: COUNTRY_CODES[country] || null,
+          isoCode,
+          countryCode: s.countryCode || null,
           valueEUR: 0,
           valueOriginal: 0,
           currency: s.currency,
@@ -134,11 +146,14 @@ export default function GeographiePage() {
     const maxValue = Math.max(...countryList.map(c => c.valueEUR));
 
     // Continent principal (simplifié)
-    const topCountry = countryList[0]?.country || "N/A";
-    let topContinent = "N/A";
-    if (["États-Unis", "Canada"].includes(topCountry)) topContinent = "Amérique";
-    else if (["France", "Allemagne", "Royaume-Uni", "Pays-Bas", "Amsterdam", "Belgique", "Suisse", "Italie", "Espagne"].includes(topCountry)) topContinent = "Europe";
-    else if (["Chine", "Japon"].includes(topCountry)) topContinent = "Asie";
+    // Continent principal : somme des valeurs par continent
+    const byContinent = {};
+    for (const c of countryList) {
+      const continent = CONTINENTS[c.countryCode];
+      if (continent) byContinent[continent] = (byContinent[continent] || 0) + c.valueEUR;
+    }
+    const topContinent =
+      Object.entries(byContinent).sort((a, b) => b[1] - a[1])[0]?.[0] || "N/A";
 
     return {
       byCountry,
@@ -180,99 +195,25 @@ export default function GeographiePage() {
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-      {/* Header */}
-      <header className="sticky top-0 z-50 backdrop-blur-xl bg-white/90 border-b border-slate-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <Link
-              href="/"
-              className="flex items-center gap-3 group transition-transform hover:scale-105"
-            >
-              <div className="relative">
-                <img
-                  src="/logo_nauticash.webp?v=3"
-                  alt="Logo Nauticash"
-                  width={32}
-                  height={32}
-                  className="rounded-lg shadow-sm"
-                />
-                <div className="absolute inset-0 rounded-lg bg-gradient-to-br from-emerald-500/20 to-blue-500/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-              <div>
-                <span className="text-xl font-bold bg-gradient-to-r from-slate-900 via-emerald-600 to-blue-600 bg-clip-text text-transparent">
-                  Nauticash
-                </span>
-                <p className="text-xs text-slate-500">Géographie</p>
-              </div>
-            </Link>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => router.push("/analytics")}
-                className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-all"
-              >
-                <svg
-                  className="w-4 h-4 sm:hidden"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                  />
-                </svg>
-                <span className="hidden sm:inline">← Analytics</span>
-              </button>
-            </div>
-          </div>
+      {loadError && (
+        <div role="alert" className="mx-auto mt-4 max-w-7xl rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {loadError}
         </div>
-      </header>
+      )}
+      {/* Header */}
+      <AppHeader />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Title */}
         <div className="mb-8">
           <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-2">
-            Analytics du Portefeuille
+            Géographie
           </h1>
           <p className="text-slate-600">
-            Visualisez la répartition et l'évolution de vos investissements
+            Exposition de votre portefeuille par pays et par continent.
           </p>
         </div>
 
-        {/* Tabs */}
-        <nav className="mb-8 border-b border-slate-200">
-          {[
-            { key: "vue", label: "Vue d'ensemble", route: "/analytics" },
-            { key: "performance", label: "Performance", route: "/analytics/performance" },
-            { key: "dividendes", label: "Dividendes", route: "/analytics/dividendes" },
-            { key: "geographie", label: "Géographie", route: "/analytics/geographie" },
-          ].map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => {
-                if (tab.route) {
-                  router.push(tab.route);
-                }
-              }}
-              disabled={!tab.route}
-              className={`relative px-6 py-3 text-sm font-medium transition-all ${
-                tab.key === "geographie"
-                  ? "text-emerald-600"
-                  : tab.route 
-                    ? "text-slate-600 hover:text-slate-900 cursor-pointer"
-                    : "text-slate-400 cursor-not-allowed"
-              }`}
-            >
-              {tab.label}
-              {tab.key === "geographie" && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-600 to-blue-600" />
-              )}
-            </button>
-          ))}
-        </nav>
 
         {loading ? (
           <div className="flex justify-center py-20">
@@ -366,11 +307,6 @@ export default function GeographiePage() {
                   <ZoomableGroup center={[0, 20]} zoom={1}>
                     <Geographies geography={geoUrl}>
                       {({ geographies }) => {
-                        console.log("🗺️ PREMIERS PAYS DE LA CARTE:");
-                        geographies.slice(0, 15).forEach(g => {
-                          console.log(`  - ${g.properties?.name || "?"} → ID: "${g.id}"`);
-                        });
-                        
                         return geographies.map((geo) => {
                           const isoCode = geo.id;
                           const countryData = geoData.countryList.find(c => c.isoCode === isoCode);

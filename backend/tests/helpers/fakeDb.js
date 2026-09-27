@@ -191,10 +191,16 @@ class FakeCollection {
     else this.docs.push(copy);
   }
 
-  async deleteMany() {
-    const deletedCount = this.docs.length;
-    this.docs = [];
-    return { deletedCount };
+  async deleteMany(filter = {}) {
+    const before = this.docs.length;
+    this.docs = this.docs.filter((d) => !matches(d, filter));
+    return { acknowledged: true, deletedCount: before - this.docs.length };
+  }
+
+  async deleteOne(filter = {}) {
+    const idx = this.docs.findIndex((d) => matches(d, filter));
+    if (idx >= 0) this.docs.splice(idx, 1);
+    return { acknowledged: true, deletedCount: idx >= 0 ? 1 : 0 };
   }
 }
 

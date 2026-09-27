@@ -1,5 +1,7 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { ToastProvider } from "./components/ui/Toast";
+import { themeInitScript } from "./components/ui/ThemeToggle";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -22,11 +24,14 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="fr">
+    <html lang="fr" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <ToastProvider>{children}</ToastProvider>
       </body>
     </html>
   );

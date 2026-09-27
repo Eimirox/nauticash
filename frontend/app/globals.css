@@ -54,10 +54,49 @@
   --radius-full: 9999px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* ================================
+   TOKENS NAUTICASH (voir docs/DESIGN.md)
+   Mode clair par défaut ; mode sombre via la classe .dark sur <html>
+   ================================ */
+:root {
+  --bg: 247 248 246;          /* #F7F8F6 écume */
+  --surface: 255 255 255;
+  --surface-2: 238 242 241;
+  --border: 221 227 225;
+  --text: 11 27 43;           /* #0B1B2B */
+  --text-muted: 81 96 110;
+  --accent: 5 150 105;        /* emerald-600 lagon */
+  --accent-2: 37 99 235;      /* blue-600 */
+  --gain: 21 128 61;
+  --loss: 185 28 28;
+  --warn: 180 83 9;
+  --on-accent: 255 255 255;
+  color-scheme: light;
+}
+
+.dark {
+  --bg: 11 27 43;             /* #0B1B2B abysse */
+  --surface: 17 38 58;
+  --surface-2: 22 48 74;
+  --border: 31 59 87;
+  --text: 232 238 242;
+  --text-muted: 159 176 191;
+  --accent: 52 211 153;       /* emerald-400 */
+  --accent-2: 96 165 250;     /* blue-400 */
+  --gain: 74 222 128;
+  --loss: 248 113 113;
+  --warn: 251 191 36;
+  --on-accent: 11 27 43;
+  --background: #0B1B2B;
+  --foreground: #E8EEF2;
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
 

@@ -27,21 +27,41 @@ class PriceUpdater {
   start() {
     if (!config.cron.updatePrices.enabled) {
       console.log("⏸️ Cron job disabled in config");
-      return;
+      return null;
     }
 
     const schedule = config.cron.updatePrices.schedule;
 
+    if (!cron.validate(schedule)) {
+      console.error(`❌ CRON_UPDATE_SCHEDULE invalide : "${schedule}" — actualisation automatique désactivée`);
+      return null;
+    }
+
     console.log(`⏰ Starting price update cron job with schedule: ${schedule}`);
 
-    // Cron job principal
-    cron.schedule(schedule, async () => {
-      await this.run();
-    });
+    // Cron job principal (node-cron v4 : noOverlap évite deux actualisations simultanées)
+    this.task = cron.schedule(
+      schedule,
+      async () => {
+        await this.run();
+      },
+      { name: "update-prices", noOverlap: true }
+    );
 
     // Info : afficher le prochain run
     console.log(`✅ Cron job started. Next run will be according to: ${schedule}`);
     console.log(`   Example: "0 */6 * * *" = every 6 hours`);
+    return this.task;
+  }
+
+  /**
+   * Arrête le cron job (tests, arrêt propre du serveur)
+   */
+  stop() {
+    if (this.task) {
+      this.task.stop();
+      this.task = null;
+    }
   }
 
   /**

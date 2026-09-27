@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { apiFetch } from "@/lib/api";
+import AppHeader from "../components/AppHeader";
 import Link from "next/link";
 import { Pie } from "react-chartjs-2";
 import Chart from "chart.js/auto";
@@ -63,7 +64,7 @@ const SECTOR_COLORS = {
 };
 
 export default function Analytics() {
-  const router = useRouter();
+  const [loadError, setLoadError] = useState(null);
   const [stocks, setStocks] = useState([]);
   const [cash, setCash] = useState({ amount: 0, currency: "EUR" });
   const [loading, setLoading] = useState(true);
@@ -89,16 +90,12 @@ export default function Analytics() {
     const fetchPortfolio = async () => {
       setLoading(true);
       try {
-        const token = localStorage.getItem("token");
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"}/api/user/portfolio`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error(`Status ${res.status}`);
-        const data = await res.json();
+        const data = await apiFetch("/api/user/portfolio");
         setStocks(data.stocks || []);
         setCash(data.cash || { amount: 0, currency: "EUR" });
       } catch (err) {
         console.error(err);
+        setLoadError(`Impossible de charger vos données : ${err.message}`);
       } finally {
         setLoading(false);
       }
@@ -226,98 +223,25 @@ export default function Analytics() {
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-      {/* Header */}
-      <header className="sticky top-0 z-50 backdrop-blur-xl bg-white/90 border-b border-slate-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <Link
-              href="/"
-              className="flex items-center gap-3 group transition-transform hover:scale-105"
-            >
-              <div className="relative">
-                <img
-                  src="/logo_nauticash.webp?v=3"
-                  alt="Logo Nauticash"
-                  width={32}
-                  height={32}
-                  className="rounded-lg shadow-sm"
-                />
-                <div className="absolute inset-0 rounded-lg bg-gradient-to-br from-emerald-500/20 to-blue-500/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-              <div>
-                <span className="text-xl font-bold bg-gradient-to-r from-slate-900 via-emerald-600 to-blue-600 bg-clip-text text-transparent">
-                  Nauticash
-                </span>
-                <p className="text-xs text-slate-500">Analytics</p>
-              </div>
-            </Link>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => router.push("/portfolio")}
-                className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-all"
-              >
-                <svg
-                  className="w-4 h-4 sm:hidden"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                  />
-                </svg>
-                <span className="hidden sm:inline">← Portfolio</span>
-              </button>
-            </div>
-          </div>
+      {loadError && (
+        <div role="alert" className="mx-auto mt-4 max-w-7xl rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {loadError}
         </div>
-      </header>
+      )}
+      {/* Header */}
+      <AppHeader />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Title */}
         <div className="mb-8">
           <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-2">
-            Analytics du Portefeuille
+            Vue d'ensemble
           </h1>
           <p className="text-slate-600">
-            Visualisez la répartition et l'évolution de vos investissements
+            Répartition de votre patrimoine par devise, type d'actif et secteur.
           </p>
         </div>
 
-        {/* Tabs */}
-        <nav className="mb-8 border-b border-slate-200">
-          {[
-            { key: "vue", label: "Vue d'ensemble", icon: "chart" },
-            { key: "o1", label: "Performance", icon: "trending", route: "/analytics/performance" },
-            { key: "o2", label: "Dividendes", icon: "cash", route: "/analytics/dividendes" },
-            { key: "o3", label: "Géographie", icon: "shield", route: "/analytics/geographie" },
-          ].map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => {
-                if (tab.route) {
-                  router.push(tab.route);
-                } else {
-                  setActiveTab(tab.key);
-                }
-              }}
-              className={`relative px-6 py-3 text-sm font-medium transition-all ${
-                activeTab === tab.key
-                  ? "text-emerald-600"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              {tab.label}
-              {activeTab === tab.key && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-600 to-blue-600" />
-              )}
-            </button>
-          ))}
-        </nav>
 
         {activeTab === "vue" && (
           <section>

@@ -5,6 +5,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const auth = require("../middleware/auth");
 const priceStore = require("../services/priceStore");
+const { resolveCountry } = require("../services/countries");
 
 const router = express.Router();
 
@@ -34,6 +35,18 @@ function readCash(user) {
   return { amount: user.cashAmount ?? 0, currency: user.cashCurrency ?? "EUR" };
 }
 
+// Pays normalisé (nom français + codes ISO pour la carte), y compris pour les anciennes données en base
+function countryFields(ticker, priceInfo = {}) {
+  const c = resolveCountry({
+    countryCode: priceInfo.countryCode,
+    country: priceInfo.country,
+    exchange: priceInfo.exchange,
+    ticker,
+    type: priceInfo.type,
+  });
+  return { country: c.name, countryCode: c.code, countryNumeric: c.numeric };
+}
+
 function enrich(position, priceInfo) {
   if (!priceInfo) {
     return {
@@ -45,6 +58,7 @@ function enrich(position, priceInfo) {
       currency: "USD",
       performance: 0,
       total: 0,
+      ...countryFields(position.ticker),
       error: "Price not available",
     };
   }
@@ -65,7 +79,7 @@ function enrich(position, priceInfo) {
     exDividendDate: priceInfo.exDividendDate || null,
     paymentDate: priceInfo.paymentDate || null,
     recordDate: priceInfo.recordDate || null,
-    country: priceInfo.country || "Unknown",
+    ...countryFields(position.ticker, priceInfo),
     sector: priceInfo.sector || null,
     industry: priceInfo.industry || null,
     type: priceInfo.type || "Stock",
