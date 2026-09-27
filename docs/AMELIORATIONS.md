@@ -11,6 +11,7 @@ Chaque session : prend **la première tâche non cochée**, la réalise, vérifi
   (Google Fonts peut être bloqué dans l'environnement : remplacer temporairement les polices dans `app/layout.js` pour le build, puis restaurer le fichier).
 - Ne jamais changer : les variables d'environnement attendues sans le noter ici, le schéma des données existantes sans migration compatible, les pages légales (contenu juridique).
 - Respecter `docs/DESIGN.md` (identité visuelle) ; les choix d'API sont documentés dans `docs/API.md`.
+- Variables d'environnement du frontend documentées dans `frontend/.env.example` (dont `NEXT_PUBLIC_CONTACT_EMAIL`, ajoutée pour la bêta).
 - Pas de nouvelle dépendance sans nécessité claire (préférer le natif), jamais de clé API dans le code.
 - Toute nouvelle route backend est accompagnée de tests.
 - Si une tâche est bloquée (info manquante, accès), la marquer `[!]` avec la raison et passer à la suivante.
@@ -33,7 +34,7 @@ Chaque session : prend **la première tâche non cochée**, la réalise, vérifi
 - [x] En-têtes de sécurité dans `next.config.mjs`
 - [x] Vulnérabilités `npm audit` backend et frontend (sans --force ; tests et build doivent passer)
 - [x] Refonte visuelle de l'accueil selon DESIGN.md + relecture des textes (ton professionnel, appel à l'action clair)
-- [ ] Page « Bêta » : bandeau discret « Version bêta » dans l'en-tête + lien « Donner mon avis » (mailto vers l'adresse de contact) pour recueillir les retours du cercle proche
+- [x] Page « Bêta » : bandeau discret « Version bêta » dans l'en-tête + lien « Donner mon avis » (mailto vers l'adresse de contact) pour recueillir les retours du cercle proche
 
 ### Après le lancement
 
@@ -69,3 +70,4 @@ Chaque session : prend **la première tâche non cochée**, la réalise, vérifi
 - 2026-09-27 – En-têtes de sécurité : frontend (Content-Security-Policy limitée au site, au backend et à exchangerate-api, X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy, HSTS, sans en-tête « X-Powered-By ») et backend (nosniff, DENY, CSP stricte pour l'API) ; vérifié en build de production sur 8 pages sans aucune violation CSP ; historique protégé contre une réponse inattendue – OK (build + 90 tests)
 - 2026-09-27 – Vulnérabilités : backend 16 → 2 (modérées, via node-cron/uuid, non exploitables ici : uuid v3/v5/v6 avec buffer non utilisés ; montée en node-cron 4 ajoutée au backlog), frontend 20 → 0 (npm audit fix, nodemon 3 en dev, overrides d3-color 3 et brace-expansion, echarts retiré car inutilisé) ; carte du monde revérifiée avec d3-color 3 – OK (build + 90 tests)
 - 2026-09-27 – Accueil refondu selon DESIGN.md : hero « abysse » avec lignes de niveau, promesse « Gardez le cap sur votre patrimoine boursier », aperçu illustratif du tableau de bord (valeurs fictives signalées), 3 bénéfices, « Prêt en trois minutes », engagements (aucune connexion bancaire, HTTPS, gratuit en bêta), appel à l'action adapté si l'utilisateur est déjà connecté, pied de page légal ; bascule FR/EN et carrousel retirés (site 100 % français) ; vérifié bureau + 375 px sans défilement horizontal – OK (build + 90 tests)
+- 2026-09-27 – Bêta : badge « Bêta » à côté du logo dans l'en-tête + lien « Donner mon avis » (email pré-rempli avec la page en cours) vers NEXT_PUBLIC_CONTACT_EMAIL (lien masqué tant que la variable n'est pas définie) ; sur mobile le lien passe dans la barre de navigation pour éviter le débordement ; frontend/.env.example créé ; cash du portefeuille protégé contre une valeur absente (affichait « NaN ») – OK (build + 90 tests). Toutes les tâches « avant lancement » sont faites.

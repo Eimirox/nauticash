@@ -107,7 +107,10 @@ export default function Portfolio() {
     try {
       const data = await apiFetch("/api/user/portfolio");
       setStocks(sortStocksGeneric(data.stocks || [], sort));
-      setCash(data.cash || { amount: 0, currency: "EUR" });
+      setCash({
+        amount: Number.isFinite(Number(data.cash?.amount)) ? Number(data.cash.amount) : 0,
+        currency: data.cash?.currency || "EUR",
+      });
     } catch (err) {
       setError(err.message);
     } finally {
