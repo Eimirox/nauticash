@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { apiFetch } from "@/lib/api";
+import { useToast } from "../components/ui";
 import {
   BarChart,
   Bar,
@@ -30,6 +31,7 @@ const MONTH_MAP = {
 };
 
 export default function PortfolioHistoryChart() {
+  const toast = useToast();
   const [history, setHistory] = useState([]);
   const [selectedYears, setSelectedYears] = useState([]);
   const [availableYears, setAvailableYears] = useState([]);
@@ -123,7 +125,7 @@ export default function PortfolioHistoryChart() {
       const value = parseFloat(manualForm.value);
 
       if (isNaN(value) || !year || !month) {
-        alert("❌ Valeur ou date invalide");
+        toast.error("Valeur ou date invalide.");
         return;
       }
 
@@ -135,10 +137,10 @@ export default function PortfolioHistoryChart() {
       await fetchHistory();
       setManualForm({ date: "", value: "" });
       setShowManualEdit(false);
-      alert(`✅ Sauvegardé : ${value.toFixed(2)}€`);
+      toast.success(`Valeur enregistrée : ${value.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`);
     } catch (err) {
       console.error(err);
-      alert(`❌ Erreur : ${err.message}`);
+      toast.error(`Enregistrement impossible : ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -177,10 +179,10 @@ export default function PortfolioHistoryChart() {
       });
 
       await fetchHistory();
-      alert(`✅ Snapshot : ${totalValueEUR.toFixed(2)}€`);
+      toast.success(`Photo du patrimoine enregistrée : ${totalValueEUR.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`);
     } catch (err) {
       console.error(err);
-      alert(`❌ Erreur : ${err.message}`);
+      toast.error(`Enregistrement impossible : ${err.message}`);
     } finally {
       setLoading(false);
     }

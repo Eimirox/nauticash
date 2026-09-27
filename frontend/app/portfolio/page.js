@@ -7,6 +7,7 @@ import { formatCurrencySymbol } from "./utils/formats";
 import { exchangeToCountry } from "./utils/exchangeMap";
 import { getPerformanceClass } from "./utils/styles";
 import { apiFetch, logout as apiLogout } from "@/lib/api";
+import { ConfirmModal, useToast } from "../components/ui";
 
 export default function Portfolio() {
   const router = useRouter();
@@ -114,20 +115,18 @@ export default function Portfolio() {
   };
 
   const [refreshing, setRefreshing] = useState(false);
-  const [notice, setNotice] = useState(null);
+  const toast = useToast();
+  const [pendingRemoval, setPendingRemoval] = useState(null);
+  const [removing, setRemoving] = useState(false);
 
   const handleUpdatePrices = async () => {
     setError(null);
-    setNotice(null);
     setRefreshing(true);
     try {
       const r = await apiFetch("/api/user/portfolio/force-refresh", { method: "POST" });
       await fetchPortfolio();
-      setNotice(
-        r.failed
-          ? `Prix actualisés (${r.failed} ticker(s) en échec).`
-          : "Prix actualisés."
-      );
+      if (r.failed) toast.error(`Prix actualisés, ${r.failed} ticker(s) en échec.`);
+      else toast.success("Prix actualisés.");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -157,16 +156,37 @@ export default function Portfolio() {
     }
   };
 
-  const removeStock = async (tickerToRemove) => {
-    if (!window.confirm(`Supprimer ${tickerToRemove} du portefeuille ?`)) return;
+  // Suppression en deux temps : demande de confirmation, puis appel au backend
+  const removeStock = (tickerToRemove) => setPendingRemoval(tickerToRemove);
+
+  const confirmRemoval = async () => {
+    const tickerToRemove = pendingRemoval;
     setError(null);
+    setRemoving(true);
     try {
       await apiFetch(`/api/user/portfolio/${encodeURIComponent(tickerToRemove)}`, { method: "DELETE" });
       setStocks((prev) => prev.filter((s) => s.ticker !== tickerToRemove));
+      toast.success(`${tickerToRemove} retiré du portefeuille.`);
     } catch (err) {
-      setError(err.message);
+      toast.error(`Suppression impossible : ${err.message}`);
+    } finally {
+      setRemoving(false);
+      setPendingRemoval(null);
     }
   };
+
+  const removalModal = (
+    <ConfirmModal
+      open={Boolean(pendingRemoval)}
+      danger
+      title={`Supprimer ${pendingRemoval || ""} ?`}
+      message="La position sera retirée de votre portefeuille. Vous pourrez la rajouter à tout moment."
+      confirmLabel="Supprimer"
+      loading={removing}
+      onConfirm={confirmRemoval}
+      onCancel={() => !removing && setPendingRemoval(null)}
+    />
+  );
 
   const handleUpdateStock = (ticker, field, value) => {
     if (!Number.isFinite(value) || value < 0) {
@@ -523,6 +543,7 @@ export default function Portfolio() {
           </button>
         </div>
         <TableContent />
+        {removalModal}
       </div>
     );
   }
@@ -634,12 +655,6 @@ export default function Portfolio() {
               />
             </svg>
             <p className="text-sm text-red-700">{error}</p>
-          </div>
-        )}
-
-        {notice && (
-          <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-800">
-            {notice}
           </div>
         )}
 
@@ -846,6 +861,7 @@ export default function Portfolio() {
           <TableContent />
         </div>
       </div>
+      {removalModal}
     </main>
   );
 }
