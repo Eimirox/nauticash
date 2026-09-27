@@ -32,7 +32,7 @@ Chaque session : prend **la première tâche non cochée**, la réalise, vérifi
 - [x] Page « Mon compte » : changer son mot de passe et supprimer son compte (RGPD)
 - [x] En-têtes de sécurité dans `next.config.mjs`
 - [x] Vulnérabilités `npm audit` backend et frontend (sans --force ; tests et build doivent passer)
-- [ ] Refonte visuelle de l'accueil selon DESIGN.md + relecture des textes (ton professionnel, appel à l'action clair)
+- [x] Refonte visuelle de l'accueil selon DESIGN.md + relecture des textes (ton professionnel, appel à l'action clair)
 - [ ] Page « Bêta » : bandeau discret « Version bêta » dans l'en-tête + lien « Donner mon avis » (mailto vers l'adresse de contact) pour recueillir les retours du cercle proche
 
 ### Après le lancement
@@ -68,3 +68,4 @@ Chaque session : prend **la première tâche non cochée**, la réalise, vérifi
 - 2026-09-27 – Page « Mon compte » (/compte, lien dans l'en-tête) : changement de mot de passe (actuel requis, mêmes règles qu'à l'inscription) et suppression définitive du compte avec mot de passe + confirmation (portefeuille, cash, historique, transactions effacés) ; routes POST /api/auth/change-password et DELETE /api/auth/account limitées en tentatives ; 6 nouveaux tests. À faire par Alex : les CGU disent « demander la suppression à l'adresse de contact », on peut désormais mentionner la page Mon compte – OK (build + 89 tests)
 - 2026-09-27 – En-têtes de sécurité : frontend (Content-Security-Policy limitée au site, au backend et à exchangerate-api, X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy, HSTS, sans en-tête « X-Powered-By ») et backend (nosniff, DENY, CSP stricte pour l'API) ; vérifié en build de production sur 8 pages sans aucune violation CSP ; historique protégé contre une réponse inattendue – OK (build + 90 tests)
 - 2026-09-27 – Vulnérabilités : backend 16 → 2 (modérées, via node-cron/uuid, non exploitables ici : uuid v3/v5/v6 avec buffer non utilisés ; montée en node-cron 4 ajoutée au backlog), frontend 20 → 0 (npm audit fix, nodemon 3 en dev, overrides d3-color 3 et brace-expansion, echarts retiré car inutilisé) ; carte du monde revérifiée avec d3-color 3 – OK (build + 90 tests)
+- 2026-09-27 – Accueil refondu selon DESIGN.md : hero « abysse » avec lignes de niveau, promesse « Gardez le cap sur votre patrimoine boursier », aperçu illustratif du tableau de bord (valeurs fictives signalées), 3 bénéfices, « Prêt en trois minutes », engagements (aucune connexion bancaire, HTTPS, gratuit en bêta), appel à l'action adapté si l'utilisateur est déjà connecté, pied de page légal ; bascule FR/EN et carrousel retirés (site 100 % français) ; vérifié bureau + 375 px sans défilement horizontal – OK (build + 90 tests)
