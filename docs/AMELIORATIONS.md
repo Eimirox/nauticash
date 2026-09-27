@@ -31,12 +31,13 @@ Chaque session : prend **la première tâche non cochée**, la réalise, vérifi
 - [x] Vue mobile du tableau des positions (cartes empilées sous 768 px)
 - [x] Page « Mon compte » : changer son mot de passe et supprimer son compte (RGPD)
 - [x] En-têtes de sécurité dans `next.config.mjs`
-- [ ] Vulnérabilités `npm audit` backend et frontend (sans --force ; tests et build doivent passer)
+- [x] Vulnérabilités `npm audit` backend et frontend (sans --force ; tests et build doivent passer)
 - [ ] Refonte visuelle de l'accueil selon DESIGN.md + relecture des textes (ton professionnel, appel à l'action clair)
 - [ ] Page « Bêta » : bandeau discret « Version bêta » dans l'en-tête + lien « Donner mon avis » (mailto vers l'adresse de contact) pour recueillir les retours du cercle proche
 
 ### Après le lancement
 
+- [ ] Passer node-cron en v4 (supprime les 2 dernières alertes npm audit backend, dépendance uuid non exploitable ici) en vérifiant le cron d'actualisation des prix
 - [ ] Tableau de bord patrimoine : valeur totale en grand, variation du jour et depuis l'achat, courbe d'évolution, répartition par type d'actif / secteur / pays
 - [ ] Taux de change servis par le backend via Frankfurter avec cache (fin des appels navigateur à exchangerate-api)
 - [ ] Dividendes : calendrier des prochains versements et revenu annuel estimé
@@ -46,7 +47,7 @@ Chaque session : prend **la première tâche non cochée**, la réalise, vérifi
 - [ ] SEO : robots, sitemap (pages publiques), Open Graph, icônes
 - [ ] Accessibilité : libellés, aria-*, focus visibles, contrastes
 - [ ] États de chargement (squelettes) sur portefeuille et analytics
-- [ ] Une seule librairie de graphiques au lieu de chart.js + echarts + recharts
+- [ ] Une seule librairie de graphiques au lieu de chart.js + recharts (echarts retiré, il n'était pas utilisé)
 - [ ] Tests : renommer le test « quota atteint pendant l'enrichissement » (il vérifie que rien n'est enregistré) et faire que FMP_DAILY_LIMIT=0 bloque les appels au lieu de supprimer la limite
 - [ ] ESLint (`npm run lint`) sans avertissement
 
@@ -66,3 +67,4 @@ Chaque session : prend **la première tâche non cochée**, la réalise, vérifi
 - 2026-09-27 – Vue mobile du portefeuille : une carte par position sous 768 px (montant, performance, prix, quantité/PRU éditables, dividende, suppression) + tri par liste déroulante, bouton plein écran masqué sur mobile ; badges « Action / Crypto » corrigés (le backend renvoie « Stock ») ; montants au format français ; vérifié à 375 px (aucun défilement horizontal, modification enregistrée) – OK (build + 83 tests)
 - 2026-09-27 – Page « Mon compte » (/compte, lien dans l'en-tête) : changement de mot de passe (actuel requis, mêmes règles qu'à l'inscription) et suppression définitive du compte avec mot de passe + confirmation (portefeuille, cash, historique, transactions effacés) ; routes POST /api/auth/change-password et DELETE /api/auth/account limitées en tentatives ; 6 nouveaux tests. À faire par Alex : les CGU disent « demander la suppression à l'adresse de contact », on peut désormais mentionner la page Mon compte – OK (build + 89 tests)
 - 2026-09-27 – En-têtes de sécurité : frontend (Content-Security-Policy limitée au site, au backend et à exchangerate-api, X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy, HSTS, sans en-tête « X-Powered-By ») et backend (nosniff, DENY, CSP stricte pour l'API) ; vérifié en build de production sur 8 pages sans aucune violation CSP ; historique protégé contre une réponse inattendue – OK (build + 90 tests)
+- 2026-09-27 – Vulnérabilités : backend 16 → 2 (modérées, via node-cron/uuid, non exploitables ici : uuid v3/v5/v6 avec buffer non utilisés ; montée en node-cron 4 ajoutée au backlog), frontend 20 → 0 (npm audit fix, nodemon 3 en dev, overrides d3-color 3 et brace-expansion, echarts retiré car inutilisé) ; carte du monde revérifiée avec d3-color 3 – OK (build + 90 tests)
