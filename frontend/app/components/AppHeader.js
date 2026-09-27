@@ -63,6 +63,20 @@ export default function AppHeader({ actions }) {
 
           <div className="flex shrink-0 items-center gap-2">
             {actions}
+            <Link
+              href="/compte"
+              aria-label="Mon compte"
+              aria-current={pathname === "/compte" ? "page" : undefined}
+              className={cx(
+                "inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+                pathname === "/compte" ? "border-accent/40 bg-accent/10 text-accent" : "border-line bg-surface text-ink-muted hover:text-ink"
+              )}
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              <span className="hidden sm:inline">Mon compte</span>
+            </Link>
             <button
               type="button"
               onClick={logout}

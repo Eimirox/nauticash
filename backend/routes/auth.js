@@ -7,6 +7,8 @@ const crypto = require("crypto");
 const User = require("../models/user");
 const { sendPasswordResetEmail } = require("../services/emailService");
 const rateLimit = require("../middleware/rateLimit");
+const auth = require("../middleware/auth");
+const mongoose = require("mongoose");
 
 const router = express.Router();
 
@@ -33,6 +35,7 @@ const loginLimiter = rateLimit({ windowMs: 15 * MIN, max: 10, message: "Trop de 
 const registerLimiter = rateLimit({ windowMs: 60 * MIN, max: 5, message: "Trop de créations de compte. Réessayez plus tard." });
 const forgotLimiter = rateLimit({ windowMs: 60 * MIN, max: 5, message: "Trop de demandes. Réessayez dans une heure." });
 const resetLimiter = rateLimit({ windowMs: 15 * MIN, max: 10 });
+const accountLimiter = rateLimit({ windowMs: 15 * MIN, max: 10, message: "Trop de tentatives. Réessayez dans 15 minutes." });
 
 const formatErrors = (errors) => ({
   message: "Validation error",
@@ -206,6 +209,85 @@ router.post(
       return res.json({ message: "Mot de passe mis à jour. Vous pouvez vous connecter." });
     } catch (err) {
       console.error("RESET-PASSWORD error:", err);
+      return res.status(500).json({ message: "Erreur serveur" });
+    }
+  }
+);
+
+// =============================================================================
+// MON COMPTE
+// =============================================================================
+
+// Vérifie le mot de passe actuel de l'utilisateur connecté
+async function checkCurrentPassword(req, res) {
+  const user = await User.findById(req.user.userId);
+  if (!user) {
+    res.status(404).json({ message: "Utilisateur introuvable." });
+    return null;
+  }
+  const ok = await bcrypt.compare(String(req.body.currentPassword || ""), user.password);
+  if (!ok) {
+    res.status(403).json({ message: "Mot de passe actuel incorrect." });
+    return null;
+  }
+  return user;
+}
+
+// POST /api/auth/change-password  { currentPassword, password }
+router.post(
+  "/change-password",
+  accountLimiter,
+  auth,
+  [body("currentPassword").notEmpty().withMessage("Mot de passe actuel requis."), ...pwValidators],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) return res.status(400).json(formatErrors(errors));
+
+      const user = await checkCurrentPassword(req, res);
+      if (!user) return;
+
+      if (await bcrypt.compare(req.body.password, user.password)) {
+        return res.status(400).json({ message: "Le nouveau mot de passe doit être différent de l'actuel." });
+      }
+
+      user.password = await bcrypt.hash(req.body.password, 10);
+      user.resetPasswordToken = null;
+      user.resetPasswordExpires = null;
+      await user.save();
+
+      return res.json({ message: "Mot de passe modifié." });
+    } catch (err) {
+      console.error("CHANGE-PASSWORD error:", err);
+      return res.status(500).json({ message: "Erreur serveur" });
+    }
+  }
+);
+
+// DELETE /api/auth/account  { currentPassword }
+// Supprime définitivement le compte et toutes ses données (portefeuille, cash, historique, transactions).
+router.delete(
+  "/account",
+  accountLimiter,
+  auth,
+  [body("currentPassword").notEmpty().withMessage("Mot de passe requis pour confirmer.")],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) return res.status(400).json(formatErrors(errors));
+
+      const user = await checkCurrentPassword(req, res);
+      if (!user) return;
+
+      const db = mongoose.connection;
+      const id = user._id;
+      await db.collection("history").deleteMany({ userId: String(id) });
+      await db.collection("transactions").deleteMany({ userId: id });
+      await db.collection("users").deleteOne({ _id: id });
+
+      return res.json({ message: "Compte supprimé." });
+    } catch (err) {
+      console.error("DELETE-ACCOUNT error:", err);
       return res.status(500).json({ message: "Erreur serveur" });
     }
   }

@@ -29,7 +29,7 @@ Chaque session : prend **la première tâche non cochée**, la réalise, vérifi
 - [x] Supprimer les onglets internes des pages analytics, devenus redondants avec la navigation de l'en-tête
 - [x] Pages 404 (`app/not-found.js`) et erreur (`app/error.js`) avec l'identité Nauticash
 - [x] Vue mobile du tableau des positions (cartes empilées sous 768 px)
-- [ ] Page « Mon compte » : changer son mot de passe et supprimer son compte (RGPD)
+- [x] Page « Mon compte » : changer son mot de passe et supprimer son compte (RGPD)
 - [ ] En-têtes de sécurité dans `next.config.mjs`
 - [ ] Vulnérabilités `npm audit` backend et frontend (sans --force ; tests et build doivent passer)
 - [ ] Refonte visuelle de l'accueil selon DESIGN.md + relecture des textes (ton professionnel, appel à l'action clair)
@@ -64,3 +64,4 @@ Chaque session : prend **la première tâche non cochée**, la réalise, vérifi
 - 2026-09-27 – Onglets internes des pages analytics supprimés (doublon avec l'en-tête) ; chaque page a son propre titre et sa description (Vue d'ensemble, Performance, Dividendes, Géographie) – OK (build + 83 tests)
 - 2026-09-27 – Pages 404 « Cap perdu », erreur « Avis de gros temps » (bouton Réessayer) et global-error de secours ; composants Compass (boussole signature, animée) et DepthLines (lignes de niveau) réutilisables ; vérifié en clair, sombre et mobile – OK (build + 83 tests)
 - 2026-09-27 – Vue mobile du portefeuille : une carte par position sous 768 px (montant, performance, prix, quantité/PRU éditables, dividende, suppression) + tri par liste déroulante, bouton plein écran masqué sur mobile ; badges « Action / Crypto » corrigés (le backend renvoie « Stock ») ; montants au format français ; vérifié à 375 px (aucun défilement horizontal, modification enregistrée) – OK (build + 83 tests)
+- 2026-09-27 – Page « Mon compte » (/compte, lien dans l'en-tête) : changement de mot de passe (actuel requis, mêmes règles qu'à l'inscription) et suppression définitive du compte avec mot de passe + confirmation (portefeuille, cash, historique, transactions effacés) ; routes POST /api/auth/change-password et DELETE /api/auth/account limitées en tentatives ; 6 nouveaux tests. À faire par Alex : les CGU disent « demander la suppression à l'adresse de contact », on peut désormais mentionner la page Mon compte – OK (build + 89 tests)
