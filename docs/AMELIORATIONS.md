@@ -22,7 +22,8 @@ Chaque session : prend **la première tâche non cochée**, la réalise, vérifi
 - [x] Design system selon DESIGN.md : tokens Tailwind/globals.css, mode sombre, composants de base (Card, Button, Stat, Badge, Modal, Toast) dans app/components/ui
 - [x] Migrer les pages analytics (`app/analytics/**`, `PortfolioHistoryChart.jsx`) vers `lib/api.js`
 - [x] Remplacer `alert()` / `window.confirm()` par les Toast / Modal du design system
-- [ ] En-tête / navigation commune (portefeuille, analytics, compte) aux couleurs du design system
+- [x] En-tête / navigation commune (portefeuille, analytics, compte) aux couleurs du design system
+- [ ] Supprimer les onglets internes des pages analytics, devenus redondants avec la navigation de l'en-tête
 - [ ] Tableau de bord patrimoine : valeur totale en grand, variation du jour et depuis l'achat, courbe d'évolution, répartition par type d'actif / secteur / pays
 - [ ] Pages 404 (`app/not-found.js`) et erreur (`app/error.js`) avec l'identité Nauticash
 - [ ] Vue mobile du tableau des positions (cartes empilées sous 768 px)
@@ -51,3 +52,4 @@ Chaque session : prend **la première tâche non cochée**, la réalise, vérifi
 - 2026-09-27 – Design system : jetons de couleur (clair/sombre) dans globals.css + Tailwind, composants Card, Button, Badge, Stat/Delta, Modal/ConfirmModal, Toast, ThemeToggle et formats FR dans app/components/ui ; mode sombre par classe (clair par défaut tant que les pages ne sont pas migrées) – OK (build + 69 tests)
 - 2026-09-27 – Pages analytics (vue d'ensemble, dividendes, géographie, performance, historique) passées sur lib/api.js : session expirée → retour à la connexion, message d'erreur visible au lieu d'un écran vide, enregistrements d'historique vérifiés (avant : échecs silencieux) ; appels exchangerate-api laissés pour la tâche « taux de change » – OK (build + 69 tests)
 - 2026-09-27 – Fin des alert()/confirm() : suppression d'une position via fenêtre de confirmation (ConfirmModal), actualisation des prix et historique via notifications (Toast) ; vérifié dans le navigateur avec API simulée – OK (build + 69 tests)
+- 2026-09-27 – En-tête commun (app/components/AppHeader.js) sur portefeuille et les 4 pages analytics : navigation avec page active, défilante sur mobile, bouton Actualiser intégré, Déconnexion partout (avant : absente des pages analytics) ; lien « Mon compte » à ajouter avec la page correspondante ; vérifié en capture bureau + mobile – OK (build + 69 tests)
