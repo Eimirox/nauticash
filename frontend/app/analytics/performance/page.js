@@ -17,7 +17,7 @@ export default function PerformancePage() {
     const fetchHistory = async () => {
       setLoading(true);
       try {
-        const data = await apiFetch("/api/user/history");
+        const data = await apiFetch("/api/user/history").then((d) => (Array.isArray(d) ? d : []));
         setHistory(data);
       } catch (err) {
         console.error("Erreur fetch history:", err);

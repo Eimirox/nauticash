@@ -95,3 +95,12 @@ describe("Routes admin (connecté en administrateur)", () => {
     }
   });
 });
+
+describe("En-têtes de sécurité de l'API", () => {
+  test("présents sur toutes les réponses", async () => {
+    const res = await h.request("GET", "/health");
+    assert.equal(res.headers.get("x-content-type-options"), "nosniff");
+    assert.equal(res.headers.get("x-frame-options"), "DENY");
+    assert.equal(res.headers.get("x-powered-by"), null);
+  });
+});

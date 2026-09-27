@@ -83,7 +83,7 @@ export default function PortfolioHistoryChart() {
 
   const fetchHistory = async () => {
     try {
-      const data = await apiFetch("/api/user/history");
+      const data = await apiFetch("/api/user/history").then((d) => (Array.isArray(d) ? d : []));
 
       setHistory(data);
 

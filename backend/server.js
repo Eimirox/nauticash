@@ -33,6 +33,18 @@ const app = express();
 app.set("trust proxy", 1);
 app.disable("x-powered-by");
 
+// En-têtes de sécurité de l'API (réponses JSON uniquement, jamais affichées dans une page)
+app.use((req, res, next) => {
+  res.set({
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+    "Cross-Origin-Resource-Policy": "cross-origin",
+  });
+  next();
+});
+
 // =============================================================================
 // MIDDLEWARE
 // =============================================================================
