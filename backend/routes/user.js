@@ -5,6 +5,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const auth = require("../middleware/auth");
 const priceStore = require("../services/priceStore");
+const { validateProfilePatch, readProfile } = require("../services/profile");
 const { resolveCountry } = require("../services/countries");
 
 const router = express.Router();
@@ -288,6 +289,39 @@ router.get("/portfolio/stats", auth, async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Error GET /portfolio/stats:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// =============================================================================
+// PROFIL : GET /api/user/profile, PATCH /api/user/profile (mise à jour partielle)
+// =============================================================================
+router.get("/profile", auth, async (req, res) => {
+  try {
+    const user = await users().findOne(userFilter(req), { projection: { email: 1, profile: 1 } });
+    if (!user) return res.status(404).json({ error: "User not found" });
+    res.json({ email: user.email, profile: readProfile(user) });
+  } catch (err) {
+    console.error("❌ Error GET /profile:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.patch("/profile", auth, async (req, res) => {
+  try {
+    const { value, errors } = validateProfilePatch(req.body);
+    if (errors) {
+      return res.status(400).json({ error: errors[0].msg, details: errors });
+    }
+
+    const $set = Object.fromEntries(Object.entries(value).map(([k, v]) => [`profile.${k}`, v]));
+    const result = await users().updateOne(userFilter(req), { $set });
+    if (result.matchedCount === 0) return res.status(404).json({ error: "User not found" });
+
+    const user = await users().findOne(userFilter(req), { projection: { email: 1, profile: 1 } });
+    res.json({ email: user.email, profile: readProfile(user) });
+  } catch (err) {
+    console.error("❌ Error PATCH /profile:", err);
     res.status(500).json({ error: "Server error" });
   }
 });
