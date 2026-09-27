@@ -38,7 +38,7 @@ Chaque session : prend **la première tâche non cochée**, la réalise, vérifi
 
 ### Après le lancement
 
-- [ ] Passer node-cron en v4 (supprime les 2 dernières alertes npm audit backend, dépendance uuid non exploitable ici) en vérifiant le cron d'actualisation des prix
+- [x] Passer node-cron en v4 (supprime les 2 dernières alertes npm audit backend, dépendance uuid non exploitable ici) en vérifiant le cron d'actualisation des prix
 - [ ] Tableau de bord patrimoine : valeur totale en grand, variation du jour et depuis l'achat, courbe d'évolution, répartition par type d'actif / secteur / pays
 - [ ] Taux de change servis par le backend via Frankfurter avec cache (fin des appels navigateur à exchangerate-api)
 - [ ] Dividendes : calendrier des prochains versements et revenu annuel estimé
@@ -71,3 +71,4 @@ Chaque session : prend **la première tâche non cochée**, la réalise, vérifi
 - 2026-09-27 – Vulnérabilités : backend 16 → 2 (modérées, via node-cron/uuid, non exploitables ici : uuid v3/v5/v6 avec buffer non utilisés ; montée en node-cron 4 ajoutée au backlog), frontend 20 → 0 (npm audit fix, nodemon 3 en dev, overrides d3-color 3 et brace-expansion, echarts retiré car inutilisé) ; carte du monde revérifiée avec d3-color 3 – OK (build + 90 tests)
 - 2026-09-27 – Accueil refondu selon DESIGN.md : hero « abysse » avec lignes de niveau, promesse « Gardez le cap sur votre patrimoine boursier », aperçu illustratif du tableau de bord (valeurs fictives signalées), 3 bénéfices, « Prêt en trois minutes », engagements (aucune connexion bancaire, HTTPS, gratuit en bêta), appel à l'action adapté si l'utilisateur est déjà connecté, pied de page légal ; bascule FR/EN et carrousel retirés (site 100 % français) ; vérifié bureau + 375 px sans défilement horizontal – OK (build + 90 tests)
 - 2026-09-27 – Bêta : badge « Bêta » à côté du logo dans l'en-tête + lien « Donner mon avis » (email pré-rempli avec la page en cours) vers NEXT_PUBLIC_CONTACT_EMAIL (lien masqué tant que la variable n'est pas définie) ; sur mobile le lien passe dans la barre de navigation pour éviter le débordement ; frontend/.env.example créé ; cash du portefeuille protégé contre une valeur absente (affichait « NaN ») – OK (build + 90 tests). Toutes les tâches « avant lancement » sont faites.
+- 2026-09-27 – node-cron 3 → 4 : backend à 0 vulnérabilité npm audit ; expression CRON_UPDATE_SCHEDULE validée au démarrage (invalide → actualisation désactivée avec message, au lieu d'un plantage), option noOverlap, méthode stop() ; 3 nouveaux tests – OK (93 tests ; frontend non modifié)
