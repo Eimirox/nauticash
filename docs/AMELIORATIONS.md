@@ -28,7 +28,7 @@ Chaque session : prend **la première tâche non cochée**, la réalise, vérifi
 
 - [x] Supprimer les onglets internes des pages analytics, devenus redondants avec la navigation de l'en-tête
 - [x] Pages 404 (`app/not-found.js`) et erreur (`app/error.js`) avec l'identité Nauticash
-- [ ] Vue mobile du tableau des positions (cartes empilées sous 768 px)
+- [x] Vue mobile du tableau des positions (cartes empilées sous 768 px)
 - [ ] Page « Mon compte » : changer son mot de passe et supprimer son compte (RGPD)
 - [ ] En-têtes de sécurité dans `next.config.mjs`
 - [ ] Vulnérabilités `npm audit` backend et frontend (sans --force ; tests et build doivent passer)
@@ -63,3 +63,4 @@ Chaque session : prend **la première tâche non cochée**, la réalise, vérifi
 - 2026-09-27 – [Demande d'Alex] Pays et carte du monde corrigés : normalisation des pays côté backend (services/countries.js : siège de l'entreprise via le profil FMP, suffixe du ticker, place de cotation, anciennes valeurs comme « NasdaqGS » ou « Amsterdam »), code ISO numérique renvoyé au frontend, profil re-téléchargé une fois pour les titres sans code pays, fond de carte servi par le site au lieu du CDN, continent principal calculé par valeur ; 14 nouveaux tests – OK (build + 83 tests)
 - 2026-09-27 – Onglets internes des pages analytics supprimés (doublon avec l'en-tête) ; chaque page a son propre titre et sa description (Vue d'ensemble, Performance, Dividendes, Géographie) – OK (build + 83 tests)
 - 2026-09-27 – Pages 404 « Cap perdu », erreur « Avis de gros temps » (bouton Réessayer) et global-error de secours ; composants Compass (boussole signature, animée) et DepthLines (lignes de niveau) réutilisables ; vérifié en clair, sombre et mobile – OK (build + 83 tests)
+- 2026-09-27 – Vue mobile du portefeuille : une carte par position sous 768 px (montant, performance, prix, quantité/PRU éditables, dividende, suppression) + tri par liste déroulante, bouton plein écran masqué sur mobile ; badges « Action / Crypto » corrigés (le backend renvoie « Stock ») ; montants au format français ; vérifié à 375 px (aucun défilement horizontal, modification enregistrée) – OK (build + 83 tests)

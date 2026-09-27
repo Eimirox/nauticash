@@ -23,7 +23,7 @@ export default function Portfolio() {
   const SORT_DIR = { NONE: "none", ASC: "asc", DESC: "desc" };
   const [sort, setSort] = useState({ key: null, dir: SORT_DIR.NONE });
 
-  const nf2 = new Intl.NumberFormat(undefined, {
+  const nf2 = new Intl.NumberFormat("fr-FR", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
@@ -240,7 +240,10 @@ export default function Portfolio() {
   }
 
   const typeBadge = (type) => {
-    const t = (type || "UNKNOWN").toUpperCase();
+    // Le backend renvoie « Stock » / « Crypto » / « ETF » ; les anciennes données « EQUITY » / « CRYPTOCURRENCY »
+    const ALIASES = { STOCK: "EQUITY", CRYPTO: "CRYPTOCURRENCY" };
+    const raw = (type || "UNKNOWN").toUpperCase();
+    const t = ALIASES[raw] || raw;
     const map = {
       ETF: "bg-purple-50 text-purple-700 border-purple-200",
       CRYPTOCURRENCY: "bg-orange-50 text-orange-700 border-orange-200",
@@ -285,9 +288,125 @@ export default function Portfolio() {
     return "";
   };
 
-  // Composant Tableau
+  // Champ numérique éditable (quantité / PRU), enregistré à la sortie du champ
+  const EditableNumber = ({ stock, field, label, className = "" }) => (
+    <input
+      type="number"
+      inputMode="decimal"
+      min="0"
+      step="any"
+      aria-label={`${label} ${stock.ticker}`}
+      key={`${field}-${stock.ticker}-${stock[field]}`}
+      defaultValue={stock[field]}
+      onBlur={(e) => {
+        const val = parseFloat(e.target.value);
+        if (!isNaN(val) && val !== stock[field]) handleUpdateStock(stock.ticker, field, val);
+      }}
+      onKeyDown={(e) => e.key === "Enter" && e.target.blur()}
+      className={`px-3 py-2 text-right text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all ${className}`}
+    />
+  );
+
+  // Vue mobile (< 768 px) : une carte par position, sans défilement horizontal
+  const MobileCards = () => (
+    <div className="md:hidden">
+      <div className="flex items-center justify-end gap-2 border-b border-slate-100 px-4 py-3">
+        <label htmlFor="mobile-sort" className="text-xs font-medium text-slate-500">Trier par</label>
+        <select
+          id="mobile-sort"
+          value={sort.key ? `${sort.key}:${sort.dir}` : ""}
+          onChange={(e) => {
+            const [key, dir] = e.target.value.split(":");
+            setSort(key ? { key, dir } : { key: null, dir: SORT_DIR.NONE });
+          }}
+          className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+        >
+          <option value="">Ordre d'ajout</option>
+          <option value="total:desc">Montant (décroissant)</option>
+          <option value="performance:desc">Performance (meilleure)</option>
+          <option value="performance:asc">Performance (pire)</option>
+          <option value="yield:desc">Rendement (décroissant)</option>
+          <option value="ticker:asc">Ticker (A → Z)</option>
+        </select>
+      </div>
+
+      {loading ? (
+        <p className="px-4 py-16 text-center text-sm text-slate-500">Chargement de votre portefeuille...</p>
+      ) : !stocks.length ? (
+        <div className="px-4 py-16 text-center">
+          <p className="mb-1 text-base font-medium text-slate-700">Aucune position</p>
+          <p className="text-sm text-slate-500">Ajoutez votre première action pour commencer</p>
+        </div>
+      ) : (
+        <ul className="divide-y divide-slate-100">
+          {stocks.map((stock) => {
+            const perf = stock.pru > 0 ? ((stock.close - stock.pru) / stock.pru) * 100 : null;
+            const total =
+              typeof stock.close === "number" && typeof stock.quantity === "number" ? stock.close * stock.quantity : null;
+            const cur = formatCurrencySymbol(stock.currency);
+            return (
+              <li key={stock.ticker} className="space-y-3 px-4 py-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base font-bold text-slate-900">{stock.ticker}</span>
+                      {typeBadge(stock.type)}
+                    </div>
+                    <p className="truncate text-xs text-slate-500">
+                      {stock.name && stock.name !== stock.ticker ? `${stock.name} · ` : ""}
+                      {exchangeToCountry[stock.country] || stock.country}
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="text-base font-semibold tabular-nums text-slate-900">
+                      {total != null ? `${nf2.format(total)} ${cur}` : "--"}
+                    </p>
+                    <p className={`text-sm font-semibold tabular-nums ${getPerformanceClass(perf)}`}>
+                      {perf != null ? `${perf > 0 ? "▲ +" : perf < 0 ? "▼ " : ""}${nf2.format(perf)} %` : "--"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div>
+                    <p className="mb-1 text-slate-500">Prix</p>
+                    <p className="font-medium tabular-nums text-slate-900">{nf2.format(stock.close)} {cur}</p>
+                  </div>
+                  <div>
+                    <p className="mb-1 text-slate-500">Quantité</p>
+                    <EditableNumber stock={stock} field="quantity" label="Quantité" className="w-full" />
+                  </div>
+                  <div>
+                    <p className="mb-1 text-slate-500">PRU</p>
+                    <EditableNumber stock={stock} field="pru" label="PRU" className="w-full" />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-slate-500">
+                  <span>
+                    Dividende : {stock.dividend != null ? `${nf2.format(stock.dividend)} ${cur}` : "--"}
+                    {stock.myDividendYield != null && ` · ${nf2.format(stock.myDividendYield)} %`}
+                  </span>
+                  <button
+                    onClick={() => removeStock(stock.ticker)}
+                    className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-600 transition hover:bg-red-600 hover:text-white"
+                  >
+                    Supprimer
+                  </button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+
+  // Composant Tableau (écrans ≥ 768 px) + cartes sur mobile
   const TableContent = () => (
-    <div className="overflow-x-auto">
+    <>
+    <MobileCards />
+    <div className="hidden md:block overflow-x-auto">
       <table className="w-full">
         <thead className="bg-slate-50 border-b-2 border-slate-200">
           <tr>
@@ -520,6 +639,7 @@ export default function Portfolio() {
         </tbody>
       </table>
     </div>
+    </>
   );
 
   // Mode Plein Écran
@@ -776,7 +896,7 @@ export default function Portfolio() {
               </span>
               <button
                 onClick={() => setFullscreenTable(true)}
-                className="px-3 py-1.5 bg-white/10 text-white text-xs font-medium rounded-lg hover:bg-white/20 transition-all flex items-center gap-1.5"
+                className="hidden md:flex px-3 py-1.5 bg-white/10 text-white text-xs font-medium rounded-lg hover:bg-white/20 transition-all items-center gap-1.5"
                 title="Mode plein écran"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
