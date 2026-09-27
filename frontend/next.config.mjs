@@ -42,6 +42,10 @@ const securityHeaders = [
 
 const nextConfig = {
   poweredByHeader: false,
+  // Ancienne adresse de la page « Mon compte »
+  async redirects() {
+    return [{ source: "/compte", destination: "/profil", permanent: true }];
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

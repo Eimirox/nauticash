@@ -3,7 +3,19 @@
 import { useEffect, useState } from "react";
 
 // Script à injecter dans <head> : applique le thème mémorisé avant l'affichage (évite le flash)
-export const themeInitScript = `try{if(localStorage.getItem("theme")==="dark")document.documentElement.classList.add("dark")}catch(e){}`;
+// Valeurs : "dark", "light" ou "system" (suit l'appareil).
+export const themeInitScript = `try{var t=localStorage.getItem("theme");if(t==="dark"||(t==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}`;
+
+// Applique et mémorise un thème choisi dans le profil
+export function applyTheme(theme) {
+  try {
+    localStorage.setItem("theme", theme);
+  } catch {}
+  const dark =
+    theme === "dark" ||
+    (theme === "system" && typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  document.documentElement.classList.toggle("dark", dark);
+}
 
 // Bouton clair / sombre. Le mode clair reste le défaut tant que toutes les pages
 // ne sont pas migrées vers les jetons du design system (voir docs/AMELIORATIONS.md).

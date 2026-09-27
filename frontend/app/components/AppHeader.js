@@ -62,7 +62,7 @@ export default function AppHeader({ actions }) {
             className="flex shrink-0 items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             <img src="/logo_nauticash.webp?v=3" alt="" width={32} height={32} className="rounded-lg shadow-sm" />
-            <span className="bg-gradient-to-r from-slate-900 via-emerald-600 to-blue-600 bg-clip-text text-xl font-bold text-transparent dark:from-white">
+            <span className="bg-gradient-to-r from-slate-900 via-emerald-600 to-blue-600 bg-clip-text text-xl font-bold text-transparent dark:from-white dark:via-emerald-300 dark:to-sky-300">
               Nauticash
             </span>
             <span
@@ -92,18 +92,18 @@ export default function AppHeader({ actions }) {
               </a>
             )}
             <Link
-              href="/compte"
-              aria-label="Mon compte"
-              aria-current={pathname === "/compte" ? "page" : undefined}
+              href="/profil"
+              aria-label="Mon profil"
+              aria-current={pathname === "/profil" ? "page" : undefined}
               className={cx(
                 "inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
-                pathname === "/compte" ? "border-accent/40 bg-accent/10 text-accent" : "border-line bg-surface text-ink-muted hover:text-ink"
+                pathname === "/profil" ? "border-accent/40 bg-accent/10 text-accent" : "border-line bg-surface text-ink-muted hover:text-ink"
               )}
             >
               <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
-              <span className="hidden sm:inline">Mon compte</span>
+              <span className="hidden sm:inline">Mon profil</span>
             </Link>
             <button
               type="button"

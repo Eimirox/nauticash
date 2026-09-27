@@ -5,6 +5,6 @@ export { default as Badge, AssetTypeBadge } from "./Badge";
 export { default as Stat, Delta } from "./Stat";
 export { default as Modal, ConfirmModal } from "./Modal";
 export { ToastProvider, useToast } from "./Toast";
-export { default as ThemeToggle, themeInitScript } from "./ThemeToggle";
+export { default as ThemeToggle, themeInitScript, applyTheme } from "./ThemeToggle";
 export { formatMoney, formatPercent } from "./format";
 export { cx } from "./cx";

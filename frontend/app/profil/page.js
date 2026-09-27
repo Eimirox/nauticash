@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import AppHeader from "../components/AppHeader";
+import ProfileForm from "../components/ProfileForm";
 import { Card, Button, ConfirmModal, useToast } from "../components/ui";
 import { apiFetch, logout } from "@/lib/api";
 
@@ -26,7 +27,7 @@ function Field({ id, label, ...props }) {
   );
 }
 
-export default function MonCompte() {
+export default function MonProfil() {
   const toast = useToast();
   const [email, setEmail] = useState("");
 
@@ -43,9 +44,6 @@ export default function MonCompte() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  useEffect(() => {
-    apiFetch("/api/auth/me").then((me) => setEmail(me.email)).catch(() => {});
-  }, []);
 
   const allValid = RULES.every((r) => r.test(next));
 
@@ -91,11 +89,15 @@ export default function MonCompte() {
 
       <div className="mx-auto max-w-2xl space-y-6 px-4 py-8 sm:px-6">
         <div>
-          <h1 className="mb-2 text-3xl font-bold md:text-4xl">Mon compte</h1>
+          <h1 className="mb-2 text-3xl font-bold md:text-4xl">Mon profil</h1>
           <p className="text-ink-muted">
             Connecté avec <span className="font-semibold text-ink">{email || "…"}</span>
           </p>
         </div>
+
+        <ProfileForm onLoaded={(data) => setEmail(data.email)} />
+
+        <h2 className="pt-6 text-xl font-semibold">Sécurité et compte</h2>
 
         <Card as="section" aria-labelledby="pw-title">
           <h2 id="pw-title" className="mb-1 text-lg font-semibold">Changer de mot de passe</h2>
