@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { apiFetch } from "@/lib/api";
+import { useFxRates, toEUR, eurPer } from "@/lib/fx";
 import AppHeader from "../components/AppHeader";
 import Link from "next/link";
 import { Pie } from "react-chartjs-2";
@@ -69,22 +70,9 @@ export default function Analytics() {
   const [cash, setCash] = useState({ amount: 0, currency: "EUR" });
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("vue");
-  const [usdToEur, setUsdToEur] = useState(0.92); // Taux de change
-
-  // Fetch taux de change USD->EUR
-  useEffect(() => {
-    const fetchExchangeRate = async () => {
-      try {
-        const res = await fetch("https://api.exchangerate-api.com/v4/latest/USD");
-        const data = await res.json();
-        setUsdToEur(data.rates.EUR || 0.92);
-        console.log("💱 Taux USD->EUR:", data.rates.EUR);
-      } catch (err) {
-        console.log("Taux de change par défaut utilisé");
-      }
-    };
-    fetchExchangeRate();
-  }, []);
+  // Taux BCE servis par le backend : toutes les devises sont converties (pas seulement l'USD)
+  const { rates, date: fxDate, stale: fxStale } = useFxRates();
+  const inEUR = (value, currency) => toEUR(value, currency, rates) ?? (currency === "EUR" || !currency ? value : 0);
 
   useEffect(() => {
     const fetchPortfolio = async () => {
@@ -115,14 +103,13 @@ export default function Analytics() {
   const totalInEUR = stocks.reduce((sum, s) => {
     const val = (s.close || 0) * (s.quantity || 0);
     if (!s.currency) return sum;
-    const valEUR = s.currency === "USD" ? val * usdToEur : val;
-    return sum + valEUR;
+    return sum + inEUR(val, s.currency);
   }, 0);
 
   // Totaux par secteur EN EUR
   const totalsPerSector = stocks.reduce((acc, s) => {
     const val = (s.close || 0) * (s.quantity || 0);
-    const valEUR = s.currency === "USD" ? val * usdToEur : val;
+    const valEUR = inEUR(val, s.currency);
 
     if (s.composition && typeof s.composition === "object") {
       // ETF avec composition { secteur: %, ... }
@@ -139,7 +126,7 @@ export default function Analytics() {
   // Ajout du cash comme secteur (converti en EUR si USD)
   if (!isNaN(cash?.amount) && cash?.currency && Math.abs(cash.amount) > 0) {
     const sectorName = cash.amount < 0 ? "Dette" : "Cash";
-    const cashEUR = cash.currency === "USD" ? Math.abs(cash.amount) * usdToEur : Math.abs(cash.amount);
+    const cashEUR = inEUR(Math.abs(cash.amount), cash.currency);
     totalsPerSector[sectorName] = (totalsPerSector[sectorName] || 0) + cashEUR;
   }
 
@@ -156,7 +143,8 @@ export default function Analytics() {
 
   // Données Pie Devise (par devise ORIGINALE)
   const curLabels = Object.keys(portfolioTotalsByCurrency);
-  const curData = Object.values(portfolioTotalsByCurrency);
+  // Parts comparées en euros (sinon 1 000 ¥ pèseraient autant que 1 000 €)
+  const curData = curLabels.map((c) => inEUR(portfolioTotalsByCurrency[c], c));
   const pieDevise = {
     labels: curLabels,
     datasets: [
@@ -299,9 +287,9 @@ export default function Analytics() {
                           {numberFormatter.format(tot)}{" "}
                           {formatCurrencySymbol(cur)}
                         </p>
-                        {cur === "USD" && (
+                        {cur !== "EUR" && (
                           <p className="text-xs text-slate-500 mt-1">
-                            ≈ {numberFormatter.format(tot * usdToEur)} €
+                            ≈ {numberFormatter.format(inEUR(tot, cur))} €
                           </p>
                         )}
                       </div>
@@ -319,9 +307,9 @@ export default function Analytics() {
                           {numberFormatter.format(Math.abs(cash.amount))}{" "}
                           {formatCurrencySymbol(cash.currency)}
                         </p>
-                        {cash.currency === "USD" && (
+                        {cash.currency !== "EUR" && (
                           <p className="text-xs text-emerald-700 mt-1">
-                            ≈ {numberFormatter.format(Math.abs(cash.amount) * usdToEur)} €
+                            ≈ {numberFormatter.format(inEUR(Math.abs(cash.amount), cash.currency))} €
                           </p>
                         )}
                       </div>
@@ -332,12 +320,18 @@ export default function Analytics() {
             </div>
 
             {/* Info taux de change */}
-            {portfolioTotalsByCurrency.USD && (
+            {Object.keys(portfolioTotalsByCurrency).some((c) => c !== "EUR") && (
               <div className="mb-6 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700 flex items-center gap-2">
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                 </svg>
-                <span>💱 Taux USD→EUR : <strong>{usdToEur.toFixed(4)}</strong> (mis à jour automatiquement)</span>
+                <span>
+                  Taux de référence BCE{fxDate ? ` du ${new Date(fxDate).toLocaleDateString("fr-FR")}` : ""} :{" "}
+                  {Object.keys(portfolioTotalsByCurrency).filter((c) => c !== "EUR").map((c) => (
+                    <strong key={c} className="mr-2">1 {c} = {eurPer(c, rates)?.toFixed(4) ?? "?"} €</strong>
+                  ))}
+                  {fxStale && "(taux approximatifs, service indisponible)"}
+                </span>
               </div>
             )}
 

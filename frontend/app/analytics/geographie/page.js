@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { apiFetch } from "@/lib/api";
+import { useFxRates, toEUR } from "@/lib/fx";
 import AppHeader from "../../components/AppHeader";
 import Link from "next/link";
 import {
@@ -57,22 +58,11 @@ export default function GeographiePage() {
   const [loadError, setLoadError] = useState(null);
   const [stocks, setStocks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [usdToEur, setUsdToEur] = useState(0.92);
   const [tooltipContent, setTooltipContent] = useState("");
 
-  // Fetch taux de change USD->EUR
-  useEffect(() => {
-    const fetchExchangeRate = async () => {
-      try {
-        const res = await fetch("https://api.exchangerate-api.com/v4/latest/USD");
-        const data = await res.json();
-        setUsdToEur(data.rates.EUR || 0.92);
-      } catch (err) {
-        console.log("Taux de change par défaut utilisé");
-      }
-    };
-    fetchExchangeRate();
-  }, []);
+  // Taux BCE servis par le backend (toutes devises)
+  const { rates, stale: fxStale } = useFxRates();
+  const inEUR = (value, currency) => toEUR(value, currency, rates) ?? (currency === "EUR" || !currency ? value : 0);
 
   // Fetch portfolio
   useEffect(() => {
@@ -113,7 +103,7 @@ export default function GeographiePage() {
       const isoCode = s.countryNumeric || COUNTRY_CODES[country] || (country === "Crypto" ? "CRYPTO" : null);
       
       const value = (s.close || 0) * (s.quantity || 0);
-      const valueEUR = s.currency === "USD" ? value * usdToEur : value;
+      const valueEUR = inEUR(value, s.currency);
       
       total += valueEUR;
 
@@ -162,7 +152,8 @@ export default function GeographiePage() {
       maxValue,
       topContinent
     };
-  }, [stocks, usdToEur]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stocks, rates]);
 
   const formatCurrency = (value) => {
     return value.toLocaleString("fr-FR", {

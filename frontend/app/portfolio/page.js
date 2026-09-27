@@ -8,7 +8,8 @@ import { exchangeToCountry } from "./utils/exchangeMap";
 import { getPerformanceClass } from "./utils/styles";
 import { apiFetch, logout as apiLogout } from "@/lib/api";
 import AppHeader from "../components/AppHeader";
-import { ConfirmModal, useToast } from "../components/ui";
+import { ConfirmModal, useToast, Delta } from "../components/ui";
+import { useFxRates, toEUR } from "@/lib/fx";
 
 export default function Portfolio() {
   const router = useRouter();
@@ -241,6 +242,40 @@ export default function Portfolio() {
     totalWealthByCurrency[cash.currency] =
       (totalWealthByCurrency[cash.currency] || 0) + cash.amount;
   }
+
+  // Synthèse en euros (taux BCE) : patrimoine, variation du jour, plus-value latente
+  const { rates } = useFxRates();
+  const summary = (() => {
+    let value = 0, dayChange = 0, prevValue = 0, cost = 0, costedValue = 0, missing = false;
+    for (const s of stocks) {
+      const qty = Number(s.quantity) || 0;
+      const v = toEUR((s.close || 0) * qty, s.currency, rates);
+      if (v === null) { missing = true; continue; }
+      value += v;
+      if (Number.isFinite(s.dayChangeValue)) {
+        const d = toEUR(s.dayChangeValue, s.currency, rates) ?? 0;
+        dayChange += d;
+        prevValue += v - d;
+      }
+      if (s.pru > 0) {
+        cost += toEUR(s.pru * qty, s.currency, rates) ?? 0;
+        costedValue += v;
+      }
+    }
+    const cashEUR = toEUR(Number(cash.amount) || 0, cash.currency, rates);
+    if (cashEUR === null && cash.amount) missing = true;
+    return {
+      ready: Boolean(rates) || stocks.every((s) => s.currency === "EUR"),
+      missing,
+      total: value + (cashEUR ?? 0),
+      invested: value,
+      dayChange,
+      dayChangePct: prevValue > 0 ? (dayChange / prevValue) * 100 : null,
+      gain: costedValue - cost,
+      gainPct: cost > 0 ? ((costedValue - cost) / cost) * 100 : null,
+    };
+  })();
+  const signed = (n) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${nf2.format(Math.abs(n))} €`;
 
   const typeBadge = (type) => {
     // Le backend renvoie « Stock » / « Crypto » / « ETF » ; les anciennes données « EQUITY » / « CRYPTOCURRENCY »
@@ -707,6 +742,30 @@ export default function Portfolio() {
               />
             </svg>
             <p className="text-sm text-red-700">{error}</p>
+          </div>
+        )}
+
+        {/* Synthèse en euros */}
+        {stocks.length > 0 && summary.ready && (
+          <div className="mb-4 p-5 bg-white border border-slate-200 shadow-lg rounded-xl grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Patrimoine total</p>
+              <p className="text-3xl font-bold text-slate-900 tabular-nums">{nf2.format(summary.total)} €</p>
+              <p className="text-xs text-slate-500 mt-1">
+                Positions et cash convertis en euros (taux BCE)
+                {summary.missing && " — une devise n'a pas pu être convertie"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Aujourd&apos;hui</p>
+              <p className="text-xl font-bold text-slate-900 tabular-nums">{signed(summary.dayChange)}</p>
+              <Delta value={summary.dayChangePct} className="text-sm" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Plus-value latente</p>
+              <p className="text-xl font-bold text-slate-900 tabular-nums">{signed(summary.gain)}</p>
+              <Delta value={summary.gainPct} suffix=" depuis l'achat" className="text-sm" />
+            </div>
           </div>
         )}
 
