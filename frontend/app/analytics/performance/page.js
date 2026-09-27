@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { apiFetch } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 export default function PerformancePage() {
   const router = useRouter();
+  const [loadError, setLoadError] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -14,14 +16,11 @@ export default function PerformancePage() {
     const fetchHistory = async () => {
       setLoading(true);
       try {
-        const token = localStorage.getItem("token");
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"}/api/user/history`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
+        const data = await apiFetch("/api/user/history");
         setHistory(data);
       } catch (err) {
         console.error("Erreur fetch history:", err);
+        setLoadError(`Impossible de charger l'historique : ${err.message}`);
       } finally {
         setLoading(false);
       }
@@ -193,6 +192,11 @@ export default function PerformancePage() {
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+      {loadError && (
+        <div role="alert" className="mx-auto mt-4 max-w-7xl rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {loadError}
+        </div>
+      )}
       {/* Header */}
       <header className="sticky top-0 z-50 backdrop-blur-xl bg-white/90 border-b border-slate-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

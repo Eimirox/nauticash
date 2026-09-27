@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { apiFetch } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Pie } from "react-chartjs-2";
@@ -64,6 +65,7 @@ const SECTOR_COLORS = {
 
 export default function Analytics() {
   const router = useRouter();
+  const [loadError, setLoadError] = useState(null);
   const [stocks, setStocks] = useState([]);
   const [cash, setCash] = useState({ amount: 0, currency: "EUR" });
   const [loading, setLoading] = useState(true);
@@ -89,16 +91,12 @@ export default function Analytics() {
     const fetchPortfolio = async () => {
       setLoading(true);
       try {
-        const token = localStorage.getItem("token");
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"}/api/user/portfolio`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error(`Status ${res.status}`);
-        const data = await res.json();
+        const data = await apiFetch("/api/user/portfolio");
         setStocks(data.stocks || []);
         setCash(data.cash || { amount: 0, currency: "EUR" });
       } catch (err) {
         console.error(err);
+        setLoadError(`Impossible de charger vos données : ${err.message}`);
       } finally {
         setLoading(false);
       }
@@ -226,6 +224,11 @@ export default function Analytics() {
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+      {loadError && (
+        <div role="alert" className="mx-auto mt-4 max-w-7xl rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {loadError}
+        </div>
+      )}
       {/* Header */}
       <header className="sticky top-0 z-50 backdrop-blur-xl bg-white/90 border-b border-slate-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

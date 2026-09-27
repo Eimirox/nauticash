@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { apiFetch } from "@/lib/api";
 import {
   BarChart,
   Bar,
@@ -80,17 +81,8 @@ export default function PortfolioHistoryChart() {
 
   const fetchHistory = async () => {
     try {
-      const token = localStorage.getItem("token");
-      // AGI_FIX: correction backtick / guillemets
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"}/api/user/history`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      const data = await res.json();
+      const data = await apiFetch("/api/user/history");
 
-      console.log("📊 Données reçues:", data);
       setHistory(data);
 
       // Extraire années
@@ -98,13 +90,11 @@ export default function PortfolioHistoryChart() {
         (a, b) => b - a
       );
       setAvailableYears(years);
-      console.log("📅 Années:", years);
 
       // Auto-sélection
       if (years.length > 0 && selectedYears.length === 0) {
         const toSelect = years.slice(0, Math.min(2, years.length));
         setSelectedYears(toSelect);
-        console.log("✅ Années sélectionnées:", toSelect);
       }
 
       // Dernier snapshot
@@ -129,7 +119,6 @@ export default function PortfolioHistoryChart() {
     e.preventDefault();
     try {
       setLoading(true);
-      const token = localStorage.getItem("token");
       const [year, month] = manualForm.date.split("-");
       const value = parseFloat(manualForm.value);
 
@@ -138,18 +127,10 @@ export default function PortfolioHistoryChart() {
         return;
       }
 
-      // AGI_FIX: correction backtick / guillemets
-      await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"}/api/user/history`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ date: manualForm.date, value }),
-        }
-      );
+      await apiFetch("/api/user/history", {
+        method: "POST",
+        body: { date: manualForm.date, value },
+      });
 
       await fetchHistory();
       setManualForm({ date: "", value: "" });
@@ -157,7 +138,7 @@ export default function PortfolioHistoryChart() {
       alert(`✅ Sauvegardé : ${value.toFixed(2)}€`);
     } catch (err) {
       console.error(err);
-      alert("❌ Erreur");
+      alert(`❌ Erreur : ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -166,16 +147,7 @@ export default function PortfolioHistoryChart() {
   const saveSnapshot = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("token");
-
-      // AGI_FIX: correction backtick / guillemets (portfolio)
-      const portfolioRes = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"}/api/user/portfolio`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      const portfolioData = await portfolioRes.json();
+      const portfolioData = await apiFetch("/api/user/portfolio");
 
       let totalValueEUR = 0;
 
@@ -199,27 +171,16 @@ export default function PortfolioHistoryChart() {
       const year = now.getFullYear();
       const month = String(now.getMonth() + 1).padStart(2, "0");
 
-      // AGI_FIX: correction backtick / guillemets (history POST)
-      await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"}/api/user/history`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            date: `${year}-${month}`,
-            value: totalValueEUR,
-          }),
-        }
-      );
+      await apiFetch("/api/user/history", {
+        method: "POST",
+        body: { date: `${year}-${month}`, value: totalValueEUR },
+      });
 
       await fetchHistory();
       alert(`✅ Snapshot : ${totalValueEUR.toFixed(2)}€`);
     } catch (err) {
       console.error(err);
-      alert("❌ Erreur");
+      alert(`❌ Erreur : ${err.message}`);
     } finally {
       setLoading(false);
     }
