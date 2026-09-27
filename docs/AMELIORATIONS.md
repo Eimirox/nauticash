@@ -36,11 +36,30 @@ Chaque session : prend **la première tâche non cochée**, la réalise, vérifi
 - [x] Refonte visuelle de l'accueil selon DESIGN.md + relecture des textes (ton professionnel, appel à l'action clair)
 - [x] Page « Bêta » : bandeau discret « Version bêta » dans l'en-tête + lien « Donner mon avis » (mailto vers l'adresse de contact) pour recueillir les retours du cercle proche
 
+### Demande d'Alex (27/09) : profil personnalisable et fonctionnalités inspirées de Finary (prioritaire)
+
+Objectif : version bêta « pro », cohérente avec DESIGN.md. Pas de synchronisation bancaire (saisie manuelle assumée).
+Quand ces tâches et l'harmonisation visuelle sont faites, la boucle peut s'arrêter.
+
+- [ ] Profil (backend) : champ `profile` sur l'utilisateur (prénom ou pseudo, couleur d'avatar, devise de référence EUR/USD/GBP/CHF, thème clair/sombre/système, mode discret, page d'accueil, objectif de patrimoine + échéance, horizon et profil de risque) ; routes GET/PATCH /api/user/profile validées, avec tests
+- [ ] Page « Mon profil » (renommer « Mon compte », garder mot de passe et suppression) : sections Identité (prénom, avatar à initiales et couleur), Affichage (devise de référence, thème, mode discret, page d'accueil), Objectifs (objectif de patrimoine, horizon, risque), enregistrement avec Toast
+- [ ] Devise de référence appliquée partout (généraliser `toEUR` de lib/fx.js en `toCurrency`) et prénom/avatar dans l'en-tête
+- [ ] Mode discret (comme Finary) : bouton œil dans l'en-tête, montants remplacés par « •••• » sur toutes les pages, pourcentages conservés, préférence mémorisée dans le profil
+- [ ] Tableau des positions : colonnes « Variation du jour » (valeur et %, champs `dayChange*` du backend) et heure de cotation (`priceTime`), badge « cours du JJ/MM » si le prix date de plus de 3 jours ouvrés
+- [ ] Historique automatique : valeur du portefeuille (en euros, taux BCE) enregistrée chaque jour par le cron pour chaque utilisateur, snapshot manuel conservé en secours ; tests
+- [ ] Performance par période (1 J, 7 J, 1 M, depuis le 1er janvier, 1 an, depuis l'achat) sur la page Performance à partir de l'historique quotidien
+- [ ] Enveloppes / comptes (PEA, CTO, assurance-vie, portefeuille crypto) : champ optionnel sur chaque position, filtre et sous-totaux par enveloppe
+- [ ] Objectif de patrimoine : jauge de progression sur le tableau de bord (valeur actuelle / objectif, rythme nécessaire jusqu'à l'échéance)
+- [ ] Score de diversification (poids des 5 premières lignes, secteurs, pays, devises) avec conseils sobres, sur la vue d'ensemble
+- [ ] Analyse des frais (inspirée du « scanner de frais » de Finary) : frais annuels (TER) saisissables par ETF/fonds, coût annuel en euros et impact projeté sur 10 et 20 ans
+- [ ] Comparaison à un indice (CAC 40, S&P 500, MSCI World) sur la courbe d'évolution (données FMP, mises en cache, quota respecté)
+- [ ] Fonds de précaution : cash comparé à N mois de dépenses saisis dans le profil
+
 ### Après le lancement
 
 - [x] Passer node-cron en v4 (supprime les 2 dernières alertes npm audit backend, dépendance uuid non exploitable ici) en vérifiant le cron d'actualisation des prix
-- [ ] Tableau de bord patrimoine : valeur totale en grand, variation du jour et depuis l'achat, courbe d'évolution, répartition par type d'actif / secteur / pays
-- [ ] Taux de change servis par le backend via Frankfurter avec cache (fin des appels navigateur à exchangerate-api)
+- [ ] Tableau de bord patrimoine : valeur totale en grand, variation du jour et depuis l'achat (carte de synthèse déjà sur le portefeuille), courbe d'évolution, répartition par type d'actif / secteur / pays
+- [x] Taux de change servis par le backend via Frankfurter avec cache (fin des appels navigateur à exchangerate-api)
 - [ ] Dividendes : calendrier des prochains versements et revenu annuel estimé
 - [ ] Route admin qui mesure la couverture des tickers des portefeuilles par chaque provider ; résultats dans docs/API.md
 - [ ] Provider Finnhub optionnel (variable FINNHUB_API_KEY) en fallback US, désactivé sans clé
@@ -72,3 +91,4 @@ Chaque session : prend **la première tâche non cochée**, la réalise, vérifi
 - 2026-09-27 – Accueil refondu selon DESIGN.md : hero « abysse » avec lignes de niveau, promesse « Gardez le cap sur votre patrimoine boursier », aperçu illustratif du tableau de bord (valeurs fictives signalées), 3 bénéfices, « Prêt en trois minutes », engagements (aucune connexion bancaire, HTTPS, gratuit en bêta), appel à l'action adapté si l'utilisateur est déjà connecté, pied de page légal ; bascule FR/EN et carrousel retirés (site 100 % français) ; vérifié bureau + 375 px sans défilement horizontal – OK (build + 90 tests)
 - 2026-09-27 – Bêta : badge « Bêta » à côté du logo dans l'en-tête + lien « Donner mon avis » (email pré-rempli avec la page en cours) vers NEXT_PUBLIC_CONTACT_EMAIL (lien masqué tant que la variable n'est pas définie) ; sur mobile le lien passe dans la barre de navigation pour éviter le débordement ; frontend/.env.example créé ; cash du portefeuille protégé contre une valeur absente (affichait « NaN ») – OK (build + 90 tests). Toutes les tâches « avant lancement » sont faites.
 - 2026-09-27 – node-cron 3 → 4 : backend à 0 vulnérabilité npm audit ; expression CRON_UPDATE_SCHEDULE validée au démarrage (invalide → actualisation désactivée avec message, au lieu d'un plantage), option noOverlap, méthode stop() ; 3 nouveaux tests – OK (93 tests ; frontend non modifié)
+- 2026-09-27 – [Demande d'Alex] Audit des données boursières : devise de cotation déduite du profil/suffixe/place (actions allemandes, suisses… étaient en USD), pence de Londres convertis en livres (valeurs ×100), dividende annuel sur les N derniers versements (jusqu'à +25 % d'écart), prix à 0 jamais enregistré, variation du jour et heure de cotation dans l'API, taux BCE via Frankfurter (GET /api/fx) utilisés sur toutes les pages (GBP, CHF, CAD, JPY étaient comptés comme des euros), rendement des dividendes affiché ×100 et calendrier des dates de détachement corrigés, carte « Patrimoine total » en euros ; après déploiement, cliquer « Actualiser » pour recalculer les données existantes – OK (build + 107 tests)
