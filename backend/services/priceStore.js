@@ -45,6 +45,7 @@ function buildDoc(ticker, quote, previous = {}) {
     profileUpdatedAt: quote.profileUpdatedAt || previous.profileUpdatedAt || null,
     dividendsUpdatedAt: quote.dividendsUpdatedAt || previous.dividendsUpdatedAt || null,
     source: quote.source || previous.source || null,
+    fmpNotCoveredAt: quote.fmpNotCoveredAt !== undefined ? quote.fmpNotCoveredAt : previous.fmpNotCoveredAt ?? null,
     lastUpdate: now,
   };
 }

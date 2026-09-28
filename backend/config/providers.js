@@ -87,6 +87,20 @@ module.exports = {
     },
   },
 
+  // Yahoo Finance (API publique non officielle, sans clé) : couverture mondiale
+  // (actions US/Europe, ETF, crypto). Sert de secours quand FMP ne couvre pas un symbole
+  // (offre gratuite FMP limitée à ~90 symboles) et pour l'autocomplétion des tickers.
+  yahoo: {
+    enabled: process.env.YAHOO_ENABLED !== "false",
+    baseUrl: process.env.YAHOO_BASE_URL || "https://query1.finance.yahoo.com",
+    limits: {
+      free: {
+        requestsPerDay: null,
+        requestsPerMinute: 60,
+      },
+    },
+  },
+
   // Configuration Alpha Vantage (backup gratuit)
   alphavantage: {
     enabled: process.env.ALPHA_VANTAGE_ENABLED === "true",

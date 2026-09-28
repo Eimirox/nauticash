@@ -50,13 +50,15 @@ class QuotaExceededError extends Error {
  * fetch() qui vérifie le quota, compte l'appel et renvoie le JSON.
  * Ne jamais logger l'URL : elle contient la clé API.
  */
-async function trackedFetchJson(provider, url) {
+async function trackedFetchJson(provider, url, init = undefined) {
   if (!canCall(provider)) throw new QuotaExceededError(provider);
   record(provider);
-  const response = await fetch(url);
+  const response = await fetch(url, init);
   if (!response.ok) {
     const err = new Error(`${provider} API returned ${response.status}`);
     err.status = response.status;
+    // FMP : 402 = symbole hors de l'offre souscrite (l'offre gratuite ne couvre qu'environ 90 symboles)
+    if (response.status === 402) err.code = "NOT_COVERED";
     throw err;
   }
   return response.json();

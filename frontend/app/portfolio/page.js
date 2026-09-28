@@ -13,6 +13,7 @@ import { quoteFreshness } from "@/lib/quoteTime";
 import { useFxRates, toCurrency, currencySymbol } from "@/lib/fx";
 import { useBaseCurrency, useProfile } from "@/lib/profile";
 import GoalGauge from "../components/GoalGauge";
+import TickerSearch from "../components/TickerSearch";
 import EmergencyFund from "../components/EmergencyFund";
 
 // Enveloppes proposées (doivent correspondre à ACCOUNTS côté backend)
@@ -154,8 +155,8 @@ export default function Portfolio() {
 
   const [adding, setAdding] = useState(false);
 
-  const addStock = async () => {
-    const t = ticker.trim().toUpperCase();
+  const addStock = async (symbol) => {
+    const t = (typeof symbol === "string" ? symbol : ticker).trim().toUpperCase();
     if (!t || adding) return;
     setError(null);
     setAdding(true);
@@ -163,8 +164,13 @@ export default function Portfolio() {
       await apiFetch("/api/user/portfolio", { method: "POST", body: { ticker: t } });
       await fetchPortfolio();
       setTicker("");
+      toast.success(`${t} ajouté au portefeuille.`);
     } catch (err) {
-      setError(err.message);
+      setError(
+        /introuvable/i.test(err.message)
+          ? `${err.message}. Tapez le nom de l'entreprise pour voir les suggestions (ex. « google » → GOOG, « airbus » → AIR.PA).`
+          : err.message
+      );
     } finally {
       setAdding(false);
     }
@@ -1008,31 +1014,15 @@ export default function Portfolio() {
 
         {/* Add Stock */}
         <div className="mb-6 flex flex-wrap items-center gap-3 p-4 bg-surface border border-line rounded-xl shadow">
-          <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-            <svg
-              className="w-5 h-5 text-ink-muted/70"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-            <input
-              type="text"
-              value={ticker}
-              onChange={(e) => setTicker(e.target.value.toUpperCase())}
-              onKeyDown={(e) => e.key === "Enter" && addStock()}
-              placeholder="Ajouter un ticker (AAPL, BTC-USD...)"
-              className="flex-1 px-3 py-2 border-0 focus:outline-none text-sm placeholder:text-ink-muted/70"
-            />
-          </div>
+          <TickerSearch
+            value={ticker}
+            onChange={setTicker}
+            onSelect={addStock}
+            disabled={adding}
+            existing={stocks.map((s) => s.ticker)}
+          />
           <button
-            onClick={addStock}
+            onClick={() => addStock()}
             disabled={adding}
             className="disabled:opacity-50 disabled:cursor-wait px-5 py-2 bg-gradient-to-r from-emerald-600 to-blue-600 text-white text-sm font-semibold rounded-lg hover:shadow-lg hover:scale-105 transition-all"
           >
