@@ -62,7 +62,7 @@ class PriceService {
    * Récupère le quote d'un ticker avec fallback intelligent
    */
   async getQuote(ticker, options = {}) {
-    const { forceRefresh = false, preferredProvider = null, previous = null } = options;
+    const { forceRefresh = false, preferredProvider = null, previous = null, live = false } = options;
 
     // 1. Vérifier le cache d'abord (sauf si forceRefresh)
     if (!forceRefresh) {
@@ -75,6 +75,9 @@ class PriceService {
 
     // 2. Déterminer l'ordre des providers à essayer
     let providersToTry = this.getProviderOrder(ticker, preferredProvider);
+    // Actualisation intraday : uniquement les providers sans quota journalier (Yahoo)
+    if (Array.isArray(options.providers)) providersToTry = providersToTry.filter((p) => options.providers.includes(p));
+    if (!providersToTry.length) throw new Error(`Aucun provider disponible pour ${ticker}`);
 
     // Symbole que l'offre FMP ne couvre pas (402 constaté il y a moins de 7 jours) :
     // on ne gaspille plus de quota FMP dessus.
@@ -111,7 +114,7 @@ class PriceService {
       try {
         console.log(`🔄 Fetching ${ticker} from ${providerName}...`);
 
-        quote = await provider.getQuote(ticker, { previous });
+        quote = await provider.getQuote(ticker, { previous, live });
         usedProvider = providerName;
 
         console.log(`✅ ${ticker} fetched from ${providerName}`);
@@ -183,7 +186,7 @@ class PriceService {
     const missingProfile = !quote.sector || quote.sector === "Unknown";
     const missingDividends = quote.type !== "Crypto" && !quote.dividendsUpdatedAt &&
       !(previous?.dividendsUpdatedAt && Date.now() - new Date(previous.dividendsUpdatedAt).getTime() < 7 * 86400000);
-    if (usedProvider === "fmp" && this.providers.yahoo && quote.type !== "Crypto" && (missingProfile || missingDividends)) {
+    if (!live && usedProvider === "fmp" && this.providers.yahoo && quote.type !== "Crypto" && (missingProfile || missingDividends)) {
       try {
         const extra = await this.providers.yahoo.getQuote(ticker, { previous });
         if (missingProfile) {
@@ -193,7 +196,7 @@ class PriceService {
           if (extra.profileUpdatedAt) quote.profileUpdatedAt = extra.profileUpdatedAt;
         }
         if (missingDividends && extra.dividendsUpdatedAt) {
-          for (const f of ["dividend", "dividendRate", "dividendYield", "exDividendDate", "dividendsUpdatedAt"]) quote[f] = extra[f];
+          for (const f of ["dividend", "dividendRate", "dividendYield", "dividendFrequency", "exDividendDate", "dividendsUpdatedAt"]) quote[f] = extra[f];
         }
       } catch (error) {
         console.log(`⚠️ Could not enrich ${ticker} from Yahoo: ${error.message}`);

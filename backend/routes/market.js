@@ -8,6 +8,7 @@ const benchmarks = require("../services/benchmarks");
 const priceService = require("../services/priceService");
 const rateLimit = require("../middleware/rateLimit");
 const { searchLocal } = require("../services/popularTickers");
+const { exchangeLabel, logoUrl } = require("../services/exchanges");
 
 const SEARCH_TTL = 7 * 24 * 60 * 60 * 1000;
 const searchCache = () => mongoose.connection.collection("symbol_search");
@@ -69,7 +70,12 @@ router.get("/search", auth, searchLimiter, async (req, res) => {
     seen.add(r.symbol);
     // Compléter une entrée locale avec le secteur trouvé en ligne
     const online = remote.find((x) => x.symbol === r.symbol);
-    merged.push({ ...r, sector: r.sector || online?.sector || null });
+    merged.push({
+      ...r,
+      sector: r.sector || online?.sector || null,
+      exchange: exchangeLabel(r.symbol, r.exchange, r.type) || r.exchange || null,
+      logo: logoUrl(r.symbol),
+    });
     if (merged.length >= 10) break;
   }
 

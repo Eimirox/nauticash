@@ -124,12 +124,13 @@ class FMPProvider {
         return { dividend: null, dividendYield: null, exDividendDate: null, paymentDate: null, recordDate: null };
       }
 
-      const { annual, latest } = annualizeDividends(data);
+      const { annual, latest, frequency } = annualizeDividends(data);
 
       return {
         dividend: annual,
         dividendRate: annual,
         dividendYield: annual && price > 0 ? (annual / price) * 100 : null,
+        dividendFrequency: annual ? frequency : null,
         exDividendDate: latest?.date || null,
         paymentDate: latest?.paymentDate || null,
         recordDate: latest?.recordDate || null,

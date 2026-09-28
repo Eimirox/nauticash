@@ -14,6 +14,7 @@ import { useFxRates, toCurrency, currencySymbol } from "@/lib/fx";
 import { useBaseCurrency, useProfile } from "@/lib/profile";
 import GoalGauge from "../components/GoalGauge";
 import TickerSearch from "../components/TickerSearch";
+import TickerLogo from "../components/TickerLogo";
 import EmergencyFund from "../components/EmergencyFund";
 
 // Enveloppes proposées (doivent correspondre à ACCOUNTS côté backend)
@@ -152,6 +153,43 @@ export default function Portfolio() {
   useEffect(() => {
     fetchPortfolio();
   }, []);
+
+  // Cours rafraîchis automatiquement chaque minute (lecture de la base uniquement : les appels
+  // aux fournisseurs de cours sont faits côté serveur, une fois pour tous les utilisateurs).
+  // Pause quand l'onglet est caché ou pendant une saisie.
+  const [lastSync, setLastSync] = useState(null);
+  useEffect(() => {
+    const tick = async () => {
+      if (document.visibilityState !== "visible") return;
+      const el = document.activeElement;
+      if (el && (el.tagName === "INPUT" || el.tagName === "SELECT")) return;
+      try {
+        const data = await apiFetch("/api/user/portfolio");
+        const fresh = new Map((data.stocks || []).map((s) => [s.ticker, s]));
+        setStocks((prev) =>
+          sortStocksGeneric(
+            prev.map((s) => {
+              const f = fresh.get(s.ticker);
+              // On garde les valeurs locales (quantité, PRU, enveloppe) et on met à jour le marché
+              return f ? { ...f, quantity: s.quantity, pru: s.pru, account: s.account, fees: s.fees } : s;
+            }),
+            sort
+          )
+        );
+        setLastSync(new Date());
+      } catch {
+        /* réessai à la minute suivante */
+      }
+    };
+    const id = setInterval(tick, 60 * 1000);
+    const onVisible = () => document.visibilityState === "visible" && tick();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sort]);
 
   const [adding, setAdding] = useState(false);
 
@@ -474,16 +512,21 @@ export default function Portfolio() {
             return (
               <li key={stock.ticker} className="space-y-3 px-4 py-4">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base font-bold text-ink">{stock.ticker}</span>
-                      {typeBadge(stock.type)}
+                  <div className="flex min-w-0 items-start gap-3">
+                    <TickerLogo ticker={stock.ticker} logo={stock.logo} size={36} />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base font-bold text-ink">{stock.ticker}</span>
+                        {typeBadge(stock.type)}
+                      </div>
+                      {stock.name && stock.name !== stock.ticker && (
+                        <p className="truncate text-sm text-ink">{stock.name}</p>
+                      )}
+                      <p className="truncate text-xs text-ink-muted">
+                        {[stock.exchange, stock.currency, exchangeToCountry[stock.country] || stock.country].filter(Boolean).join(" · ")}
+                      </p>
+                      <AccountSelect stock={stock} className="mt-1" />
                     </div>
-                    <AccountSelect stock={stock} className="mt-1" />
-                    <p className="truncate text-xs text-ink-muted">
-                      {stock.name && stock.name !== stock.ticker ? `${stock.name} · ` : ""}
-                      {exchangeToCountry[stock.country] || stock.country}
-                    </p>
                   </div>
                   <div className="shrink-0 text-right">
                     <p className="money text-base font-semibold tabular-nums text-ink">
@@ -545,7 +588,7 @@ export default function Portfolio() {
         <thead className="bg-surface-2 border-b-2 border-line">
           <tr>
             <th className="px-6 py-4 text-left text-xs font-semibold text-ink uppercase tracking-wider">
-              Ticker
+              Titre
             </th>
             <th className="px-6 py-4 text-left text-xs font-semibold text-ink uppercase tracking-wider">
               Pays
@@ -650,9 +693,20 @@ export default function Portfolio() {
                   key={stock.ticker}
                   className="border-b border-line hover:bg-surface-2 transition-colors"
                 >
-                  <td className="px-6 py-4 font-bold text-ink text-base">
-                    {stock.ticker}
-                    <AccountSelect stock={stock} className="mt-1 block" />
+                  <td className="px-6 py-4">
+                    <div className="flex items-start gap-3">
+                      <TickerLogo ticker={stock.ticker} logo={stock.logo} size={36} className="mt-0.5" />
+                      <div className="min-w-0">
+                        <span className="block text-base font-bold text-ink">{stock.ticker}</span>
+                        {stock.name && stock.name !== stock.ticker && (
+                          <span className="block max-w-[14rem] truncate text-sm text-ink" title={stock.name}>{stock.name}</span>
+                        )}
+                        <span className="block text-xs text-ink-muted">
+                          {[stock.exchange, stock.currency].filter(Boolean).join(" · ")}
+                        </span>
+                        <AccountSelect stock={stock} className="mt-1 block" />
+                      </div>
+                    </div>
                   </td>
                   <td className="px-6 py-4 text-sm text-ink-muted">
                     {exchangeToCountry[stock.country] || stock.country}
@@ -861,6 +915,8 @@ export default function Portfolio() {
               <p className="money text-3xl font-bold text-ink tabular-nums">{nf2.format(summary.total)} {baseSymbol}</p>
               <p className="text-xs text-ink-muted mt-1">
                 Positions et cash convertis en {base} (taux BCE)
+                {" · "}cours actualisés chaque minute pendant les séances
+                {lastSync && ` (${lastSync.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })})`}
                 {summary.missing && " — une devise n'a pas pu être convertie"}
               </p>
             </div>

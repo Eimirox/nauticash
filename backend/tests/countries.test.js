@@ -62,7 +62,7 @@ describe("GET /api/user/portfolio : pays", () => {
     await h.request("POST", "/api/user/portfolio", { token, body: { ticker: "AAPL" } });
     await h.db.collection("prices").updateOne(
       { symbol: "AAPL" },
-      { $set: { countryCode: null, lastUpdate: new Date(Date.now() - 3600e3) } }
+      { $set: { countryCode: null, lastUpdate: new Date(Date.now() - 3600e3), fullUpdateAt: new Date(Date.now() - 3600e3) } }
     );
     h.fmp.calls.length = 0;
     await h.request("POST", "/api/user/portfolio/force-refresh", { token });

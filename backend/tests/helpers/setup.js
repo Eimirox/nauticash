@@ -28,6 +28,7 @@ const TEST_ENV = {
   FMP_DAILY_LIMIT: "",
   CRON_UPDATE_PRICES: "false",
   CRON_DAILY_HISTORY: "false",
+  CRON_LIVE_PRICES: "false",
   HEALTHCHECK_ON_START: "false",
 };
 

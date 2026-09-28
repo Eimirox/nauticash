@@ -133,3 +133,88 @@ describe("GET /api/market/search", () => {
     assert.equal(res.body.results[0].symbol, "V");
   });
 });
+
+describe("Cours du jour via Yahoo", () => {
+  test("en séance, la veille n'est pas la barre du jour (variation du jour correcte)", async () => {
+    h.fmp.notCovered.NVDA = true;
+    const chart = nvdaChart();
+    chart.indicators.quote[0].close = [170, 176, 179.9]; // barre du jour ≠ cours instantané
+    h.yahoo.charts.NVDA = chart;
+    h.yahoo.search.nvda = nvdaSearch;
+    const { token } = await h.registerUser();
+    const s = (await add(token, { ticker: "NVDA", quantity: 10 })).body.stock;
+    assert.equal(s.previousClose, 176);
+    assert.ok(Math.abs(s.dayChange - 4.5) < 1e-9);
+    assert.ok(Math.abs(s.dayChangeValue - 45) < 1e-9);
+  });
+});
+
+describe("Actualisation intraday (jobs/livePrices.js)", () => {
+  const live = require("../jobs/livePrices");
+  const config = require("../config/providers");
+
+  test("rafraîchit via Yahoo seulement les titres détenus dont le marché est ouvert, sans FMP", async () => {
+    h.fmp.notCovered.NVDA = true;
+    h.yahoo.charts.NVDA = nvdaChart();
+    h.yahoo.search.nvda = nvdaSearch;
+    h.yahoo.charts["AIR.PA"] = { meta: { currency: "EUR", regularMarketPrice: 150, chartPreviousClose: 148, regularMarketTime: now, instrumentType: "EQUITY", exchangeName: "PAR" } };
+    const { token } = await h.registerUser();
+    await add(token, { ticker: "NVDA", quantity: 1 });
+    await h.db.collection("prices").updateOne({ symbol: "NVDA" }, { $set: { lastUpdate: new Date("2026-09-28T14:50:00Z") } });
+    const fmpBefore = h.fmp.calls.length;
+    h.yahoo.calls.length = 0;
+    h.yahoo.charts.NVDA.meta.regularMarketPrice = 185;
+    h.yahoo.charts.NVDA.meta.chartPreviousClose = 176;
+
+    // Lundi 28/09/2026 à 15:00 UTC : Wall Street ouverte
+    const res = await live.run(new Date("2026-09-28T15:00:00Z"));
+    assert.equal(res.refreshed, 1);
+    assert.equal(h.fmp.calls.length, fmpBefore, "aucun appel FMP en journée");
+    assert.deepEqual(h.yahoo.calls.map((c) => c.endpoint), ["chart"], "un seul appel léger");
+    const doc = await h.db.collection("prices").findOne({ symbol: "NVDA" });
+    assert.equal(doc.close, 185);
+    assert.equal(doc.sector, "Technology", "le profil est conservé");
+    assert.ok(doc.dividend > 0, "les dividendes sont conservés");
+
+    // Rafraîchi à l'instant : pas de nouvel appel à la minute suivante
+    h.yahoo.calls.length = 0;
+    await h.db.collection("prices").updateOne({ symbol: "NVDA" }, { $set: { lastUpdate: new Date("2026-09-28T15:00:30Z") } });
+    await live.run(new Date("2026-09-28T15:01:00Z"));
+    assert.equal(h.yahoo.calls.length, 0);
+  });
+
+  test("ne fait rien marché fermé (nuit, week-end)", async () => {
+    h.yahoo.charts.NVDA = nvdaChart();
+    h.fmp.notCovered.NVDA = true;
+    h.yahoo.search.nvda = nvdaSearch;
+    const { token } = await h.registerUser();
+    await add(token, { ticker: "NVDA", quantity: 1 });
+    h.yahoo.calls.length = 0;
+    await live.run(new Date("2026-09-27T15:00:00Z")); // dimanche
+    await live.run(new Date("2026-09-28T03:00:00Z")); // nuit
+    assert.equal(h.yahoo.calls.length, 0);
+  });
+
+  test("respecte le plafond d'appels par minute, cours les plus anciens d'abord", async () => {
+    const original = config.cron.livePrices.maxPerRun;
+    config.cron.livePrices.maxPerRun = 1;
+    try {
+      for (const [sym, price] of [["AAA", 10], ["BBB", 20]]) {
+        h.yahoo.charts[sym] = { meta: { currency: "USD", regularMarketPrice: price, chartPreviousClose: price, regularMarketTime: now, instrumentType: "EQUITY", exchangeName: "NMS" } };
+        h.fmp.notCovered[sym] = true;
+      }
+      const { token } = await h.registerUser();
+      await add(token, { ticker: "AAA", quantity: 1 });
+      await add(token, { ticker: "BBB", quantity: 1 });
+      await h.db.collection("prices").updateOne({ symbol: "AAA" }, { $set: { lastUpdate: new Date(Date.now() - 5 * 60e3) } });
+      await h.db.collection("prices").updateOne({ symbol: "BBB" }, { $set: { lastUpdate: new Date(Date.now() - 50 * 60e3) } });
+      h.yahoo.calls.length = 0;
+      const res = await live.run(new Date());
+      if (res.candidates === 0) return; // marché fermé au moment du test
+      assert.equal(res.refreshed, 1);
+      assert.deepEqual(h.yahoo.calls.map((c) => c.symbol), ["BBB"]);
+    } finally {
+      config.cron.livePrices.maxPerRun = original;
+    }
+  });
+});
