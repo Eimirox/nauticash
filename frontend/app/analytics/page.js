@@ -6,6 +6,8 @@ import { useFxRates, toCurrency, ratePer, currencySymbol } from "@/lib/fx";
 import { useBaseCurrency } from "@/lib/profile";
 import DiversificationCard from "../components/DiversificationCard";
 import FeesCard from "../components/FeesCard";
+import DividendIncomeCard from "../components/DividendIncomeCard";
+import { estimateDividends } from "@/lib/dividendCalendar";
 import AppHeader from "../components/AppHeader";
 import Link from "next/link";
 import { Pie } from "react-chartjs-2";
@@ -160,6 +162,7 @@ export default function Analytics() {
   const totalsPerType = allocationByType(stocks, cash, toBaseOrNull);
   const typeLabels = Object.keys(totalsPerType);
   const countryRows = allocationByCountry(stocks, toBaseOrNull, 5);
+  const dividendEstimate = summaryReady ? estimateDividends(stocks, inBase) : null;
   const pieType = {
     labels: typeLabels,
     datasets: [
@@ -389,6 +392,9 @@ export default function Analytics() {
                 </span>
               </div>
             )}
+
+            {/* Revenus de dividendes : revenu annuel estimé et prochain versement */}
+            {!loading && <DividendIncomeCard estimate={dividendEstimate} portfolioValue={summary.invested} base={base} />}
 
             {/* Score de diversification */}
             <DiversificationCard

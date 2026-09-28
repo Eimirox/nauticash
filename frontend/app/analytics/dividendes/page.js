@@ -4,7 +4,8 @@ import { useState, useEffect, useMemo } from "react";
 import { apiFetch } from "@/lib/api";
 import { useFxRates, toCurrency, ratePer, currencySymbol } from "@/lib/fx";
 import { useBaseCurrency } from "@/lib/profile";
-import { projectDividends, FREQUENCY_LABELS } from "@/lib/dividendCalendar";
+import { estimateDividends, FREQUENCY_LABELS } from "@/lib/dividendCalendar";
+import DividendCalendar from "../../components/DividendCalendar";
 import TickerLogo from "../../components/TickerLogo";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { formatCurrencySymbol } from "../../portfolio/utils/formats";
@@ -41,67 +42,23 @@ export default function DividendesPage() {
 
   // Calculs des dividendes (toutes devises, converties dans la devise de référence avec les taux BCE)
   const dividendData = useMemo(() => {
-    const empty = { stocksWithDividends: [], totalsByCurrency: {}, totalAnnualInBase: 0, portfolioYield: 0, calendar: [], months: [], totalPortfolioValue: 0 };
-    if (!stocks || stocks.length === 0) return empty;
-
-    const stocksWithDividends = stocks
-      .filter((s) => s.dividend != null && s.dividend > 0)
-      .map((s) => {
-        const quantity = s.quantity || 0;
-        const annualDivPerShare = s.dividend;
-        const totalAnnual = annualDivPerShare * quantity;
-        // Rendement au cours actuel, en % (le backend le donne déjà en %)
-        const yieldPercent = s.close > 0 ? (annualDivPerShare / s.close) * 100 : Number(s.dividendYield) || 0;
-        return {
-          ticker: s.ticker,
-          name: s.name,
-          quantity,
-          divPerShare: annualDivPerShare,
-          totalAnnual,
-          totalAnnualBase: inBase(totalAnnual, s.currency),
-          yieldPercent,
-          yieldOnCost: s.pru > 0 ? (annualDivPerShare / s.pru) * 100 : null,
-          positionValue: (s.close || 0) * quantity,
-          currency: s.currency || "USD",
-          exDividendDate: s.exDividendDate,
-          nextExDividendDate: s.nextExDividendDate || null,
-          paymentDate: s.paymentDate,
-          sector: s.sector,
-          logo: s.logo,
-          exchange: s.exchange,
-          // Fréquence connue (backend) ; à défaut : trimestriel aux États-Unis, annuel ailleurs (estimation)
-          frequency: Number(s.dividendFrequency) || (String(s.ticker).includes(".") ? 1 : 4),
-          frequencyEstimated: !s.dividendFrequency,
-        };
-      })
-      .sort((a, b) => b.totalAnnualBase - a.totalAnnualBase);
-
+    const est = estimateDividends(stocks, inBase);
+    const stocksWithDividends = est.positions;
     const totalsByCurrency = stocksWithDividends.reduce((acc, s) => {
       acc[s.currency] = (acc[s.currency] || 0) + s.totalAnnual;
       return acc;
     }, {});
-    const totalAnnualInBase = stocksWithDividends.reduce((sum, s) => sum + s.totalAnnualBase, 0);
-
-    const totalPortfolioValue = stocks.reduce((sum, s) => sum + inBase((s.close || 0) * (s.quantity || 0), s.currency), 0);
-    const portfolioYield = totalPortfolioValue > 0 ? (totalAnnualInBase / totalPortfolioValue) * 100 : 0;
-
-    // Projection des 12 prochains mois (montant par versement = annuel / fréquence)
-    const parseDate = (d) => (typeof d === "number" ? new Date(d * 1000) : new Date(d));
-    const projection = projectDividends(
-      stocksWithDividends.map((s) => ({
-        ticker: s.ticker,
-        name: s.name,
-        annualBase: s.totalAnnualBase,
-        frequency: s.frequency,
-        lastExDate: s.exDividendDate && !Number.isNaN(parseDate(s.exDividendDate).getTime()) ? parseDate(s.exDividendDate).toISOString() : null,
-        nextExDate: s.nextExDividendDate,
-      }))
-    );
-    // Un seul prochain détachement par titre (le plus proche), du plus proche au plus lointain
-    const seen = new Set();
-    const calendar = projection.upcoming.filter((u) => !seen.has(u.ticker) && seen.add(u.ticker));
-
-    return { stocksWithDividends, totalsByCurrency, totalAnnualInBase, portfolioYield, calendar, months: projection.months, totalPortfolioValue };
+    const totalPortfolioValue = (stocks || []).reduce((sum, s) => sum + inBase((s.close || 0) * (s.quantity || 0), s.currency), 0);
+    const portfolioYield = totalPortfolioValue > 0 ? (est.annual / totalPortfolioValue) * 100 : 0;
+    return {
+      stocksWithDividends,
+      totalsByCurrency,
+      totalAnnualInBase: est.annual,
+      portfolioYield,
+      months: est.months,
+      next12: est.next12,
+      upcomingCount: est.upcoming.length,
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stocks, rates, base]);
 
@@ -110,14 +67,6 @@ export default function DividendesPage() {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     }) + " " + formatCurrencySymbol(currency);
-  };
-
-  const formatDate = (date) => {
-    return date.toLocaleDateString("fr-FR", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric"
-    });
   };
 
   return (
@@ -180,12 +129,12 @@ export default function DividendesPage() {
 
               {/* Total Converti */}
               <div className="bg-gradient-to-br from-emerald-50 to-blue-50 dark:from-accent/10 dark:to-accent-2/10 border border-accent/40 rounded-xl shadow-lg p-6">
-                <h3 className="text-sm font-semibold text-accent uppercase mb-3">Total ({base})</h3>
+                <h3 className="text-sm font-semibold text-accent uppercase mb-3">Revenu annuel estimé</h3>
                 <p className="money text-3xl font-bold text-accent mb-1">
                   {formatCurrency(dividendData.totalAnnualInBase, base)}
                 </p>
                 <p className="text-xs text-accent">
-                  par an, soit <span className="money">{formatCurrency(dividendData.totalAnnualInBase / 12, base)}</span> / mois
+                  par an ({base}), soit <span className="money">{formatCurrency(dividendData.totalAnnualInBase / 12, base)}</span> / mois en moyenne
                 </p>
               </div>
 
@@ -303,7 +252,7 @@ export default function DividendesPage() {
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={dividendData.months} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#94A3B8" strokeOpacity={0.25} vertical={false} />
-                      <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#8A9AA9" }} interval={0} />
+                      <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#8A9AA9" }} interval="preserveStartEnd" minTickGap={6} />
                       <YAxis tick={{ fontSize: 11, fill: "#8A9AA9" }} width={44} />
                       <Tooltip
                         cursor={{ fill: "rgba(148,163,184,0.12)" }}
@@ -323,40 +272,14 @@ export default function DividendesPage() {
               </div>
             )}
 
-            {/* Prochains détachements */}
-            {dividendData.calendar.length > 0 && (
-              <div className="bg-surface border border-line rounded-xl shadow-lg p-6">
-                <div className="flex items-center gap-2 mb-6">
-                  <svg className="w-5 h-5 text-accent" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-                  </svg>
-                  <h3 className="text-lg font-bold text-ink">Prochains détachements (estimés)</h3>
-                </div>
-                <div className="space-y-3">
-                  {dividendData.calendar.slice(0, 8).map((item, idx) => {
-                    const stock = dividendData.stocksWithDividends.find((x) => x.ticker === item.ticker);
-                    return (
-                      <div key={idx} className="flex items-center justify-between gap-3 p-3 bg-surface-2 rounded-lg">
-                        <div className="flex min-w-0 items-center gap-3">
-                          <TickerLogo ticker={item.ticker} logo={stock?.logo} size={36} />
-                          <div className="min-w-0">
-                            <div className="text-sm font-bold text-ink">{item.ticker}</div>
-                            <div className="truncate text-xs text-ink-muted">
-                              {formatDate(item.date)} · {(FREQUENCY_LABELS[item.frequency] || "").toLowerCase()}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-sm font-bold text-accent">
-                            <span className="money">{formatCurrency(item.amount, base)}</span>
-                          </div>
-                          <div className="text-xs text-ink-muted">par versement</div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+            {/* Calendrier des 12 prochains mois */}
+            {dividendData.upcomingCount > 0 && (
+              <DividendCalendar
+                months={dividendData.months}
+                next12={dividendData.next12}
+                base={base}
+                logos={Object.fromEntries(dividendData.stocksWithDividends.map((s) => [s.ticker, s.logo]))}
+              />
             )}
 
             {/* Info */}
