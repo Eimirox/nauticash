@@ -93,8 +93,11 @@ export function projectDividends(positions, now = new Date()) {
       date = new Date(`${String(p.lastExDate).slice(0, 10)}T12:00:00`);
     }
     if (!date || Number.isNaN(date.getTime())) continue;
-    // Une date passée (estimation ancienne) est avancée au prochain versement
-    for (let guard = 0; date < today && guard < 120; guard++) date = addMonths(date, 12 / f);
+    // Dates calculées depuis la date d'origine (pas de dérive 31 → 30 → 28 d'un versement à l'autre) ;
+    // une date passée (estimation ancienne) est avancée au prochain versement
+    const anchor = date;
+    let k = 0;
+    while (date < today && k < 120) date = addMonths(anchor, ++k * (12 / f));
     for (let guard = 0; date < end && guard < 24; guard++) {
       const item = { ticker: p.ticker, name: p.name, date: new Date(date), amount: perPayment, frequency: f };
       const m = byKey.get(`${date.getFullYear()}-${date.getMonth()}`);
@@ -103,7 +106,7 @@ export function projectDividends(positions, now = new Date()) {
         m.items.push(item);
       }
       upcoming.push(item);
-      date = addMonths(date, 12 / f);
+      date = addMonths(anchor, ++k * (12 / f));
     }
   }
   upcoming.sort((a, b) => a.date - b.date);
