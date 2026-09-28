@@ -73,3 +73,7 @@ framer-motion est disponible. Animations **sobres** : apparition en fondu + 8 px
 - Focus toujours visible : anneau `ring-2` couleur `--accent`, décalé de 2 px.
 - Boutons icônes avec `aria-label` ; champs avec `<label>` associé.
 - Textes en français, `lang="fr"`.
+
+## Mode discret
+
+Tout montant qui révèle le patrimoine (totaux, valeurs de position, cash, quantités, dividendes perçus) porte la classe `money`. Quand `<html>` a la classe `discreet` (bouton œil de l'en-tête, préférence `discreetMode` du profil), le texte est remplacé par « •••• » et les champs de saisie sont floutés hors édition. Les pourcentages, prix unitaires et PRU restent visibles. En JavaScript (infobulles, graphiques), utiliser `useDiscreet()` de `lib/profile.js`.

@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { apiFetch } from "@/lib/api";
+import { useFxRates, toCurrency, currencySymbol } from "@/lib/fx";
+import { useBaseCurrency, useDiscreet } from "@/lib/profile";
 import AppHeader from "../../components/AppHeader";
 import Link from "next/link";
 import {
@@ -57,22 +59,14 @@ export default function GeographiePage() {
   const [loadError, setLoadError] = useState(null);
   const [stocks, setStocks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [usdToEur, setUsdToEur] = useState(0.92);
   const [tooltipContent, setTooltipContent] = useState("");
 
-  // Fetch taux de change USD->EUR
-  useEffect(() => {
-    const fetchExchangeRate = async () => {
-      try {
-        const res = await fetch("https://api.exchangerate-api.com/v4/latest/USD");
-        const data = await res.json();
-        setUsdToEur(data.rates.EUR || 0.92);
-      } catch (err) {
-        console.log("Taux de change par défaut utilisé");
-      }
-    };
-    fetchExchangeRate();
-  }, []);
+  // Taux BCE servis par le backend (toutes devises)
+  const { rates, stale: fxStale } = useFxRates();
+  // Montants convertis dans la devise de référence du profil (EUR par défaut)
+  const base = useBaseCurrency();
+  const [discreet] = useDiscreet();
+  const inBase = (value, currency) => toCurrency(value, currency, base, rates) ?? ((currency || "EUR") === base ? value : 0);
 
   // Fetch portfolio
   useEffect(() => {
@@ -113,44 +107,44 @@ export default function GeographiePage() {
       const isoCode = s.countryNumeric || COUNTRY_CODES[country] || (country === "Crypto" ? "CRYPTO" : null);
       
       const value = (s.close || 0) * (s.quantity || 0);
-      const valueEUR = s.currency === "USD" ? value * usdToEur : value;
+      const valueBase = inBase(value, s.currency);
       
-      total += valueEUR;
+      total += valueBase;
 
       if (!byCountry[country]) {
         byCountry[country] = {
           country,
           isoCode,
           countryCode: s.countryCode || null,
-          valueEUR: 0,
+          valueBase: 0,
           valueOriginal: 0,
           currency: s.currency,
           stocks: []
         };
       }
 
-      byCountry[country].valueEUR += valueEUR;
+      byCountry[country].valueBase += valueBase;
       byCountry[country].valueOriginal += value;
       byCountry[country].stocks.push({
         ticker: s.ticker,
         name: s.name,
-        value: valueEUR
+        value: valueBase
       });
     });
 
     // Convertir en liste triée
     const countryList = Object.values(byCountry)
-      .sort((a, b) => b.valueEUR - a.valueEUR);
+      .sort((a, b) => b.valueBase - a.valueBase);
 
     // Valeur max pour l'échelle de couleurs
-    const maxValue = Math.max(...countryList.map(c => c.valueEUR));
+    const maxValue = Math.max(...countryList.map(c => c.valueBase));
 
     // Continent principal (simplifié)
     // Continent principal : somme des valeurs par continent
     const byContinent = {};
     for (const c of countryList) {
       const continent = CONTINENTS[c.countryCode];
-      if (continent) byContinent[continent] = (byContinent[continent] || 0) + c.valueEUR;
+      if (continent) byContinent[continent] = (byContinent[continent] || 0) + c.valueBase;
     }
     const topContinent =
       Object.entries(byContinent).sort((a, b) => b[1] - a[1])[0]?.[0] || "N/A";
@@ -162,13 +156,14 @@ export default function GeographiePage() {
       maxValue,
       topContinent
     };
-  }, [stocks, usdToEur]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stocks, rates, base]);
 
   const formatCurrency = (value) => {
     return value.toLocaleString("fr-FR", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
-    }) + "€";
+    }) + " " + currencySymbol(base);
   };
 
   const formatPercent = (value, total) => {
@@ -183,7 +178,7 @@ export default function GeographiePage() {
     const countryData = geoData.countryList.find(c => c.isoCode === isoCode);
     if (!countryData) return "#E5E7EB";
 
-    const intensity = countryData.valueEUR / geoData.maxValue;
+    const intensity = countryData.valueBase / geoData.maxValue;
     
     // Gradient de vert emerald
     if (intensity > 0.7) return "#059669"; // Très foncé
@@ -326,7 +321,9 @@ export default function GeographiePage() {
                               onMouseEnter={() => {
                                 if (countryData) {
                                   setTooltipContent(
-                                    `${countryData.country}: ${formatCurrency(countryData.valueEUR)} (${formatPercent(countryData.valueEUR, geoData.total)})`
+                                    discreet
+                                      ? `${countryData.country} (${formatPercent(countryData.valueBase, geoData.total)})`
+                                      : `${countryData.country}: ${formatCurrency(countryData.valueBase)} (${formatPercent(countryData.valueBase, geoData.total)})`
                                   );
                                 }
                               }}
@@ -381,11 +378,11 @@ export default function GeographiePage() {
                           </div>
                         </td>
                         <td className="text-right py-3 px-4 text-sm font-bold text-emerald-600">
-                          {formatCurrency(item.valueEUR)}
+                          <span className="money">{formatCurrency(item.valueBase)}</span>
                         </td>
                         <td className="text-right py-3 px-4">
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
-                            {formatPercent(item.valueEUR, geoData.total)}
+                            {formatPercent(item.valueBase, geoData.total)}
                           </span>
                         </td>
                         <td className="text-right py-3 px-4 text-sm text-slate-600">

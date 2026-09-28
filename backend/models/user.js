@@ -9,11 +9,16 @@ const UserSchema = new mongoose.Schema({
       ticker:   { type: String, required: true },
       quantity: { type: Number, default: 0 },
       pru:      { type: Number, default: 0 },
+      // Enveloppe : PEA, CTO, AV (assurance-vie), PER, CRYPTO ou null
+      account:  { type: String, default: null },
     }
   ],
 
   cashAmount:   { type: Number, default: 0 },       
   cashCurrency: { type: String, default: "EUR" },
+
+  // Préférences personnelles (voir services/profile.js pour les champs et valeurs par défaut)
+  profile: { type: mongoose.Schema.Types.Mixed, default: undefined },
 
   // Réinitialisation du mot de passe (le token est stocké hashé en SHA-256)
   resetPasswordToken:   { type: String, default: null, index: true },

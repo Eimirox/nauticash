@@ -8,7 +8,13 @@ import { exchangeToCountry } from "./utils/exchangeMap";
 import { getPerformanceClass } from "./utils/styles";
 import { apiFetch, logout as apiLogout } from "@/lib/api";
 import AppHeader from "../components/AppHeader";
-import { ConfirmModal, useToast } from "../components/ui";
+import { ConfirmModal, useToast, Delta } from "../components/ui";
+import { quoteFreshness } from "@/lib/quoteTime";
+import { useFxRates, toCurrency, currencySymbol } from "@/lib/fx";
+import { useBaseCurrency } from "@/lib/profile";
+
+// Enveloppes proposées (doivent correspondre à ACCOUNTS côté backend)
+const ACCOUNT_LABELS = { PEA: "PEA", CTO: "Compte-titres", AV: "Assurance-vie", PER: "PER", CRYPTO: "Crypto" };
 
 export default function Portfolio() {
   const router = useRouter();
@@ -32,6 +38,8 @@ export default function Portfolio() {
     switch (key) {
       case "price":
         return typeof stock.close === "number" ? stock.close : null;
+      case "day":
+        return Number.isFinite(stock.dayChangePercent) ? stock.dayChangePercent : null;
       case "performance": {
         const perf =
           stock.pru > 0 ? ((stock.close - stock.pru) / stock.pru) * 100 : null;
@@ -192,6 +200,17 @@ export default function Portfolio() {
     />
   );
 
+  // Enveloppe (PEA, CTO…) : enregistrée immédiatement
+  const handleUpdateAccount = (ticker, account) => {
+    setStocks((prev) => prev.map((s) => (s.ticker === ticker ? { ...s, account: account || null } : s)));
+    apiFetch(`/api/user/portfolio/${encodeURIComponent(ticker)}`, { method: "PATCH", body: { account: account || null } }).catch(
+      (err) => {
+        setError(`Enveloppe non enregistrée : ${err.message}`);
+        fetchPortfolio();
+      }
+    );
+  };
+
   const handleUpdateStock = (ticker, field, value) => {
     if (!Number.isFinite(value) || value < 0) {
       setError("La quantité et le PRU doivent être des nombres positifs.");
@@ -242,6 +261,57 @@ export default function Portfolio() {
       (totalWealthByCurrency[cash.currency] || 0) + cash.amount;
   }
 
+  // Synthèse dans la devise de référence du profil (taux BCE) : patrimoine, variation du jour, plus-value latente
+  const { rates } = useFxRates();
+  const base = useBaseCurrency();
+  const baseSymbol = currencySymbol(base);
+  const toBase = (amount, currency) => toCurrency(amount, currency, base, rates);
+  const summary = (() => {
+    let value = 0, dayChange = 0, prevValue = 0, cost = 0, costedValue = 0, missing = false;
+    for (const s of stocks) {
+      const qty = Number(s.quantity) || 0;
+      const v = toBase((s.close || 0) * qty, s.currency);
+      if (v === null) { missing = true; continue; }
+      value += v;
+      if (Number.isFinite(s.dayChangeValue)) {
+        const d = toBase(s.dayChangeValue, s.currency) ?? 0;
+        dayChange += d;
+        prevValue += v - d;
+      }
+      if (s.pru > 0) {
+        cost += toBase(s.pru * qty, s.currency) ?? 0;
+        costedValue += v;
+      }
+    }
+    const cashBase = toBase(Number(cash.amount) || 0, cash.currency);
+    if (cashBase === null && cash.amount) missing = true;
+    return {
+      ready: Boolean(rates) || (stocks.every((s) => (s.currency || "EUR") === base) && (!cash.amount || cash.currency === base)),
+      missing,
+      total: value + (cashBase ?? 0),
+      invested: value,
+      dayChange,
+      dayChangePct: prevValue > 0 ? (dayChange / prevValue) * 100 : null,
+      gain: costedValue - cost,
+      gainPct: cost > 0 ? ((costedValue - cost) / cost) * 100 : null,
+    };
+  })();
+  // Filtre et sous-totaux par enveloppe (dans la devise de référence)
+  const [accountFilter, setAccountFilter] = useState("all");
+  const accountTotals = stocks.reduce((acc, s) => {
+    const key = s.account || "NONE";
+    const v = toBase((s.close || 0) * (Number(s.quantity) || 0), s.currency) ?? 0;
+    acc[key] = (acc[key] || 0) + v;
+    return acc;
+  }, {});
+  const hasAccounts = stocks.some((s) => s.account);
+  // Si la dernière position d'une enveloppe change d'enveloppe, on revient à « Toutes »
+  const activeFilter = accountFilter !== "all" && accountTotals[accountFilter] === undefined ? "all" : accountFilter;
+  const visibleStocks =
+    activeFilter === "all" ? stocks : stocks.filter((s) => (s.account || "NONE") === activeFilter);
+
+  const signed = (n) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${nf2.format(Math.abs(n))} ${baseSymbol}`;
+
   const typeBadge = (type) => {
     // Le backend renvoie « Stock » / « Crypto » / « ETF » ; les anciennes données « EQUITY » / « CRYPTOCURRENCY »
     const ALIASES = { STOCK: "EQUITY", CRYPTO: "CRYPTOCURRENCY" };
@@ -291,6 +361,49 @@ export default function Portfolio() {
     return "";
   };
 
+  // Sélecteur d'enveloppe compact, sous le ticker
+  const AccountSelect = ({ stock, className = "" }) => (
+    <select
+      aria-label={`Enveloppe de ${stock.ticker}`}
+      value={stock.account || ""}
+      onChange={(e) => handleUpdateAccount(stock.ticker, e.target.value)}
+      className={`rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 ${className}`}
+    >
+      <option value="">Sans enveloppe</option>
+      {Object.entries(ACCOUNT_LABELS).map(([k, label]) => (
+        <option key={k} value={k}>{label}</option>
+      ))}
+    </select>
+  );
+
+  // Heure de cotation sous le prix ; badge orange si le cours date de plus de 3 jours ouvrés
+  const QuoteTime = ({ stock }) => {
+    const f = quoteFreshness(stock.priceTime);
+    if (!f) return null;
+    return f.stale ? (
+      <span title={f.title} className="mt-1 inline-block whitespace-nowrap rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">
+        cours du {f.label}
+      </span>
+    ) : (
+      <span title={f.title} className="mt-0.5 block text-[11px] font-normal text-slate-400 tabular-nums">
+        {f.label}
+      </span>
+    );
+  };
+
+  // Variation du jour : pourcentage + montant pour la position
+  const DayChange = ({ stock, cur }) => (
+    <span className="inline-flex flex-col items-end">
+      <Delta value={stock.dayChangePercent} className="whitespace-nowrap text-sm" />
+      {Number.isFinite(stock.dayChangeValue) && (
+        <span className="money whitespace-nowrap text-[11px] text-slate-500 tabular-nums">
+          {stock.dayChangeValue > 0 ? "+" : stock.dayChangeValue < 0 ? "−" : ""}
+          {nf2.format(Math.abs(stock.dayChangeValue))} {cur}
+        </span>
+      )}
+    </span>
+  );
+
   // Champ numérique éditable (quantité / PRU), enregistré à la sortie du champ
   const EditableNumber = ({ stock, field, label, className = "" }) => (
     <input
@@ -306,7 +419,7 @@ export default function Portfolio() {
         if (!isNaN(val) && val !== stock[field]) handleUpdateStock(stock.ticker, field, val);
       }}
       onKeyDown={(e) => e.key === "Enter" && e.target.blur()}
-      className={`px-3 py-2 text-right text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all ${className}`}
+      className={`px-3 py-2 text-right text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all ${field === "quantity" ? "money" : ""} ${className}`}
     />
   );
 
@@ -328,6 +441,8 @@ export default function Portfolio() {
           <option value="total:desc">Montant (décroissant)</option>
           <option value="performance:desc">Performance (meilleure)</option>
           <option value="performance:asc">Performance (pire)</option>
+          <option value="day:desc">Variation du jour (meilleure)</option>
+          <option value="day:asc">Variation du jour (pire)</option>
           <option value="yield:desc">Rendement (décroissant)</option>
           <option value="ticker:asc">Ticker (A → Z)</option>
         </select>
@@ -342,7 +457,7 @@ export default function Portfolio() {
         </div>
       ) : (
         <ul className="divide-y divide-slate-100">
-          {stocks.map((stock) => {
+          {visibleStocks.map((stock) => {
             const perf = stock.pru > 0 ? ((stock.close - stock.pru) / stock.pru) * 100 : null;
             const total =
               typeof stock.close === "number" && typeof stock.quantity === "number" ? stock.close * stock.quantity : null;
@@ -355,18 +470,24 @@ export default function Portfolio() {
                       <span className="text-base font-bold text-slate-900">{stock.ticker}</span>
                       {typeBadge(stock.type)}
                     </div>
+                    <AccountSelect stock={stock} className="mt-1" />
                     <p className="truncate text-xs text-slate-500">
                       {stock.name && stock.name !== stock.ticker ? `${stock.name} · ` : ""}
                       {exchangeToCountry[stock.country] || stock.country}
                     </p>
                   </div>
                   <div className="shrink-0 text-right">
-                    <p className="text-base font-semibold tabular-nums text-slate-900">
+                    <p className="money text-base font-semibold tabular-nums text-slate-900">
                       {total != null ? `${nf2.format(total)} ${cur}` : "--"}
                     </p>
                     <p className={`text-sm font-semibold tabular-nums ${getPerformanceClass(perf)}`}>
                       {perf != null ? `${perf > 0 ? "▲ +" : perf < 0 ? "▼ " : ""}${nf2.format(perf)} %` : "--"}
                     </p>
+                    {Number.isFinite(stock.dayChangePercent) && (
+                      <p className="text-xs text-slate-500">
+                        <Delta value={stock.dayChangePercent} className="text-xs" /> aujourd&apos;hui
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -374,6 +495,7 @@ export default function Portfolio() {
                   <div>
                     <p className="mb-1 text-slate-500">Prix</p>
                     <p className="font-medium tabular-nums text-slate-900">{nf2.format(stock.close)} {cur}</p>
+                    <QuoteTime stock={stock} />
                   </div>
                   <div>
                     <p className="mb-1 text-slate-500">Quantité</p>
@@ -428,6 +550,12 @@ export default function Portfolio() {
             >
               Prix {caret("price")}
             </th>
+            <th
+              className="px-6 py-4 text-right text-xs font-semibold text-slate-700 uppercase tracking-wider cursor-pointer hover:text-emerald-600 transition select-none"
+              onClick={() => toggleSort("day")}
+            >
+              Jour {caret("day")}
+            </th>
             <th className="px-6 py-4 text-right text-xs font-semibold text-slate-700 uppercase tracking-wider">
               Quantité
             </th>
@@ -467,7 +595,7 @@ export default function Portfolio() {
           {loading ? (
             <tr>
               <td
-                colSpan="11"
+                colSpan="12"
                 className="px-6 py-20 text-center text-slate-500"
               >
                 <div className="flex flex-col items-center gap-3">
@@ -497,7 +625,7 @@ export default function Portfolio() {
               </td>
             </tr>
           ) : stocks.length ? (
-            stocks.map((stock) => {
+            visibleStocks.map((stock) => {
               const perf =
                 stock.pru > 0
                   ? ((stock.close - stock.pru) / stock.pru) * 100
@@ -515,14 +643,20 @@ export default function Portfolio() {
                 >
                   <td className="px-6 py-4 font-bold text-slate-900 text-base">
                     {stock.ticker}
+                    <AccountSelect stock={stock} className="mt-1 block" />
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-600">
                     {exchangeToCountry[stock.country] || stock.country}
                   </td>
                   <td className="px-6 py-4">{typeBadge(stock.type)}</td>
                   <td className="px-6 py-4 text-right text-slate-900 font-medium">
-                    {nf2.format(stock.close)}{" "}
-                    {formatCurrencySymbol(stock.currency)}
+                    <span className="whitespace-nowrap">
+                      {nf2.format(stock.close)} {formatCurrencySymbol(stock.currency)}
+                    </span>
+                    <QuoteTime stock={stock} />
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <DayChange stock={stock} cur={formatCurrencySymbol(stock.currency)} />
                   </td>
                   
                   {/* QUANTITÉ - VERSION SIMPLE AVEC defaultValue */}
@@ -542,7 +676,7 @@ export default function Portfolio() {
                           e.target.blur();
                         }
                       }}
-                      className="w-24 px-3 py-2 text-right text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                      className="money w-24 px-3 py-2 text-right text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                     />
                   </td>
                   
@@ -594,7 +728,7 @@ export default function Portfolio() {
                       : "--"}
                   </td>
                   <td className="px-6 py-4 text-right font-semibold text-slate-900">
-                    {total != null ? nf2.format(total) : "--"}
+                    <span className="money">{total != null ? nf2.format(total) : "--"}</span>
                   </td>
                   <td className="px-6 py-4">
                     <button
@@ -610,7 +744,7 @@ export default function Portfolio() {
           ) : (
             <tr>
               <td
-                colSpan="11"
+                colSpan="12"
                 className="px-6 py-20 text-center text-slate-500"
               >
                 <div className="flex flex-col items-center gap-3">
@@ -710,6 +844,30 @@ export default function Portfolio() {
           </div>
         )}
 
+        {/* Synthèse dans la devise de référence */}
+        {stocks.length > 0 && summary.ready && (
+          <div className="mb-4 p-5 bg-white border border-slate-200 shadow-lg rounded-xl grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Patrimoine total</p>
+              <p className="money text-3xl font-bold text-slate-900 tabular-nums">{nf2.format(summary.total)} {baseSymbol}</p>
+              <p className="text-xs text-slate-500 mt-1">
+                Positions et cash convertis en {base} (taux BCE)
+                {summary.missing && " — une devise n'a pas pu être convertie"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Aujourd&apos;hui</p>
+              <p className="money text-xl font-bold text-slate-900 tabular-nums">{signed(summary.dayChange)}</p>
+              <Delta value={summary.dayChangePct} className="text-sm" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Plus-value latente</p>
+              <p className="money text-xl font-bold text-slate-900 tabular-nums">{signed(summary.gain)}</p>
+              <Delta value={summary.gainPct} suffix=" depuis l'achat" className="text-sm" />
+            </div>
+          </div>
+        )}
+
         {/* KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
           {Object.entries(portfolioTotalsByCurrency).map(([cur, tot]) => (
@@ -723,7 +881,7 @@ export default function Portfolio() {
                   Positions {cur}
                 </p>
                 <p className="text-2xl font-bold text-slate-900">
-                  {nf2.format(Number(tot))} {formatCurrencySymbol(cur)}
+                  <span className="money">{nf2.format(Number(tot))} {formatCurrencySymbol(cur)}</span>
                 </p>
               </div>
             </div>
@@ -738,7 +896,7 @@ export default function Portfolio() {
                 <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1">
                   Cash / Dette
                 </p>
-                <p className="text-lg font-bold text-emerald-900">
+                <p className="money text-lg font-bold text-emerald-900">
                   {nf2.format(cash.amount)} {formatCurrencySymbol(cash.currency)}
                 </p>
               </div>
@@ -797,7 +955,7 @@ export default function Portfolio() {
                   }}
                   onBlur={() => syncCashUpdate(cash.amount, cash.currency)}
                   onKeyDown={(e) => e.key === "Enter" && e.target.blur()}
-                  className="w-32 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                  className="money w-32 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                 />
               </div>
               <div>
@@ -879,6 +1037,34 @@ export default function Portfolio() {
             </span>
           </button>
         </div>
+
+        {/* Enveloppes : filtre et sous-totaux */}
+        {hasAccounts && (
+          <div className="mb-4 flex gap-2 overflow-x-auto pb-1" role="group" aria-label="Filtrer par enveloppe">
+            {[["all", "Toutes"], ...Object.entries(ACCOUNT_LABELS), ["NONE", "Sans enveloppe"]]
+              .filter(([k]) => k === "all" || accountTotals[k] !== undefined)
+              .map(([k, label]) => {
+                const active = activeFilter === k;
+                const amount = k === "all" ? summary.invested : accountTotals[k];
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setAccountFilter(k)}
+                    className={`shrink-0 rounded-xl border px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
+                      active ? "border-emerald-500 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-white text-slate-700 hover:border-emerald-300"
+                    }`}
+                  >
+                    <span className="block text-xs font-semibold">{label}</span>
+                    <span className="money block text-sm font-bold tabular-nums">
+                      {nf2.format(amount || 0)} {baseSymbol}
+                    </span>
+                  </button>
+                );
+              })}
+          </div>
+        )}
 
         {/* Table */}
         <div className="bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">

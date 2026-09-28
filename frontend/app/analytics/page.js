@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { apiFetch } from "@/lib/api";
+import { useFxRates, toCurrency, ratePer, currencySymbol } from "@/lib/fx";
+import { useBaseCurrency } from "@/lib/profile";
 import AppHeader from "../components/AppHeader";
 import Link from "next/link";
 import { Pie } from "react-chartjs-2";
@@ -69,22 +71,12 @@ export default function Analytics() {
   const [cash, setCash] = useState({ amount: 0, currency: "EUR" });
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("vue");
-  const [usdToEur, setUsdToEur] = useState(0.92); // Taux de change
-
-  // Fetch taux de change USD->EUR
-  useEffect(() => {
-    const fetchExchangeRate = async () => {
-      try {
-        const res = await fetch("https://api.exchangerate-api.com/v4/latest/USD");
-        const data = await res.json();
-        setUsdToEur(data.rates.EUR || 0.92);
-        console.log("💱 Taux USD->EUR:", data.rates.EUR);
-      } catch (err) {
-        console.log("Taux de change par défaut utilisé");
-      }
-    };
-    fetchExchangeRate();
-  }, []);
+  // Taux BCE servis par le backend : toutes les devises sont converties (pas seulement l'USD)
+  const { rates, date: fxDate, stale: fxStale } = useFxRates();
+  // Montants convertis dans la devise de référence du profil (EUR par défaut)
+  const base = useBaseCurrency();
+  const baseSymbol = currencySymbol(base);
+  const inBase = (value, currency) => toCurrency(value, currency, base, rates) ?? ((currency || "EUR") === base ? value : 0);
 
   useEffect(() => {
     const fetchPortfolio = async () => {
@@ -111,36 +103,35 @@ export default function Analytics() {
     return acc;
   }, {});
 
-  // Total CONVERTI en EUR (pour KPI)
-  const totalInEUR = stocks.reduce((sum, s) => {
+  // Total converti dans la devise de référence (pour KPI)
+  const totalInBase = stocks.reduce((sum, s) => {
     const val = (s.close || 0) * (s.quantity || 0);
     if (!s.currency) return sum;
-    const valEUR = s.currency === "USD" ? val * usdToEur : val;
-    return sum + valEUR;
+    return sum + inBase(val, s.currency);
   }, 0);
 
-  // Totaux par secteur EN EUR
+  // Totaux par secteur dans la devise de référence
   const totalsPerSector = stocks.reduce((acc, s) => {
     const val = (s.close || 0) * (s.quantity || 0);
-    const valEUR = s.currency === "USD" ? val * usdToEur : val;
+    const valBase = inBase(val, s.currency);
 
     if (s.composition && typeof s.composition === "object") {
       // ETF avec composition { secteur: %, ... }
       Object.entries(s.composition).forEach(([sect, pct]) => {
-        acc[sect] = (acc[sect] || 0) + (valEUR * pct) / 100;
+        acc[sect] = (acc[sect] || 0) + (valBase * pct) / 100;
       });
     } else {
       const sect = s.sector || "Unknown";
-      acc[sect] = (acc[sect] || 0) + valEUR;
+      acc[sect] = (acc[sect] || 0) + valBase;
     }
     return acc;
   }, {});
 
-  // Ajout du cash comme secteur (converti en EUR si USD)
+  // Ajout du cash comme secteur (converti dans la devise de référence)
   if (!isNaN(cash?.amount) && cash?.currency && Math.abs(cash.amount) > 0) {
     const sectorName = cash.amount < 0 ? "Dette" : "Cash";
-    const cashEUR = cash.currency === "USD" ? Math.abs(cash.amount) * usdToEur : Math.abs(cash.amount);
-    totalsPerSector[sectorName] = (totalsPerSector[sectorName] || 0) + cashEUR;
+    const cashBase = inBase(Math.abs(cash.amount), cash.currency);
+    totalsPerSector[sectorName] = (totalsPerSector[sectorName] || 0) + cashBase;
   }
 
   // Fonction pour obtenir la couleur d'un secteur
@@ -156,7 +147,8 @@ export default function Analytics() {
 
   // Données Pie Devise (par devise ORIGINALE)
   const curLabels = Object.keys(portfolioTotalsByCurrency);
-  const curData = Object.values(portfolioTotalsByCurrency);
+  // Parts comparées dans une même devise (sinon 1 000 ¥ pèseraient autant que 1 000 €)
+  const curData = curLabels.map((c) => inBase(portfolioTotalsByCurrency[c], c));
   const pieDevise = {
     labels: curLabels,
     datasets: [
@@ -184,7 +176,7 @@ export default function Analytics() {
     ],
   };
 
-  const numberFormatter = new Intl.NumberFormat(undefined, {
+  const numberFormatter = new Intl.NumberFormat("fr-FR", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
@@ -271,15 +263,15 @@ export default function Analytics() {
                 </div>
               ) : (
                 <>
-                  {/* Total en EUR (tout converti) */}
+                  {/* Total dans la devise de référence (tout converti) */}
                   <div className="relative p-6 bg-white border border-slate-200 shadow-lg rounded-xl overflow-hidden group hover:shadow-xl transition-all">
                     <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-emerald-100 to-blue-100 rounded-full -mr-12 -mt-12 opacity-40 group-hover:opacity-60 transition-opacity" />
                     <div className="relative">
                       <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
-                        Total (converti EUR)
+                        Total (converti en {base})
                       </p>
                       <p className="text-3xl font-bold text-slate-900">
-                        {numberFormatter.format(totalInEUR)} €
+                        <span className="money">{numberFormatter.format(totalInBase)} {baseSymbol}</span>
                       </p>
                     </div>
                   </div>
@@ -296,12 +288,11 @@ export default function Analytics() {
                           Positions {cur}
                         </p>
                         <p className="text-2xl font-bold text-slate-900">
-                          {numberFormatter.format(tot)}{" "}
-                          {formatCurrencySymbol(cur)}
+                          <span className="money">{numberFormatter.format(tot)} {formatCurrencySymbol(cur)}</span>
                         </p>
-                        {cur === "USD" && (
+                        {cur !== base && (
                           <p className="text-xs text-slate-500 mt-1">
-                            ≈ {numberFormatter.format(tot * usdToEur)} €
+                            ≈ <span className="money">{numberFormatter.format(inBase(tot, cur))} {baseSymbol}</span>
                           </p>
                         )}
                       </div>
@@ -316,12 +307,11 @@ export default function Analytics() {
                           {cash.amount < 0 ? "Dette" : "Cash"}
                         </p>
                         <p className="text-2xl font-bold text-emerald-900">
-                          {numberFormatter.format(Math.abs(cash.amount))}{" "}
-                          {formatCurrencySymbol(cash.currency)}
+                          <span className="money">{numberFormatter.format(Math.abs(cash.amount))} {formatCurrencySymbol(cash.currency)}</span>
                         </p>
-                        {cash.currency === "USD" && (
+                        {cash.currency !== base && (
                           <p className="text-xs text-emerald-700 mt-1">
-                            ≈ {numberFormatter.format(Math.abs(cash.amount) * usdToEur)} €
+                            ≈ <span className="money">{numberFormatter.format(inBase(Math.abs(cash.amount), cash.currency))} {baseSymbol}</span>
                           </p>
                         )}
                       </div>
@@ -332,12 +322,18 @@ export default function Analytics() {
             </div>
 
             {/* Info taux de change */}
-            {portfolioTotalsByCurrency.USD && (
+            {Object.keys(portfolioTotalsByCurrency).some((c) => c !== base) && (
               <div className="mb-6 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700 flex items-center gap-2">
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                 </svg>
-                <span>💱 Taux USD→EUR : <strong>{usdToEur.toFixed(4)}</strong> (mis à jour automatiquement)</span>
+                <span>
+                  Taux de référence BCE{fxDate ? ` du ${new Date(fxDate).toLocaleDateString("fr-FR")}` : ""} :{" "}
+                  {Object.keys(portfolioTotalsByCurrency).filter((c) => c !== base).map((c) => (
+                    <strong key={c} className="mr-2">1 {c} = {ratePer(c, base, rates)?.toFixed(4) ?? "?"} {baseSymbol}</strong>
+                  ))}
+                  {fxStale && "(taux approximatifs, service indisponible)"}
+                </span>
               </div>
             )}
 

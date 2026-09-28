@@ -5,20 +5,32 @@ import { apiFetch } from "@/lib/api";
 import AppHeader from "../../components/AppHeader";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Delta } from "../../components/ui";
+import { periodPerformance } from "@/lib/periodPerf";
+import { fetchFxRates, toEUR } from "@/lib/fx";
 
 export default function PerformancePage() {
   const router = useRouter();
   const [loadError, setLoadError] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [daily, setDaily] = useState([]);
+  const [sincePurchase, setSincePurchase] = useState(null);
 
   // Fetch historique
   useEffect(() => {
     const fetchHistory = async () => {
       setLoading(true);
       try {
-        const data = await apiFetch("/api/user/history").then((d) => (Array.isArray(d) ? d : []));
+        const [data, dailyData] = await Promise.all([
+          apiFetch("/api/user/history").then((d) => (Array.isArray(d) ? d : [])),
+          apiFetch("/api/user/history/daily?days=400")
+            .then((d) => (Array.isArray(d) ? d : []))
+            .catch(() => []),
+        ]);
         setHistory(data);
+        setDaily(dailyData);
+        loadSincePurchase();
       } catch (err) {
         console.error("Erreur fetch history:", err);
         setLoadError(`Impossible de charger l'historique : ${err.message}`);
@@ -26,8 +38,31 @@ export default function PerformancePage() {
         setLoading(false);
       }
     };
+    // « Depuis l'achat » : plus-value latente des positions dont le PRU est renseigné, en euros
+    const loadSincePurchase = async () => {
+      try {
+        const [portfolio, fx] = await Promise.all([apiFetch("/api/user/portfolio"), fetchFxRates()]);
+        let cost = 0;
+        let value = 0;
+        for (const s of portfolio.stocks || []) {
+          const qty = Number(s.quantity) || 0;
+          if (!(s.pru > 0) || !qty) continue;
+          const c = toEUR(s.pru * qty, s.currency, fx.rates);
+          const v = toEUR((s.close || 0) * qty, s.currency, fx.rates);
+          if (c === null || v === null) continue;
+          cost += c;
+          value += v;
+        }
+        setSincePurchase(cost > 0 ? { amount: value - cost, pct: ((value - cost) / cost) * 100 } : null);
+      } catch {
+        setSincePurchase(null);
+      }
+    };
     fetchHistory();
   }, []);
+
+  const periods = useMemo(() => periodPerformance(daily), [daily]);
+  const lastDaily = daily.length ? daily[daily.length - 1] : null;
 
   // Calculs optimisés avec useMemo
   const performanceData = useMemo(() => {
@@ -167,8 +202,11 @@ export default function PerformancePage() {
     return `${value >= 0 ? "+" : ""}${value.toLocaleString("fr-FR", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
-    })}€`;
+    })} €`;
   };
+
+  const formatValue = (value) =>
+    `${Number(value).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 
   const getColorClass = (value) => {
     if (value == null || isNaN(value)) return "text-slate-500";
@@ -220,13 +258,55 @@ export default function PerformancePage() {
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
             </svg>
           </div>
-        ) : !history || history.length < 2 ? (
+        ) : (
+          <>
+          <section aria-labelledby="periods-title" className="mb-6 bg-white border border-slate-200 rounded-xl shadow-lg p-6">
+            <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+              <h2 id="periods-title" className="text-lg font-bold text-slate-900">Performance par période</h2>
+              {lastDaily && (
+                <p className="text-xs text-slate-500">
+                  Valeur au {new Date(`${lastDaily.date}T12:00:00Z`).toLocaleDateString("fr-FR")} :{" "}
+                  <span className="money font-semibold text-slate-700">{formatValue(lastDaily.value)}</span>
+                </p>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+              {periods.map((p) => (
+                <div key={p.key} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{p.label}</p>
+                  <Delta value={p.pct} className="text-lg" />
+                  {p.amount != null && (
+                    <p className={`money text-xs tabular-nums ${getColorClass(p.amount)}`}>{formatAmount(p.amount)}</p>
+                  )}
+                  {p.partial && p.from && (
+                    <p className="mt-1 text-[11px] text-slate-400">
+                      depuis le {new Date(`${p.from}T12:00:00Z`).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}
+                    </p>
+                  )}
+                </div>
+              ))}
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">Depuis l&apos;achat</p>
+                <Delta value={sincePurchase?.pct} className="text-lg" />
+                {sincePurchase && (
+                  <p className={`money text-xs tabular-nums ${getColorClass(sincePurchase.amount)}`}>{formatAmount(sincePurchase.amount)}</p>
+                )}
+              </div>
+            </div>
+            <p className="mt-4 text-xs text-slate-500">
+              {daily.length < 2
+                ? "La valeur de votre portefeuille est enregistrée automatiquement chaque soir : les performances par période s'afficheront dès le deuxième jour."
+                : "Variation de la valeur du portefeuille en euros (taux BCE), achats et ventes de la période inclus. « Depuis l'achat » compare la valeur actuelle à vos prix de revient (PRU)."}
+            </p>
+          </section>
+
+          {!history || history.length < 2 ? (
           <div className="flex flex-col items-center justify-center py-20 text-slate-500">
             <svg className="w-16 h-16 mb-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
-            <p className="text-lg font-medium mb-2">Pas assez de données</p>
-            <p className="text-sm mb-4">Il faut au moins 2 snapshots pour calculer la performance</p>
+            <p className="text-lg font-medium mb-2">Relevé mensuel en cours de constitution</p>
+            <p className="text-sm mb-4 text-center">Les performances mois par mois s&apos;afficheront à partir du deuxième mois enregistré.</p>
             <button
               onClick={() => router.push("/analytics")}
               className="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition"
@@ -251,7 +331,7 @@ export default function PerformancePage() {
                     <p className={`text-3xl font-bold mb-1 ${getColorClass(performanceData.currentMonthPerf.perfPercent)}`}>
                       {formatPercent(performanceData.currentMonthPerf.perfPercent)}
                     </p>
-                    <p className={`text-sm ${getColorClass(performanceData.currentMonthPerf.perfAmount)}`}>
+                    <p className={`money text-sm ${getColorClass(performanceData.currentMonthPerf.perfAmount)}`}>
                       {formatAmount(performanceData.currentMonthPerf.perfAmount)}
                     </p>
                   </>
@@ -273,7 +353,7 @@ export default function PerformancePage() {
                     <p className={`text-3xl font-bold mb-1 ${getColorClass(performanceData.currentYearPerf.perfPercent)}`}>
                       {formatPercent(performanceData.currentYearPerf.perfPercent)}
                     </p>
-                    <p className={`text-sm ${getColorClass(performanceData.currentYearPerf.perfAmount)}`}>
+                    <p className={`money text-sm ${getColorClass(performanceData.currentYearPerf.perfAmount)}`}>
                       {formatAmount(performanceData.currentYearPerf.perfAmount)}
                     </p>
                   </>
@@ -295,7 +375,7 @@ export default function PerformancePage() {
                     <p className={`text-3xl font-bold mb-1 ${getColorClass(performanceData.allTimePerf.perfPercent)}`}>
                       {formatPercent(performanceData.allTimePerf.perfPercent)}
                     </p>
-                    <p className={`text-sm ${getColorClass(performanceData.allTimePerf.perfAmount)}`}>
+                    <p className={`money text-sm ${getColorClass(performanceData.allTimePerf.perfAmount)}`}>
                       {formatAmount(performanceData.allTimePerf.perfAmount)}
                     </p>
                   </>
@@ -331,16 +411,16 @@ export default function PerformancePage() {
                           {getMonthName(item.month)} {item.year}
                         </td>
                         <td className="text-right py-3 px-4 text-sm text-slate-600">
-                          {item.previousValue.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}€
+                          <span className="money">{item.previousValue.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}€</span>
                         </td>
                         <td className="text-right py-3 px-4 text-sm text-slate-600">
-                          {item.value.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}€
+                          <span className="money">{item.value.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}€</span>
                         </td>
                         <td className={`text-right py-3 px-4 text-sm font-bold ${getColorClass(item.perfPercent)}`}>
                           {formatPercent(item.perfPercent)}
                         </td>
                         <td className={`text-right py-3 px-4 text-sm font-medium ${getColorClass(item.perfAmount)}`}>
-                          {formatAmount(item.perfAmount)}
+                          <span className="money">{formatAmount(item.perfAmount)}</span>
                         </td>
                       </tr>
                     ))}
@@ -376,16 +456,16 @@ export default function PerformancePage() {
                           {item.year}
                         </td>
                         <td className="text-right py-3 px-4 text-sm text-slate-600">
-                          {item.startValue.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}€
+                          <span className="money">{item.startValue.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}€</span>
                         </td>
                         <td className="text-right py-3 px-4 text-sm text-slate-600">
-                          {item.endValue.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}€
+                          <span className="money">{item.endValue.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}€</span>
                         </td>
                         <td className={`text-right py-3 px-4 text-lg font-bold ${getColorClass(item.perfPercent)}`}>
                           {formatPercent(item.perfPercent)}
                         </td>
                         <td className={`text-right py-3 px-4 text-sm font-medium ${getColorClass(item.perfAmount)}`}>
-                          {formatAmount(item.perfAmount)}
+                          <span className="money">{formatAmount(item.perfAmount)}</span>
                         </td>
                         <td className="text-center py-3 px-4 text-sm text-slate-600">
                           {item.monthsCount}/12
@@ -406,13 +486,15 @@ export default function PerformancePage() {
                 <div className="text-sm text-blue-900">
                   <p className="font-semibold mb-1">📊 Calcul des performances</p>
                   <p className="text-blue-700">
-                    Les performances sont calculées à partir de vos snapshots mensuels. Pour des données plus précises, 
-                    pensez à sauvegarder un snapshot chaque mois dans l'onglet Analytics.
+                    Les performances mensuelles sont calculées à partir du relevé de chaque mois, mis à jour
+                    automatiquement chaque soir (une valeur saisie à la main reste prioritaire).
                   </p>
                 </div>
               </div>
             </div>
           </div>
+          )}
+          </>
         )}
       </div>
     </main>

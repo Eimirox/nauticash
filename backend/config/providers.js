@@ -135,6 +135,11 @@ module.exports = {
       // Délai entre chaque requête (ms) pour respecter les rate limits
       delayBetweenRequests: parseInt(process.env.CRON_DELAY) || 1000,
     },
+    // Valeur quotidienne des portefeuilles (après la clôture américaine, heure UTC)
+    dailyHistory: {
+      enabled: process.env.CRON_DAILY_HISTORY !== "false",
+      schedule: process.env.CRON_HISTORY_SCHEDULE || "45 21 * * *",
+    },
   },
 
   // Rate limiting (pour éviter de dépasser les quotas)

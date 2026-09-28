@@ -5,6 +5,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const auth = require("../middleware/auth");
 const priceStore = require("../services/priceStore");
+const { validateProfilePatch, readProfile } = require("../services/profile");
 const { resolveCountry } = require("../services/countries");
 
 const router = express.Router();
@@ -54,6 +55,7 @@ function enrich(position, priceInfo) {
       name: position.ticker,
       quantity: position.quantity,
       pru: position.pru,
+      account: position.account || null,
       close: 0,
       currency: "USD",
       performance: 0,
@@ -64,15 +66,25 @@ function enrich(position, priceInfo) {
   }
 
   const close = priceInfo.close || 0;
+  const previousClose = priceInfo.previousClose > 0 ? priceInfo.previousClose : null;
+  // Variation du jour : écart au cours de clôture de la veille (même devise que le prix)
+  const dayChange = previousClose ? close - previousClose : Number.isFinite(priceInfo.change) ? priceInfo.change : null;
+  const dayChangePercent = previousClose ? (dayChange / previousClose) * 100 : priceInfo.changePercent ?? null;
   return {
     ticker: position.ticker,
     name: priceInfo.name || position.ticker,
     quantity: position.quantity,
     pru: position.pru,
+    account: position.account || null,
     close,
     currency: priceInfo.currency || "USD",
     performance: position.pru > 0 ? ((close - position.pru) / position.pru) * 100 : 0,
     total: close * position.quantity,
+    previousClose,
+    dayChange,
+    dayChangePercent,
+    dayChangeValue: dayChange !== null ? dayChange * position.quantity : null,
+    priceTime: priceInfo.marketTime || priceInfo.lastUpdate || null,
     dividend: priceInfo.dividend ?? null,
     dividendYield: priceInfo.dividendYield ?? null,
     myDividendYield: priceInfo.dividend && close > 0 ? (priceInfo.dividend / close) * 100 : null,
@@ -86,6 +98,17 @@ function enrich(position, priceInfo) {
     lastUpdate: priceInfo.lastUpdate,
     source: priceInfo.source,
   };
+}
+
+// Enveloppes fiscales / comptes (champ optionnel de chaque position)
+const ACCOUNTS = ["PEA", "CTO", "AV", "PER", "CRYPTO"];
+
+/** undefined = champ absent ; null = aucune enveloppe ; false = valeur invalide */
+function readAccount(value) {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  const v = String(value).toUpperCase();
+  return ACCOUNTS.includes(v) ? v : false;
 }
 
 // =============================================================================
@@ -118,7 +141,9 @@ router.post("/portfolio", auth, async (req, res) => {
     const ticker = normalizeTicker(req.body.ticker);
     const quantity = req.body.quantity === undefined ? 0 : toNumber(req.body.quantity);
     const pru = req.body.pru === undefined ? 0 : toNumber(req.body.pru);
+    const account = readAccount(req.body.account);
 
+    if (account === false) return res.status(400).json({ error: "Enveloppe invalide." });
     if (!TICKER_RE.test(ticker)) return res.status(400).json({ error: "Ticker invalide." });
     if (!isValidAmount(quantity) || !isValidAmount(pru)) {
       return res.status(400).json({ error: "Quantité ou PRU invalide." });
@@ -138,12 +163,12 @@ router.post("/portfolio", auth, async (req, res) => {
     }
 
     await users().updateOne(userFilter(req), {
-      $push: { portfolio: { _id: new mongoose.Types.ObjectId(), ticker, quantity, pru } },
+      $push: { portfolio: { _id: new mongoose.Types.ObjectId(), ticker, quantity, pru, account: account ?? null } },
     });
 
     res.status(201).json({
       message: "Stock added successfully",
-      stock: enrich({ ticker, quantity, pru }, doc),
+      stock: enrich({ ticker, quantity, pru, account: account ?? null }, doc),
     });
   } catch (err) {
     console.error("❌ Error POST /portfolio:", err);
@@ -152,7 +177,7 @@ router.post("/portfolio", auth, async (req, res) => {
 });
 
 // =============================================================================
-// PATCH /api/user/portfolio/:ticker  { quantity?, pru? }
+// PATCH /api/user/portfolio/:ticker  { quantity?, pru?, account? }
 // =============================================================================
 router.patch("/portfolio/:ticker", auth, async (req, res) => {
   try {
@@ -165,6 +190,9 @@ router.patch("/portfolio/:ticker", auth, async (req, res) => {
       if (!isValidAmount(value)) return res.status(400).json({ error: `${field} invalide.` });
       $set[`portfolio.$.${field}`] = value;
     }
+    const account = readAccount(req.body.account);
+    if (account === false) return res.status(400).json({ error: "Enveloppe invalide." });
+    if (account !== undefined) $set["portfolio.$.account"] = account;
     if (!Object.keys($set).length) return res.status(400).json({ error: "Rien à mettre à jour." });
 
     const result = await users().updateOne({ ...userFilter(req), "portfolio.ticker": ticker }, { $set });
@@ -279,6 +307,39 @@ router.get("/portfolio/stats", auth, async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Error GET /portfolio/stats:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// =============================================================================
+// PROFIL : GET /api/user/profile, PATCH /api/user/profile (mise à jour partielle)
+// =============================================================================
+router.get("/profile", auth, async (req, res) => {
+  try {
+    const user = await users().findOne(userFilter(req), { projection: { email: 1, profile: 1 } });
+    if (!user) return res.status(404).json({ error: "User not found" });
+    res.json({ email: user.email, profile: readProfile(user) });
+  } catch (err) {
+    console.error("❌ Error GET /profile:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.patch("/profile", auth, async (req, res) => {
+  try {
+    const { value, errors } = validateProfilePatch(req.body);
+    if (errors) {
+      return res.status(400).json({ error: errors[0].msg, details: errors });
+    }
+
+    const $set = Object.fromEntries(Object.entries(value).map(([k, v]) => [`profile.${k}`, v]));
+    const result = await users().updateOne(userFilter(req), { $set });
+    if (result.matchedCount === 0) return res.status(404).json({ error: "User not found" });
+
+    const user = await users().findOne(userFilter(req), { projection: { email: 1, profile: 1 } });
+    res.json({ email: user.email, profile: readProfile(user) });
+  } catch (err) {
+    console.error("❌ Error PATCH /profile:", err);
     res.status(500).json({ error: "Server error" });
   }
 });

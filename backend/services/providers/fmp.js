@@ -3,6 +3,8 @@
 
 const config = require("../../config/providers");
 const { trackedFetchJson } = require("../apiUsage");
+const { detectQuoteCurrency, normalizeQuoteUnits } = require("../currency");
+const { annualizeDividends } = require("../dividends");
 
 const DAY = 24 * 60 * 60 * 1000;
 const PROFILE_TTL = 30 * DAY;
@@ -49,47 +51,64 @@ class FMPProvider {
       throw new Error(`No data found for ${ticker}`);
     }
 
-    const quote = this.normalizeQuote(data[0], ticker);
-    if (quote.type === "Crypto") return quote;
-
-    // Profil (nom, secteur, industrie, type ETF) : rarement modifié
-    if (
-      isStale(previous?.profileUpdatedAt, PROFILE_TTL) ||
-      !previous?.sector ||
-      previous.sector === "Unknown" ||
-      !previous?.countryCode // pays du siège jamais récupéré (données antérieures)
-    ) {
-      const profile = await this.getProfile(mappedTicker);
-      if (profile) {
-        quote.name = profile.name || quote.name;
-        quote.sector = profile.sector;
-        quote.industry = profile.industry;
-        if (profile.isEtf || profile.isFund) quote.type = "ETF";
-        if (profile.countryCode) quote.countryCode = profile.countryCode;
-        if (profile.country) quote.country = profile.country;
-        if (!data[0].currency && profile.currency) quote.currency = profile.currency;
-        if (!quote.dividend && profile.lastDividend) quote.dividend = profile.lastDividend;
-        quote.profileUpdatedAt = new Date();
-      }
-    } else if (previous) {
-      quote.name = previous.name || quote.name;
-      quote.sector = previous.sector;
-      quote.industry = previous.industry;
-      quote.type = previous.type || quote.type;
-      if (previous.countryCode) quote.countryCode = previous.countryCode;
-      if (quote.country === "Unknown") quote.country = previous.country || quote.country;
+    const raw = data[0];
+    if (!(Number(raw.price) > 0)) {
+      // Ne jamais enregistrer un prix à 0 : l'ancien prix reste en base
+      throw new Error(`Prix indisponible pour ${ticker}`);
     }
 
-    // Dividendes : un changement par trimestre au plus
-    if (quote.type !== "ETF" && isStale(previous?.dividendsUpdatedAt, DIVIDENDS_TTL)) {
-      const div = await this.getDividends(mappedTicker, quote.price);
-      if (div) {
-        Object.assign(quote, div);
-        quote.dividendsUpdatedAt = new Date();
+    const quote = this.normalizeQuote(raw, ticker);
+    let profileCurrency = null;
+
+    if (quote.type !== "Crypto") {
+      // Profil (nom, secteur, industrie, type ETF, devise) : rarement modifié
+      if (
+        isStale(previous?.profileUpdatedAt, PROFILE_TTL) ||
+        !previous?.sector ||
+        previous.sector === "Unknown" ||
+        !previous?.countryCode || // pays du siège jamais récupéré (données antérieures)
+        !previous?.quoteCurrency // devise de cotation jamais vérifiée (données antérieures)
+      ) {
+        const profile = await this.getProfile(mappedTicker);
+        if (profile) {
+          quote.name = profile.name || quote.name;
+          quote.sector = profile.sector;
+          quote.industry = profile.industry;
+          if (profile.isEtf || profile.isFund) quote.type = "ETF";
+          if (profile.countryCode) quote.countryCode = profile.countryCode;
+          if (profile.country) quote.country = profile.country;
+          profileCurrency = profile.currency;
+          if (!quote.dividend && profile.lastDividend) quote.dividend = profile.lastDividend;
+          quote.profileUpdatedAt = new Date();
+        }
+      } else if (previous) {
+        quote.name = previous.name || quote.name;
+        quote.sector = previous.sector;
+        quote.industry = previous.industry;
+        quote.type = previous.type || quote.type;
+        if (previous.countryCode) quote.countryCode = previous.countryCode;
+        if (quote.country === "Unknown") quote.country = previous.country || quote.country;
+      }
+
+      // Dividendes : un changement par trimestre au plus
+      if (quote.type !== "ETF" && (isStale(previous?.dividendsUpdatedAt, DIVIDENDS_TTL) || !previous?.quoteCurrency)) {
+        const div = await this.getDividends(mappedTicker, quote.price);
+        if (div) {
+          Object.assign(quote, div);
+          quote.dividendsUpdatedAt = new Date();
+        }
       }
     }
 
-    return quote;
+    // Devise de cotation (l'endpoint /stable/quote ne la renvoie pas) puis conversion
+    // des sous-unités (pence → livres) : tous les prix enregistrés sont en devise principale.
+    const rawCurrency = detectQuoteCurrency({
+      ticker,
+      apiCurrency: raw.currency || profileCurrency,
+      knownCurrency: previous?.quoteCurrency,
+      exchange: raw.exchange || raw.exchangeShortName,
+    });
+    return normalizeQuoteUnits(quote, rawCurrency);
   }
 
   /**
@@ -105,18 +124,15 @@ class FMPProvider {
         return { dividend: null, dividendYield: null, exDividendDate: null, paymentDate: null, recordDate: null };
       }
 
-      const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
-      const lastYear = data.filter((d) => new Date(d.date).getTime() >= oneYearAgo);
-      const annual = lastYear.reduce((sum, d) => sum + (Number(d.adjDividend ?? d.dividend) || 0), 0);
-      const latest = data[0];
+      const { annual, latest } = annualizeDividends(data);
 
       return {
-        dividend: annual > 0 ? annual : null,
-        dividendRate: annual > 0 ? annual : null,
-        dividendYield: annual > 0 && price > 0 ? (annual / price) * 100 : null,
-        exDividendDate: latest.date || null,
-        paymentDate: latest.paymentDate || null,
-        recordDate: latest.recordDate || null,
+        dividend: annual,
+        dividendRate: annual,
+        dividendYield: annual && price > 0 ? (annual / price) * 100 : null,
+        exDividendDate: latest?.date || null,
+        paymentDate: latest?.paymentDate || null,
+        recordDate: latest?.recordDate || null,
       };
     } catch (error) {
       if (error.code === "QUOTA_EXCEEDED") throw error;
@@ -169,7 +185,14 @@ class FMPProvider {
       }
 
       // Normaliser tous les quotes
-      return data.map((quote) => this.normalizeQuote(quote, quote.symbol));
+      return data
+        .filter((raw) => Number(raw.price) > 0)
+        .map((raw) =>
+          normalizeQuoteUnits(
+            this.normalizeQuote(raw, raw.symbol),
+            detectQuoteCurrency({ ticker: raw.symbol, apiCurrency: raw.currency, exchange: raw.exchange })
+          )
+        );
     } catch (error) {
       console.error(`❌ FMP getBatchQuotes error:`, error.message);
       throw error;
@@ -183,8 +206,8 @@ class FMPProvider {
     return {
       symbol: originalTicker,
       name: fmpData.name || originalTicker,
-      price: fmpData.price || 0,
-      close: fmpData.price || 0,
+      price: Number(fmpData.price) || 0,
+      close: Number(fmpData.price) || 0,
       open: fmpData.open || null,
       high: fmpData.dayHigh || null,
       low: fmpData.dayLow || null,
@@ -193,7 +216,8 @@ class FMPProvider {
       change: fmpData.change || null,
       changePercent: fmpData.changePercentage ?? fmpData.changesPercentage ?? null,
       marketCap: fmpData.marketCap || null,
-      currency: this.detectCurrency(fmpData, originalTicker),
+      currency: fmpData.currency || null, // devise définitive fixée dans getQuote
+      marketTime: Number(fmpData.timestamp) > 0 ? new Date(Number(fmpData.timestamp) * 1000) : null,
       exchange: fmpData.exchange || fmpData.exchangeShortName || "Unknown",
       country: this.detectCountry(fmpData),
       sector: null, // Sera enrichi par getProfile
@@ -208,47 +232,6 @@ class FMPProvider {
       lastUpdate: new Date(),
       source: "fmp",
     };
-  }
-
-  /**
-   * Détecte la devise d'un ticker
-   */
-  detectCurrency(fmpData, ticker) {
-    // Utilise la devise renvoyée par FMP si disponible
-    if (fmpData.currency) {
-      return fmpData.currency;
-    }
-
-    // Sinon, devine selon l'exchange
-    const exchange = (fmpData.exchange || fmpData.exchangeShortName || "").toUpperCase();
-
-    if (exchange.includes("NASDAQ") || exchange.includes("NYSE") || exchange.includes("AMEX")) {
-      return "USD";
-    }
-
-    if (exchange.includes("PA") || exchange === "EURONEXT") {
-      return "EUR";
-    }
-
-    if (exchange.includes("AS") || exchange === "AMS") {
-      return "EUR";
-    }
-
-    if (exchange.includes("LON") || exchange === "LSE") {
-      return "GBP";
-    }
-
-    // Crypto
-    if (ticker.includes("USD") || ticker.includes("USDT")) {
-      return "USD";
-    }
-
-    if (ticker.includes("EUR")) {
-      return "EUR";
-    }
-
-    // Par défaut
-    return "USD";
   }
 
   /**

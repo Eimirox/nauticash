@@ -12,7 +12,7 @@ Comparatif des sources gratuites utilisables par Nauticash et stratégie retenue
 | **Alpha Vantage** | ~25 appels/jour, ~5/min | Actions européennes, historique mensuel ajusté (dividendes) | Quota très faible | Secours et enrichissement des dividendes (`services/providers/alphavantage.js`) |
 | **Finnhub** | ~60 appels/min | Cours US temps réel, profil, dividendes, actualités | International surtout payant | Candidat : fallback US optionnel (clé `FINNHUB_API_KEY`) |
 | **Twelve Data** | ~800 appels/jour, ~8/min | Bonne API, crypto, forex | Europe et ETF plutôt payants | Configuré mais non branché (`config/providers.js`) |
-| **Frankfurter** | Gratuit, sans clé | Taux de change de référence BCE, simple et fiable | Taux quotidiens uniquement | Candidat pour les conversions de devises (remplacerait l'appel navigateur à exchangerate-api) |
+| **Frankfurter** | Gratuit, sans clé | Taux de change de référence BCE, simple et fiable | Taux quotidiens uniquement | **Utilisé** : `GET /api/fx` (`services/fx.js`), cache 6 h, base EUR |
 | **Yahoo Finance (non officiel)** | Pas d'offre officielle | Couverture mondiale très large | Non documenté, peut casser ou bloquer sans préavis | Dernier recours uniquement, à éviter en production |
 
 ## Stratégie actuelle
@@ -23,9 +23,19 @@ Comparatif des sources gratuites utilisables par Nauticash et stratégie retenue
 4. **Quotas** comptés par appel HTTP réel (`services/apiUsage.js`), surchargeables par `FMP_DAILY_LIMIT` / `ALPHAVANTAGE_DAILY_LIMIT`.
 5. **Fallback** : ordre de `ACTIVE_PROVIDERS`, avec enrichissement des dividendes par Alpha Vantage si FMP n'a rien trouvé.
 
+## Cohérence des données (vérifiée le 27/09/2026)
+
+- `/stable/quote` ne renvoie pas la devise : elle vient du profil FMP, sinon du suffixe du ticker (`.DE` → EUR, `.SW` → CHF, `.L` → GBp…), sinon de la place de cotation (`services/currency.js`).
+- Les cotations en sous-unités (GBp/GBX de Londres, ZAc, ILA) sont converties en devise principale avant l'enregistrement : la base ne contient que des GBP, ZAR, ILS.
+- Dividende annuel = somme des N derniers versements, N = fréquence annuelle (`services/dividends.js`), et non « tout ce qui tombe dans 365 jours ».
+- Un prix nul n'est jamais enregistré ; l'heure de cotation FMP est conservée (`marketTime`).
+
+## Historique quotidien (depuis le 28/09/2026)
+
+Chaque soir à 21:45 UTC (`CRON_HISTORY_SCHEDULE`, désactivable avec `CRON_DAILY_HISTORY=false`), `jobs/dailySnapshot.js` enregistre pour chaque utilisateur la valeur du portefeuille en euros (cours en cache × quantités + cash, taux BCE du jour) dans la collection `history_daily` (`{ userId, date: "AAAA-MM-JJ", value, invested, cash, missing }`). Aucun appel aux API de cotation : seuls les cours déjà en base sont utilisés. Le relevé mensuel (`history`) est tenu à jour automatiquement (`auto: true`), sauf si l'utilisateur a saisi une valeur à la main pour ce mois. Lecture : `GET /api/user/history/daily?days=365`.
+
 ## Pistes (voir `docs/AMELIORATIONS.md`)
 
 - Route admin qui mesure, pour les tickers réellement détenus, quel provider les couvre (résultats à reporter ici).
 - Finnhub en fallback US, désactivé sans clé.
-- Taux de change servis par le backend via Frankfurter, avec cache.
 - Fallback par région : suffixes `.PA`, `.AS`, `.DE`, `.L` → provider adapté à l'Europe.

@@ -282,6 +282,7 @@ router.delete(
       const db = mongoose.connection;
       const id = user._id;
       await db.collection("history").deleteMany({ userId: String(id) });
+      await db.collection("history_daily").deleteMany({ userId: String(id) });
       await db.collection("transactions").deleteMany({ userId: id });
       await db.collection("users").deleteOne({ _id: id });
 

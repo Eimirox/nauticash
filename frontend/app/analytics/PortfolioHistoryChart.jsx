@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { apiFetch } from "@/lib/api";
+import { useFxRates, toEUR, fetchFxRates } from "@/lib/fx";
 import { useToast } from "../components/ui";
 import {
   BarChart,
@@ -39,7 +40,6 @@ export default function PortfolioHistoryChart() {
   const [lastSnapshot, setLastSnapshot] = useState(null);
   const [showManualEdit, setShowManualEdit] = useState(false);
   const [manualForm, setManualForm] = useState({ date: "", value: "" });
-  const [usdToEur, setUsdToEur] = useState(0.92);
 
   const yearColors = {
     2023: "#6B7280",
@@ -63,19 +63,8 @@ export default function PortfolioHistoryChart() {
     return MONTH_MAP[month] || null;
   };
 
-  // Fetch taux de change
-  useEffect(() => {
-    const fetchExchangeRate = async () => {
-      try {
-        const res = await fetch("https://api.exchangerate-api.com/v4/latest/USD");
-        const data = await res.json();
-        setUsdToEur(data.rates.EUR || 0.92);
-      } catch (err) {
-        console.log("Taux de change par défaut utilisé");
-      }
-    };
-    fetchExchangeRate();
-  }, []);
+  // Taux BCE servis par le backend (toutes devises)
+  const { stale: fxStale } = useFxRates();
 
   useEffect(() => {
     fetchHistory();
@@ -149,25 +138,27 @@ export default function PortfolioHistoryChart() {
   const saveSnapshot = async () => {
     try {
       setLoading(true);
-      const portfolioData = await apiFetch("/api/user/portfolio");
+      const [portfolioData, fxData] = await Promise.all([apiFetch("/api/user/portfolio"), fetchFxRates()]);
+
+      // Conversion stricte : une devise inconnue ferait enregistrer une valeur fausse
+      const unknown = new Set();
+      const inEUR = (value, currency) => {
+        const v = toEUR(value, currency || "EUR", fxData.rates);
+        if (v === null) unknown.add(currency);
+        return v ?? 0;
+      };
 
       let totalValueEUR = 0;
 
       (portfolioData.stocks || []).forEach((stock) => {
         const value = (stock.close || 0) * (stock.quantity || 0);
-        if (stock.currency === "USD") {
-          totalValueEUR += value * usdToEur;
-        } else {
-          totalValueEUR += value;
-        }
+        totalValueEUR += inEUR(value, stock.currency);
       });
 
       const cashValue = portfolioData.cash?.amount || 0;
-      if (portfolioData.cash?.currency === "USD") {
-        totalValueEUR += cashValue * usdToEur;
-      } else {
-        totalValueEUR += cashValue;
-      }
+      totalValueEUR += inEUR(cashValue, portfolioData.cash?.currency);
+
+      if (unknown.size) throw new Error(`taux de change indisponible pour ${[...unknown].join(", ")}`);
 
       const now = new Date();
       const year = now.getFullYear();
@@ -367,7 +358,7 @@ export default function PortfolioHistoryChart() {
 
       {/* Info taux */}
       <div className="mb-4 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700">
-        💱 Taux USD→EUR : {usdToEur.toFixed(4)}
+        Taux de change BCE (toutes devises){fxStale ? " : approximatifs, service indisponible" : ""}
       </div>
 
       {/* Édition manuelle */}
@@ -534,7 +525,7 @@ export default function PortfolioHistoryChart() {
             <p className="font-semibold mb-1">💡 Snapshot mensuel</p>
             <p className="text-blue-700">
               Le "Snapshot auto" calcule la valeur totale (stocks + cash) et
-              convertit USD→EUR automatiquement.
+              convertit toutes les devises en euros (taux de référence BCE).
             </p>
           </div>
         </div>

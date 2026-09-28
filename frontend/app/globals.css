@@ -513,3 +513,31 @@ select:focus-visible {
     outline-offset: 2px;
   }
 }
+/* Mode discret (bouton œil de l'en-tête) : les montants marqués .money sont remplacés
+   par « •••• » ; les pourcentages restent visibles. Champs de saisie floutés hors édition. */
+.discreet .money:not(input) {
+  position: relative;
+  min-width: 2.8em;
+  color: transparent !important;
+  user-select: none;
+}
+.discreet .money:not(input)::after {
+  content: "••••";
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-align: inherit;
+  letter-spacing: 0.1em;
+  color: rgb(100 116 139);
+}
+.discreet span.money {
+  display: inline-block;
+}
+.discreet .money:not(input) .money::after {
+  content: none;
+}
+.discreet input.money:not(:focus) {
+  color: transparent;
+  text-shadow: 0 0 8px rgb(100 116 139);
+}

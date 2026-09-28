@@ -1,6 +1,7 @@
 const express = require("express");
 const auth = require("../middleware/auth");
 const mongoose = require("mongoose");
+const dailyHistory = require("../services/dailyHistory");
 
 const router = express.Router();
 
@@ -31,13 +32,25 @@ router.post("/history", auth, async (req, res) => {
 
     await history().updateOne(
       { userId: req.user.userId, year, month },
-      { $set: { value } },
+      { $set: { value, auto: false } },
       { upsert: true }
     );
 
     res.status(201).json({ message: "Historique mis à jour" });
   } catch (err) {
     console.error("Erreur POST /history:", err.message);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+// --- GET /api/user/history/daily?days=365 ---
+// Valeur quotidienne (en euros) enregistrée automatiquement chaque soir
+router.get("/history/daily", auth, async (req, res) => {
+  try {
+    const days = Math.min(Math.max(parseInt(req.query.days, 10) || 365, 1), 3660);
+    res.json(await dailyHistory.getDaily(req.user.userId, { days }));
+  } catch (err) {
+    console.error("Erreur GET /history/daily:", err.message);
     res.status(500).json({ error: "Erreur serveur" });
   }
 });

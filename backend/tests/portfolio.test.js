@@ -308,3 +308,37 @@ describe("PATCH /api/user/cash", () => {
     assert.deepEqual((await getPortfolio(user.token)).cash, { amount: 50, currency: "CHF" });
   });
 });
+
+describe("Enveloppes (PEA, CTO, assurance-vie…)", () => {
+  test("enveloppe facultative à l'ajout, renvoyée par GET", async () => {
+    const { token } = await h.registerUser();
+    assert.equal((await addStock(token, { ticker: "AAPL", quantity: 1, account: "pea" })).status, 201);
+    const [stock] = (await getPortfolio(token)).stocks;
+    assert.equal(stock.account, "PEA", "normalisée en majuscules");
+  });
+
+  test("sans enveloppe : account vaut null", async () => {
+    const { token } = await h.registerUser();
+    const res = await addStock(token, { ticker: "AAPL", quantity: 1 });
+    assert.equal(res.body.stock.account, null);
+  });
+
+  test("refuse une enveloppe inconnue", async () => {
+    const { token } = await h.registerUser();
+    const res = await addStock(token, { ticker: "AAPL", quantity: 1, account: "LIVRET" });
+    assert.equal(res.status, 400);
+    assert.equal((await getPortfolio(token)).stocks.length, 0);
+  });
+
+  test("PATCH change puis retire l'enveloppe", async () => {
+    const { token } = await h.registerUser();
+    await addStock(token, { ticker: "AAPL", quantity: 1 });
+    const patch = (body) => h.request("PATCH", "/api/user/portfolio/AAPL", { token, body });
+
+    assert.equal((await patch({ account: "CTO" })).status, 200);
+    assert.equal((await getPortfolio(token)).stocks[0].account, "CTO");
+    assert.equal((await patch({ account: "Compte épargne" })).status, 400);
+    assert.equal((await patch({ account: "" })).status, 200);
+    assert.equal((await getPortfolio(token)).stocks[0].account, null);
+  });
+});

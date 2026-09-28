@@ -26,6 +26,7 @@ const transactionRoutes = require("./routes/transactions");
 // Services
 const priceService = require("./services/priceService");
 const priceUpdater = require("./jobs/updatePrices");
+const dailySnapshot = require("./jobs/dailySnapshot");
 
 const app = express();
 
@@ -65,6 +66,19 @@ app.use("/api/user", userRoutes);
 app.use("/api/user", historyRoutes);
 app.use("/api/transactions", transactionRoutes);
 
+// Taux de change (public, mis en cache côté serveur) : base EUR
+const fx = require("./services/fx");
+app.get("/api/fx", async (req, res) => {
+  try {
+    const data = await fx.getRates();
+    res.set("Cache-Control", "public, max-age=3600");
+    res.json(data);
+  } catch (err) {
+    console.error("❌ Error GET /api/fx:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 // Health check
 app.get("/health", (req, res) => {
   res.json({
@@ -86,10 +100,12 @@ app.get("/api/admin/stats", async (req, res) => {
   try {
     const stats = priceService.getUsageStats();
     const cronStats = priceUpdater.getStats();
+    const historyStats = dailySnapshot.getStats();
 
     res.json({
       apiUsage: stats,
       cronJob: cronStats,
+      dailyHistory: historyStats,
       timestamp: new Date(),
     });
   } catch (error) {
@@ -225,6 +241,9 @@ const startServer = async () => {
       console.log("⏸️ Cron job disabled");
     }
 
+    // 4 bis. Historique quotidien des portefeuilles
+    dailySnapshot.start();
+
     // 5. Démarrer le serveur Express
     app.listen(PORT, () => {
       console.log("\n" + "=".repeat(60));
@@ -250,6 +269,7 @@ const startServer = async () => {
       console.log("   GET    /api/user/portfolio/stats");
       console.log("   GET    /api/user/history");
       console.log("   POST   /api/user/history");
+      console.log("   GET    /api/user/history/daily");
       console.log("   GET    /api/admin/stats");
       console.log("   GET    /api/admin/health");
       console.log("   POST   /api/admin/update-prices");

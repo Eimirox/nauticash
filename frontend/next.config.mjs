@@ -19,7 +19,7 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
-  `connect-src 'self' ${apiOrigin} https://api.exchangerate-api.com${isDev ? " ws: http://localhost:*" : ""}`,
+  `connect-src 'self' ${apiOrigin}${isDev ? " ws: http://localhost:*" : ""}`,
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -42,6 +42,10 @@ const securityHeaders = [
 
 const nextConfig = {
   poweredByHeader: false,
+  // Ancienne adresse de la page « Mon compte »
+  async redirects() {
+    return [{ source: "/compte", destination: "/profil", permanent: true }];
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

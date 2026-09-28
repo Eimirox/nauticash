@@ -3,6 +3,7 @@
 
 const config = require("../config/providers");
 const apiUsage = require("./apiUsage");
+const { detectQuoteCurrency, normalizeQuoteUnits, toMajorUnit } = require("./currency");
 const FMPProvider = require("./providers/fmp");
 const AlphaVantageProvider = require("./providers/alphavantage");
 // À ajouter plus tard :
@@ -116,6 +117,17 @@ class PriceService {
     if (!quote) {
       throw new Error(`No provider available for ${ticker}`);
     }
+    if (!(Number(quote.price || quote.close) > 0)) {
+      throw new Error(`Prix indisponible pour ${ticker}`);
+    }
+
+    // Providers qui ne convertissent pas eux-mêmes les sous-unités (pence → livres)
+    if (quote.quoteCurrency === undefined) {
+      quote = normalizeQuoteUnits(
+        quote,
+        detectQuoteCurrency({ ticker, apiCurrency: quote.currency, knownCurrency: previous?.quoteCurrency, exchange: quote.exchange })
+      );
+    }
 
     // 4. ENRICHISSEMENT : FMP n'a pas pu vérifier les dividendes d'une action
     //    → on tente Alpha Vantage, sauf si on a déjà une donnée de moins de 7 jours.
@@ -135,7 +147,10 @@ class PriceService {
       try {
         const dividendInfo = await this.providers.alphavantage.getDividends(ticker);
         if (dividendInfo && dividendInfo.annualDividend) {
-          quote.dividend = dividendInfo.annualDividend;
+          // Alpha Vantage donne le dividende dans la devise de cotation (pence pour Londres)
+          const { factor } = toMajorUnit(quote.quoteCurrency);
+          quote.dividend = dividendInfo.annualDividend / factor;
+          quote.dividendRate = quote.dividend;
           quote.dividendYield = dividendInfo.dividendYield;
           quote.exDividendDate = dividendInfo.exDividendDate;
           quote.dividendsUpdatedAt = new Date();
