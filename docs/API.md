@@ -49,6 +49,23 @@ Yahoo est ajouté automatiquement en dernier recours (`YAHOO_ENABLED=false` pour
 
 **Autocomplétion** : `GET /api/market/search?q=` fusionne une liste locale de titres courants (`services/popularTickers.js`, instantanée, sans appel) et la recherche Yahoo mise en cache 7 jours par requête ; indices exclus ; 60 recherches/min/IP.
 
+## Mesure de la couverture (route admin, depuis le 28/09/2026)
+
+`GET /api/admin/coverage` (compte listé dans `ADMIN_EMAILS`) teste, pour chaque ticker réellement détenu (les plus détenus d'abord), si chaque provider actif renvoie un cours. Lecture seule : rien n'est enregistré.
+
+- Paramètres : `limit` (1 à 200 tickers, 50 par défaut) et `providers` (ex. `fmp,yahoo` ; par défaut tous les providers actifs).
+- Coût : **1 appel par provider et par ticker** (FMP `quote`, Alpha Vantage `GLOBAL_QUOTE`, Yahoo `chart` léger), compté dans les quotas ; un provider dont le quota est atteint n'est plus appelé (statut `quota`). Avec 50 tickers, compter 50 appels FMP sur 250/jour : à lancer hors du créneau de 21:15 UTC, ou avec `providers=yahoo`.
+- Statuts par ticker : `ok` (cours reçu), `not_covered` (402 FMP, 404 ou aucune donnée), `unsupported` (type non géré, ex. crypto chez Alpha Vantage), `quota`, `error`.
+- Réponse : `summary.<provider>` (compteurs + `coverage` en % = ok / (ok + not_covered)), `uncovered` (tickers qu'aucun provider ne cote), `tickers[]` (détenteurs, source actuelle en base, résultat par provider).
+
+### Résultats en production
+
+À remplir après un appel en production (l'environnement de test n'a ni la base réelle ni les clés API) :
+
+| Date | Tickers testés | FMP | Yahoo | Alpha Vantage | Non couverts |
+|---|---|---|---|---|---|
+| _à mesurer_ | | | | | |
+
 ## Rythme d'actualisation (28/09/2026)
 
 | Quand | Job | Source | Coût |
@@ -64,6 +81,6 @@ Yahoo est ajouté automatiquement en dernier recours (`YAHOO_ENABLED=false` pour
 
 ## Pistes (voir `docs/AMELIORATIONS.md`)
 
-- Route admin qui mesure, pour les tickers réellement détenus, quel provider les couvre (résultats à reporter ici).
+- Reporter ci-dessus les résultats de `GET /api/admin/coverage` en production.
 - Finnhub en fallback US, désactivé sans clé.
 - Fallback par région : suffixes `.PA`, `.AS`, `.DE`, `.L` → provider adapté à l'Europe.

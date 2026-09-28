@@ -29,6 +29,7 @@ const priceService = require("./services/priceService");
 const priceUpdater = require("./jobs/updatePrices");
 const dailySnapshot = require("./jobs/dailySnapshot");
 const livePrices = require("./jobs/livePrices");
+const coverage = require("./services/coverage");
 
 const app = express();
 
@@ -124,6 +125,16 @@ app.get("/api/admin/health", async (req, res) => {
     res.json(health);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Couverture des tickers détenus par chaque provider (lecture seule, ~1 appel par provider et par ticker)
+// ?limit=50 (1 à 200 tickers, les plus détenus d'abord) & ?providers=fmp,yahoo
+app.get("/api/admin/coverage", async (req, res) => {
+  try {
+    res.json(await coverage.measureCoverage({ limit: req.query.limit, providers: req.query.providers }));
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message });
   }
 });
 
@@ -278,6 +289,7 @@ const startServer = async () => {
       console.log("   GET    /api/market/benchmarks/:key");
       console.log("   GET    /api/admin/stats");
       console.log("   GET    /api/admin/health");
+      console.log("   GET    /api/admin/coverage");
       console.log("   POST   /api/admin/update-prices");
       console.log("");
 
