@@ -309,7 +309,7 @@ export default function PortfolioHistoryChart() {
           <button
             onClick={saveSnapshot}
             disabled={loading}
-            className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-blue-600 text-white text-sm font-semibold rounded-lg hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-2"
+            className="px-4 py-2 bg-gradient-to-r from-emerald-700 to-blue-600 text-white text-sm font-semibold rounded-lg hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-2"
           >
             {loading ? (
               <>

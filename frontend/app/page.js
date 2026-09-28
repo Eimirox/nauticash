@@ -90,7 +90,7 @@ export default function Home() {
     : { href: "/register", label: "Créer mon compte gratuit" };
 
   const btnPrimary =
-    "inline-flex min-h-12 items-center justify-center rounded-xl bg-gradient-to-r from-emerald-500 to-blue-500 px-6 text-base font-semibold text-white shadow-lg shadow-emerald-500/20 transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0B1B2B]";
+    "inline-flex min-h-12 items-center justify-center rounded-xl bg-gradient-to-r from-emerald-700 to-blue-600 px-6 text-base font-semibold text-white shadow-lg shadow-emerald-500/20 transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0B1B2B]";
 
   return (
     <main className="flex min-h-screen flex-col bg-bg text-ink">
@@ -120,6 +120,7 @@ export default function Home() {
             )}
           </nav>
         </header>
+        <div id="contenu" tabIndex={-1} className="outline-none" />
 
         <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 pb-20 pt-12 sm:px-6 lg:grid-cols-2 lg:px-8 lg:pb-28 lg:pt-20">
           <div>

@@ -5,7 +5,7 @@ import DepthLines from "./DepthLines";
 // Mise en page commune aux pages 404 et erreur
 export default function StatusPage({ code, title, message, children }) {
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-bg px-4 text-ink">
+    <main id="contenu" tabIndex={-1} className="relative flex min-h-screen items-center justify-center overflow-hidden bg-bg px-4 text-ink">
       <DepthLines className="pointer-events-none absolute inset-0 h-full w-full text-accent-2" />
       <div className="relative w-full max-w-md text-center">
         <Compass className="mx-auto mb-6 h-24 w-24 text-ink-muted" spin />

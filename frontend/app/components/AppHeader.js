@@ -59,6 +59,7 @@ export default function AppHeader({ actions }) {
   });
 
   return (
+    <>
     <header className="sticky top-0 z-50 border-b border-line bg-surface/90 backdrop-blur-xl">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between gap-4">
@@ -162,5 +163,8 @@ export default function AppHeader({ actions }) {
         </nav>
       </div>
     </header>
+    {/* Cible du lien d'évitement « Aller au contenu » (app/layout.js) */}
+    <div id="contenu" tabIndex={-1} className="scroll-mt-28 outline-none" />
+    </>
   );
 }

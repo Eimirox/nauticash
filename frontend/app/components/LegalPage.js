@@ -15,6 +15,7 @@ export default function LegalPage({ title, updated, children }) {
           <Link href="/" className="text-sm text-ink-muted hover:text-ink">← Accueil</Link>
         </div>
       </header>
+      <div id="contenu" tabIndex={-1} className="outline-none" />
 
       <article className="max-w-3xl mx-auto px-4 py-10 text-ink leading-relaxed
         [&_h2]:text-xl [&_h2]:font-bold [&_h2]:text-ink [&_h2]:mt-10 [&_h2]:mb-3

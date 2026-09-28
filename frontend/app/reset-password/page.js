@@ -99,7 +99,7 @@ function ResetPasswordForm() {
       {error && <div className="bg-loss/10 border border-loss/30 rounded-lg p-3 text-sm text-loss">{error}</div>}
 
       <button type="submit" disabled={loading}
-        className="w-full py-3 px-4 bg-gradient-to-r from-emerald-600 to-blue-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100">
+        className="w-full py-3 px-4 bg-gradient-to-r from-emerald-700 to-blue-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100">
         {loading ? "Enregistrement..." : "Changer le mot de passe"}
       </button>
     </form>
@@ -108,7 +108,7 @@ function ResetPasswordForm() {
 
 export default function ResetPassword() {
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50 dark:from-bg dark:via-bg dark:to-surface flex items-center justify-center p-4">
+    <main id="contenu" tabIndex={-1} className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50 dark:from-bg dark:via-bg dark:to-surface flex items-center justify-center p-4">
       <div className="relative w-full max-w-md">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-3 group mb-2">

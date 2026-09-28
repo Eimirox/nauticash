@@ -53,6 +53,9 @@ export default function RootLayout({ children }) {
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <a href="#contenu" className="skip-link">
+          Aller au contenu
+        </a>
         <ToastProvider>{children}</ToastProvider>
       </body>
     </html>

@@ -65,7 +65,7 @@
   --border: 221 227 225;
   --text: 11 27 43;           /* #0B1B2B */
   --text-muted: 81 96 110;
-  --accent: 5 150 105;        /* emerald-600 lagon */
+  --accent: 4 120 87;         /* emerald-700 lagon (AA : 5,2:1 sur le fond, 5,5:1 texte blanc) */
   --accent-2: 37 99 235;      /* blue-600 */
   --gain: 21 128 61;
   --loss: 185 28 28;
@@ -369,14 +369,36 @@ body {
 /* ================================
    FOCUS STYLES
    ================================ */
+/* Focus toujours visible (DESIGN.md) : anneau 2 px couleur --accent, décalé de 2 px */
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
-select:focus-visible {
-  outline: 2px solid var(--primary);
+select:focus-visible,
+summary:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:not([tabindex="-1"]):focus-visible {
+  outline: 2px solid rgb(var(--accent));
   outline-offset: 2px;
-  border-radius: var(--radius-md);
+}
+
+/* Lien d'évitement « Aller au contenu » : invisible jusqu'au premier Tab */
+.skip-link {
+  position: fixed;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 100;
+  padding: 0.5rem 1rem;
+  border-radius: 0.75rem;
+  background: rgb(var(--surface));
+  color: rgb(var(--text));
+  border: 1px solid rgb(var(--border));
+  font-weight: 600;
+  font-size: 0.875rem;
+  transform: translateY(-200%);
+}
+.skip-link:focus {
+  transform: none;
 }
 
 /* ================================
@@ -529,7 +551,7 @@ select:focus-visible {
   white-space: nowrap;
   text-align: inherit;
   letter-spacing: 0.1em;
-  color: rgb(100 116 139);
+  color: rgb(var(--text-muted));
 }
 .discreet span.money {
   display: inline-block;
@@ -539,7 +561,7 @@ select:focus-visible {
 }
 .discreet input.money:not(:focus) {
   color: transparent;
-  text-shadow: 0 0 8px rgb(100 116 139);
+  text-shadow: 0 0 8px rgb(var(--text-muted));
 }
 
 /* Mode sombre : champs de saisie lisibles sur toutes les pages (fond de surface, texte clair) */

@@ -73,7 +73,7 @@ export default function Register() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50 dark:from-bg dark:via-bg dark:to-surface flex items-center justify-center p-4 py-12">
+    <main id="contenu" tabIndex={-1} className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50 dark:from-bg dark:via-bg dark:to-surface flex items-center justify-center p-4 py-12">
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-[0.03]">
         <div
@@ -367,7 +367,7 @@ export default function Register() {
               disabled={!canSubmit}
               className={`w-full py-3 px-4 text-white font-semibold rounded-lg shadow-lg transition-all ${
                 canSubmit
-                  ? "bg-gradient-to-r from-emerald-600 to-blue-600 hover:shadow-xl hover:scale-[1.02]"
+                  ? "bg-gradient-to-r from-emerald-700 to-blue-600 hover:shadow-xl hover:scale-[1.02]"
                   : "bg-line text-ink-muted cursor-not-allowed"
               }`}
             >
