@@ -36,17 +36,39 @@ export function useFxRates() {
   return state;
 }
 
-/** Montant converti en euros ; null si la devise est inconnue ou les taux absents */
-export function toEUR(amount, currency, rates) {
+/**
+ * Montant converti d'une devise à une autre via l'euro (taux BCE, base EUR) ;
+ * null si l'une des devises est inconnue ou si les taux ne sont pas chargés.
+ */
+export function toCurrency(amount, from, to = "EUR", rates) {
   const n = Number(amount);
   if (!Number.isFinite(n)) return null;
-  if (!currency || currency === "EUR") return n;
-  const rate = Number(rates?.[currency]);
-  return rate > 0 ? n / rate : null;
+  const src = from || "EUR";
+  const dst = to || "EUR";
+  if (src === dst) return n;
+  const rateFrom = src === "EUR" ? 1 : Number(rates?.[src]);
+  const rateTo = dst === "EUR" ? 1 : Number(rates?.[dst]);
+  return rateFrom > 0 && rateTo > 0 ? (n / rateFrom) * rateTo : null;
+}
+
+/** Montant converti en euros ; null si la devise est inconnue ou les taux absents */
+export function toEUR(amount, currency, rates) {
+  return toCurrency(amount, currency, "EUR", rates);
+}
+
+/** Taux « 1 <devise> = x <devise de référence> » pour l'affichage */
+export function ratePer(currency, base = "EUR", rates) {
+  return toCurrency(1, currency, base, rates);
 }
 
 /** Taux « 1 <devise> = x € » pour l'affichage */
 export function eurPer(currency, rates) {
-  const rate = Number(rates?.[currency]);
-  return rate > 0 ? 1 / rate : null;
+  return ratePer(currency, "EUR", rates);
+}
+
+const SYMBOLS = { EUR: "€", USD: "$", GBP: "£", CHF: "CHF", JPY: "¥" };
+
+/** Symbole court d'une devise (code ISO sinon) */
+export function currencySymbol(currency) {
+  return SYMBOLS[currency] || currency || "€";
 }

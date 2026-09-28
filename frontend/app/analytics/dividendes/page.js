@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { apiFetch } from "@/lib/api";
-import { useFxRates, toEUR, eurPer } from "@/lib/fx";
+import { useFxRates, toCurrency, ratePer, currencySymbol } from "@/lib/fx";
+import { useBaseCurrency } from "@/lib/profile";
 import { formatCurrencySymbol } from "../../portfolio/utils/formats";
 import AppHeader from "../../components/AppHeader";
 import { useRouter } from "next/navigation";
@@ -14,7 +15,9 @@ export default function DividendesPage() {
   const [stocks, setStocks] = useState([]);
   const [loading, setLoading] = useState(true);
   const { rates, date: fxDate, stale: fxStale } = useFxRates();
-  const inEUR = (value, currency) => toEUR(value, currency, rates) ?? (currency === "EUR" || !currency ? value : 0);
+  // Montants convertis dans la devise de référence du profil (EUR par défaut)
+  const base = useBaseCurrency();
+  const inBase = (value, currency) => toCurrency(value, currency, base, rates) ?? ((currency || "EUR") === base ? value : 0);
 
   // Fetch portfolio
   useEffect(() => {
@@ -33,9 +36,9 @@ export default function DividendesPage() {
     fetchPortfolio();
   }, []);
 
-  // Calculs des dividendes (toutes devises, converties en euros avec les taux BCE)
+  // Calculs des dividendes (toutes devises, converties dans la devise de référence avec les taux BCE)
   const dividendData = useMemo(() => {
-    const empty = { stocksWithDividends: [], totalsByCurrency: {}, totalAnnualInEUR: 0, portfolioYield: 0, calendar: [], totalPortfolioValue: 0 };
+    const empty = { stocksWithDividends: [], totalsByCurrency: {}, totalAnnualInBase: 0, portfolioYield: 0, calendar: [], totalPortfolioValue: 0 };
     if (!stocks || stocks.length === 0) return empty;
 
     const stocksWithDividends = stocks
@@ -52,7 +55,7 @@ export default function DividendesPage() {
           quantity,
           divPerShare: annualDivPerShare,
           totalAnnual,
-          totalAnnualEUR: inEUR(totalAnnual, s.currency),
+          totalAnnualBase: inBase(totalAnnual, s.currency),
           yieldPercent,
           yieldOnCost: s.pru > 0 ? (annualDivPerShare / s.pru) * 100 : null,
           positionValue: (s.close || 0) * quantity,
@@ -62,16 +65,16 @@ export default function DividendesPage() {
           sector: s.sector,
         };
       })
-      .sort((a, b) => b.totalAnnualEUR - a.totalAnnualEUR);
+      .sort((a, b) => b.totalAnnualBase - a.totalAnnualBase);
 
     const totalsByCurrency = stocksWithDividends.reduce((acc, s) => {
       acc[s.currency] = (acc[s.currency] || 0) + s.totalAnnual;
       return acc;
     }, {});
-    const totalAnnualInEUR = stocksWithDividends.reduce((sum, s) => sum + s.totalAnnualEUR, 0);
+    const totalAnnualInBase = stocksWithDividends.reduce((sum, s) => sum + s.totalAnnualBase, 0);
 
-    const totalPortfolioValue = stocks.reduce((sum, s) => sum + inEUR((s.close || 0) * (s.quantity || 0), s.currency), 0);
-    const portfolioYield = totalPortfolioValue > 0 ? (totalAnnualInEUR / totalPortfolioValue) * 100 : 0;
+    const totalPortfolioValue = stocks.reduce((sum, s) => sum + inBase((s.close || 0) * (s.quantity || 0), s.currency), 0);
+    const portfolioYield = totalPortfolioValue > 0 ? (totalAnnualInBase / totalPortfolioValue) * 100 : 0;
 
     // Dernières dates de détachement (ISO « 2026-09-17 » ; anciennes données en secondes)
     const parseDate = (d) => (typeof d === "number" ? new Date(d * 1000) : new Date(d));
@@ -86,9 +89,9 @@ export default function DividendesPage() {
       }))
       .sort((a, b) => b.date - a.date);
 
-    return { stocksWithDividends, totalsByCurrency, totalAnnualInEUR, portfolioYield, calendar, totalPortfolioValue };
+    return { stocksWithDividends, totalsByCurrency, totalAnnualInBase, portfolioYield, calendar, totalPortfolioValue };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stocks, rates]);
+  }, [stocks, rates, base]);
 
   const formatCurrency = (value, currency = "EUR") => {
     return value.toLocaleString("fr-FR", {
@@ -158,19 +161,19 @@ export default function DividendesPage() {
                   <h3 className="text-sm font-semibold text-slate-600 uppercase mb-3">Dividendes {cur}</h3>
                   <p className="text-3xl font-bold text-emerald-600 mb-1">{formatCurrency(tot, cur)}</p>
                   <p className="text-xs text-slate-500">
-                    {cur === "EUR" ? "par an" : `≈ ${formatCurrency(inEUR(tot, cur), "EUR")} / an`}
+                    {cur === base ? "par an" : `≈ ${formatCurrency(inBase(tot, cur), base)} / an`}
                   </p>
                 </div>
               ))}
 
               {/* Total Converti */}
               <div className="bg-gradient-to-br from-emerald-50 to-blue-50 border border-emerald-200 rounded-xl shadow-lg p-6">
-                <h3 className="text-sm font-semibold text-emerald-700 uppercase mb-3">Total (EUR)</h3>
+                <h3 className="text-sm font-semibold text-emerald-700 uppercase mb-3">Total ({base})</h3>
                 <p className="text-3xl font-bold text-emerald-600 mb-1">
-                  {formatCurrency(dividendData.totalAnnualInEUR, "EUR")}
+                  {formatCurrency(dividendData.totalAnnualInBase, base)}
                 </p>
                 <p className="text-xs text-emerald-700">
-                  par an, soit {formatCurrency(dividendData.totalAnnualInEUR / 12, "EUR")} / mois
+                  par an, soit {formatCurrency(dividendData.totalAnnualInBase / 12, base)} / mois
                 </p>
               </div>
 
@@ -190,11 +193,11 @@ export default function DividendesPage() {
             </div>
 
             {/* Taux de change info */}
-            {Object.keys(dividendData.totalsByCurrency).some((c) => c !== "EUR") && (
+            {Object.keys(dividendData.totalsByCurrency).some((c) => c !== base) && (
               <div className="px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700">
                 Taux de référence BCE{fxDate ? ` du ${new Date(fxDate).toLocaleDateString("fr-FR")}` : ""} :{" "}
-                {Object.keys(dividendData.totalsByCurrency).filter((c) => c !== "EUR").map((c) => (
-                  <strong key={c} className="mr-2">1 {c} = {eurPer(c, rates)?.toFixed(4) ?? "?"} €</strong>
+                {Object.keys(dividendData.totalsByCurrency).filter((c) => c !== base).map((c) => (
+                  <strong key={c} className="mr-2">1 {c} = {ratePer(c, base, rates)?.toFixed(4) ?? "?"} {currencySymbol(base)}</strong>
                 ))}
                 {fxStale && "(taux approximatifs, service indisponible)"}
               </div>

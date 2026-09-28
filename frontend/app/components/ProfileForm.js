@@ -3,44 +3,15 @@
 import { useEffect, useState } from "react";
 import { Card, Button, useToast, applyTheme, cx } from "./ui";
 import { apiFetch } from "@/lib/api";
+import { setCachedProfile } from "@/lib/profile";
+import { Avatar, AVATAR_COLORS, initialsOf } from "./Avatar";
 
-// Couleurs d'avatar proposées (doivent correspondre à AVATAR_COLORS côté backend)
-export const AVATAR_COLORS = {
-  emerald: "bg-emerald-600",
-  blue: "bg-blue-600",
-  teal: "bg-teal-600",
-  indigo: "bg-indigo-600",
-  amber: "bg-amber-600",
-  rose: "bg-rose-600",
-  slate: "bg-slate-600",
-};
+export { Avatar, AVATAR_COLORS, initialsOf };
 
 const COLOR_NAMES = {
   emerald: "Vert lagon", blue: "Bleu", teal: "Turquoise", indigo: "Indigo",
   amber: "Ambre", rose: "Rose", slate: "Ardoise",
 };
-
-export function initialsOf(name, email) {
-  const src = (name || "").trim() || (email || "").split("@")[0];
-  const parts = src.split(/[\s._-]+/).filter(Boolean);
-  const letters = parts.length > 1 ? parts[0][0] + parts[1][0] : src.slice(0, 2);
-  return letters.toUpperCase() || "?";
-}
-
-export function Avatar({ name, email, color = "emerald", size = "md" }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={cx(
-        "inline-flex shrink-0 items-center justify-center rounded-full font-semibold text-white",
-        AVATAR_COLORS[color] || AVATAR_COLORS.emerald,
-        size === "lg" ? "h-16 w-16 text-xl" : "h-8 w-8 text-xs"
-      )}
-    >
-      {initialsOf(name, email)}
-    </span>
-  );
-}
 
 const inputClass =
   "w-full rounded-xl border border-line bg-surface px-4 py-3 text-ink focus:border-transparent focus:outline-none focus:ring-2 focus:ring-accent";
@@ -115,6 +86,7 @@ export default function ProfileForm({ onLoaded }) {
       setSaved(data.profile);
       setForm(toForm(data.profile));
       if (changes.theme) applyTheme(data.profile.theme);
+      setCachedProfile(data);
       onLoaded?.(data);
       toast.success("Profil enregistré.");
     } catch (err) {

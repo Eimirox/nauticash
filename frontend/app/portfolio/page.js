@@ -9,7 +9,8 @@ import { getPerformanceClass } from "./utils/styles";
 import { apiFetch, logout as apiLogout } from "@/lib/api";
 import AppHeader from "../components/AppHeader";
 import { ConfirmModal, useToast, Delta } from "../components/ui";
-import { useFxRates, toEUR } from "@/lib/fx";
+import { useFxRates, toCurrency, currencySymbol } from "@/lib/fx";
+import { useBaseCurrency } from "@/lib/profile";
 
 export default function Portfolio() {
   const router = useRouter();
@@ -243,31 +244,34 @@ export default function Portfolio() {
       (totalWealthByCurrency[cash.currency] || 0) + cash.amount;
   }
 
-  // Synthèse en euros (taux BCE) : patrimoine, variation du jour, plus-value latente
+  // Synthèse dans la devise de référence du profil (taux BCE) : patrimoine, variation du jour, plus-value latente
   const { rates } = useFxRates();
+  const base = useBaseCurrency();
+  const baseSymbol = currencySymbol(base);
+  const toBase = (amount, currency) => toCurrency(amount, currency, base, rates);
   const summary = (() => {
     let value = 0, dayChange = 0, prevValue = 0, cost = 0, costedValue = 0, missing = false;
     for (const s of stocks) {
       const qty = Number(s.quantity) || 0;
-      const v = toEUR((s.close || 0) * qty, s.currency, rates);
+      const v = toBase((s.close || 0) * qty, s.currency);
       if (v === null) { missing = true; continue; }
       value += v;
       if (Number.isFinite(s.dayChangeValue)) {
-        const d = toEUR(s.dayChangeValue, s.currency, rates) ?? 0;
+        const d = toBase(s.dayChangeValue, s.currency) ?? 0;
         dayChange += d;
         prevValue += v - d;
       }
       if (s.pru > 0) {
-        cost += toEUR(s.pru * qty, s.currency, rates) ?? 0;
+        cost += toBase(s.pru * qty, s.currency) ?? 0;
         costedValue += v;
       }
     }
-    const cashEUR = toEUR(Number(cash.amount) || 0, cash.currency, rates);
-    if (cashEUR === null && cash.amount) missing = true;
+    const cashBase = toBase(Number(cash.amount) || 0, cash.currency);
+    if (cashBase === null && cash.amount) missing = true;
     return {
-      ready: Boolean(rates) || stocks.every((s) => s.currency === "EUR"),
+      ready: Boolean(rates) || (stocks.every((s) => (s.currency || "EUR") === base) && (!cash.amount || cash.currency === base)),
       missing,
-      total: value + (cashEUR ?? 0),
+      total: value + (cashBase ?? 0),
       invested: value,
       dayChange,
       dayChangePct: prevValue > 0 ? (dayChange / prevValue) * 100 : null,
@@ -275,7 +279,7 @@ export default function Portfolio() {
       gainPct: cost > 0 ? ((costedValue - cost) / cost) * 100 : null,
     };
   })();
-  const signed = (n) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${nf2.format(Math.abs(n))} €`;
+  const signed = (n) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${nf2.format(Math.abs(n))} ${baseSymbol}`;
 
   const typeBadge = (type) => {
     // Le backend renvoie « Stock » / « Crypto » / « ETF » ; les anciennes données « EQUITY » / « CRYPTOCURRENCY »
@@ -745,14 +749,14 @@ export default function Portfolio() {
           </div>
         )}
 
-        {/* Synthèse en euros */}
+        {/* Synthèse dans la devise de référence */}
         {stocks.length > 0 && summary.ready && (
           <div className="mb-4 p-5 bg-white border border-slate-200 shadow-lg rounded-xl grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Patrimoine total</p>
-              <p className="text-3xl font-bold text-slate-900 tabular-nums">{nf2.format(summary.total)} €</p>
+              <p className="text-3xl font-bold text-slate-900 tabular-nums">{nf2.format(summary.total)} {baseSymbol}</p>
               <p className="text-xs text-slate-500 mt-1">
-                Positions et cash convertis en euros (taux BCE)
+                Positions et cash convertis en {base} (taux BCE)
                 {summary.missing && " — une devise n'a pas pu être convertie"}
               </p>
             </div>

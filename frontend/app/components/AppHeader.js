@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout } from "@/lib/api";
 import { cx } from "./ui/cx";
+import { Avatar } from "./Avatar";
+import { useProfile } from "@/lib/profile";
 
 // Adresse qui reçoit les retours de la bêta (variable Vercel NEXT_PUBLIC_CONTACT_EMAIL) ;
 // sans elle, le lien « Donner mon avis » n'est pas affiché.
@@ -34,6 +36,8 @@ function isActive(pathname, { href, exact }) {
  */
 export default function AppHeader({ actions }) {
   const pathname = usePathname() || "";
+  const { email, profile, loading: profileLoading } = useProfile();
+  const firstName = (profile.displayName || "").trim().split(/\s+/)[0];
 
   const links = NAV.map((item) => {
     const active = isActive(pathname, item);
@@ -93,17 +97,19 @@ export default function AppHeader({ actions }) {
             )}
             <Link
               href="/profil"
-              aria-label="Mon profil"
+              aria-label={firstName ? `Mon profil (${firstName})` : "Mon profil"}
               aria-current={pathname === "/profil" ? "page" : undefined}
               className={cx(
-                "inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+                "inline-flex min-h-10 items-center gap-2 rounded-xl border pl-1.5 pr-1.5 sm:pr-3 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
                 pathname === "/profil" ? "border-accent/40 bg-accent/10 text-accent" : "border-line bg-surface text-ink-muted hover:text-ink"
               )}
             >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-              <span className="hidden sm:inline">Mon profil</span>
+              {profileLoading ? (
+                <span aria-hidden="true" className="h-7 w-7 animate-pulse rounded-full bg-surface-2" />
+              ) : (
+                <Avatar name={profile.displayName} email={email} color={profile.avatarColor} size="sm" />
+              )}
+              <span className="hidden max-w-[9rem] truncate sm:inline">{firstName || "Mon profil"}</span>
             </Link>
             <button
               type="button"
