@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Delta } from "../../components/ui";
 import { periodPerformance } from "@/lib/periodPerf";
+import BenchmarkChart from "../../components/BenchmarkChart";
 import { fetchFxRates, toEUR } from "@/lib/fx";
 
 export default function PerformancePage() {
@@ -299,6 +300,8 @@ export default function PerformancePage() {
                 : "Variation de la valeur du portefeuille en euros (taux BCE), achats et ventes de la période inclus. « Depuis l'achat » compare la valeur actuelle à vos prix de revient (PRU)."}
             </p>
           </section>
+
+          <BenchmarkChart daily={daily} />
 
           {!history || history.length < 2 ? (
           <div className="flex flex-col items-center justify-center py-20 text-slate-500">

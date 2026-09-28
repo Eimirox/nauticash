@@ -60,6 +60,7 @@ const fmp = {
   quotes: {},       // symbol -> objet "quote" FMP
   profiles: {},     // symbol -> objet "profile" FMP
   dividends: {},    // symbol -> tableau de dividendes FMP
+  history: {},      // symbol -> historique de fin de journée (endpoint historical-price-eod/light)
   failWith: null,   // code HTTP à renvoyer pour tous les appels (ex. 500)
 };
 
@@ -95,6 +96,7 @@ globalThis.fetch = async (input, init = {}) => {
     }
     if (endpoint === "profile") return jsonResponse(200, fmp.profiles[symbol] ? [fmp.profiles[symbol]] : []);
     if (endpoint === "dividends") return jsonResponse(200, fmp.dividends[symbol] || []);
+    if (endpoint === "light") return jsonResponse(200, fmp.history[symbol] || []);
     return jsonResponse(404, { error: "unknown endpoint" });
   }
 

@@ -22,6 +22,7 @@ const authRoutes = require("./routes/auth");
 const userRoutes = require("./routes/user");
 const historyRoutes = require("./routes/history");
 const transactionRoutes = require("./routes/transactions");
+const marketRoutes = require("./routes/market");
 
 // Services
 const priceService = require("./services/priceService");
@@ -65,6 +66,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/user", historyRoutes);
 app.use("/api/transactions", transactionRoutes);
+app.use("/api/market", marketRoutes);
 
 // Taux de change (public, mis en cache côté serveur) : base EUR
 const fx = require("./services/fx");
@@ -270,6 +272,7 @@ const startServer = async () => {
       console.log("   GET    /api/user/history");
       console.log("   POST   /api/user/history");
       console.log("   GET    /api/user/history/daily");
+      console.log("   GET    /api/market/benchmarks/:key");
       console.log("   GET    /api/admin/stats");
       console.log("   GET    /api/admin/health");
       console.log("   POST   /api/admin/update-prices");
