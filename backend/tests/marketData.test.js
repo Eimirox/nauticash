@@ -23,6 +23,16 @@ describe("Dividende annuel", () => {
     assert.ok(Math.abs(annual - 1.04) < 1e-9, `attendu 1,04, obtenu ${annual}`);
   });
 
+  test("hausse de dividende confirmée : dernier versement × fréquence (cas NVDA)", () => {
+    const rows = [[18, 0.25], [116, 0.25], [201, 0.01], [298, 0.01]].map(([d, a]) => ({ date: ago(d), dividend: a }));
+    assert.equal(annualizeDividends(rows, NOW).annual, 1);
+  });
+
+  test("dividende exceptionnel isolé : pas extrapolé sur l'année", () => {
+    const rows = [[10, 2], [100, 0.5], [190, 0.5], [280, 0.5]].map(([d, a]) => ({ date: ago(d), dividend: a }));
+    assert.equal(annualizeDividends(rows, NOW).annual, 3.5);
+  });
+
   test("fréquence déclarée par l'API (mensuel)", () => {
     const rows = Array.from({ length: 13 }, (_, i) => ({ date: ago(i * 30 + 5), adjDividend: 0.1, frequency: "Monthly" }));
     assert.ok(Math.abs(annualizeDividends(rows, NOW).annual - 1.2) < 1e-9);

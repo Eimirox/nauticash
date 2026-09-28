@@ -5,6 +5,7 @@
 // glissent : 5 versements trimestriels peuvent tomber dans la fenêtre (+25 %), ou 3 (−25 %).
 // On prend donc les N derniers versements, N = fréquence annuelle (déclarée par l'API
 // ou déduite de l'écart entre versements), ce qui donne le dividende annuel « courant ».
+// Si les deux derniers versements sont identiques, on annualise le dernier (hausse récente).
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -54,7 +55,13 @@ function annualizeDividends(data, now = Date.now()) {
   }
 
   const frequency = frequencyOf(relevant);
-  const annual = relevant.slice(0, frequency).reduce((sum, d) => sum + amountOf(d), 0);
+  let annual = relevant.slice(0, frequency).reduce((sum, d) => sum + amountOf(d), 0);
+
+  // Dividende augmenté (ou baissé) et confirmé par deux versements identiques :
+  // rythme actuel = dernier versement × fréquence (ex. NVDA 0,01 $ → 0,25 $ par trimestre).
+  if (frequency > 1 && relevant.length >= 2 && Math.abs(amountOf(relevant[0]) - amountOf(relevant[1])) < 1e-9) {
+    annual = amountOf(relevant[0]) * frequency;
+  }
   return { annual: annual > 0 ? Math.round(annual * 1e6) / 1e6 : null, frequency, latest };
 }
 
