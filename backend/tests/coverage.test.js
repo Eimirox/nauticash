@@ -183,6 +183,27 @@ describe("Actualisation intraday (jobs/livePrices.js)", () => {
     assert.equal(h.yahoo.calls.length, 0);
   });
 
+  test("diagnostic : l'erreur d'un cours figé est visible dans les stats puis effacée au succès", async () => {
+    h.fmp.notCovered.NVDA = true;
+    h.yahoo.charts.NVDA = nvdaChart();
+    h.yahoo.search.nvda = nvdaSearch;
+    const { token } = await h.registerUser();
+    await add(token, { ticker: "NVDA", quantity: 1 });
+    await h.db.collection("prices").updateOne({ symbol: "NVDA" }, { $set: { lastUpdate: new Date("2026-09-28T14:00:00Z") } });
+
+    delete h.yahoo.charts.NVDA; // Yahoo ne renvoie plus rien pour ce symbole
+    const res = await live.run(new Date("2026-09-28T15:00:00Z"));
+    assert.equal(res.failed, 1);
+    const err = live.getStats().errors.NVDA;
+    assert.ok(err, "erreur mémorisée pour NVDA");
+    assert.match(err.message, /No data found|failed/i);
+    assert.equal(err.count, 1);
+
+    h.yahoo.charts.NVDA = nvdaChart();
+    await live.run(new Date("2026-09-28T15:05:00Z"));
+    assert.equal(live.getStats().errors.NVDA, undefined, "effacée après un succès");
+  });
+
   test("ne fait rien marché fermé (nuit, week-end)", async () => {
     h.yahoo.charts.NVDA = nvdaChart();
     h.fmp.notCovered.NVDA = true;

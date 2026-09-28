@@ -172,21 +172,23 @@ export default function GeographiePage() {
     return ((value / total) * 100).toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " %";
   };
 
-  // Obtenir la couleur selon la valeur (gradient vert)
+  // Couleurs de la carte (jetons DESIGN.md, lisibles en clair comme en sombre) :
+  // mer = surface-2, pays non détenus = gris neutre nettement distinct, pays détenus = accent
+  // dont l'opacité croît avec l'exposition (jamais sous 45 % pour rester bien visible).
+  const LAND = "rgb(var(--text-muted) / 0.35)";
+  const exposureFill = (level) => `rgb(var(--accent) / ${level})`;
+  const LEVELS = [0.45, 0.65, 0.85, 1];
+
   const getColor = (isoCode) => {
-    if (!isoCode) return "rgb(var(--surface-2))";
-    
+    if (!isoCode) return LAND;
     const countryData = geoData.countryList.find(c => c.isoCode === isoCode);
-    if (!countryData) return "rgb(var(--surface-2))";
+    if (!countryData || !(geoData.maxValue > 0)) return LAND;
 
     const intensity = countryData.valueBase / geoData.maxValue;
-    
-    // Gradient de vert emerald
-    if (intensity > 0.7) return "#059669"; // Très foncé
-    if (intensity > 0.4) return "#10B981"; // Foncé
-    if (intensity > 0.2) return "#34D399"; // Moyen
-    if (intensity > 0.1) return "#6EE7B7"; // Clair
-    return "#A7F3D0"; // Très clair
+    if (intensity > 0.7) return exposureFill(LEVELS[3]);
+    if (intensity > 0.4) return exposureFill(LEVELS[2]);
+    if (intensity > 0.15) return exposureFill(LEVELS[1]);
+    return exposureFill(LEVELS[0]);
   };
 
   return (
@@ -280,15 +282,19 @@ export default function GeographiePage() {
               <div className="mb-4 flex items-center gap-4 text-xs text-ink-muted">
                 <span>Exposition :</span>
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded" style={{ backgroundColor: "#A7F3D0" }}></div>
+                  <div className="w-4 h-4 rounded" style={{ backgroundColor: LAND }}></div>
+                  <span>Aucune</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded" style={{ backgroundColor: exposureFill(LEVELS[0]) }}></div>
                   <span>Faible</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded" style={{ backgroundColor: "#10B981" }}></div>
+                  <div className="w-4 h-4 rounded" style={{ backgroundColor: exposureFill(LEVELS[2]) }}></div>
                   <span>Moyenne</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded" style={{ backgroundColor: "#059669" }}></div>
+                  <div className="w-4 h-4 rounded" style={{ backgroundColor: exposureFill(LEVELS[3]) }}></div>
                   <span>Élevée</span>
                 </div>
               </div>
@@ -311,12 +317,12 @@ export default function GeographiePage() {
                             <Geography
                               key={geo.rsmKey}
                               geography={geo}
-                              strokeWidth={0.5}
+                              strokeWidth={0.6}
                               style={{
                                 // Couleurs en style (et non en attribut) pour suivre les jetons clair/sombre
-                                default: { fill: getColor(isoCode), stroke: "rgb(var(--surface))", outline: "none" },
-                                hover: { fill: "#F59E0B", outline: "none", cursor: "pointer" },
-                                pressed: { fill: getColor(isoCode), outline: "none" }
+                                default: { fill: getColor(isoCode), stroke: "rgb(var(--surface-2))", outline: "none" },
+                                hover: { fill: countryData ? "rgb(var(--warn))" : getColor(isoCode), stroke: "rgb(var(--surface-2))", outline: "none", cursor: countryData ? "pointer" : "default" },
+                                pressed: { fill: getColor(isoCode), stroke: "rgb(var(--surface-2))", outline: "none" }
                               }}
                               onMouseEnter={() => {
                                 if (countryData) {

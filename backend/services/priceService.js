@@ -7,6 +7,7 @@ const { detectQuoteCurrency, normalizeQuoteUnits, toMajorUnit } = require("./cur
 const FMPProvider = require("./providers/fmp");
 const AlphaVantageProvider = require("./providers/alphavantage");
 const YahooProvider = require("./providers/yahoo");
+const FinnhubProvider = require("./providers/finnhub");
 // À ajouter plus tard :
 // const TwelveDataProvider = require("./providers/twelvedata");
 // const PolygonProvider = require("./providers/polygon");
@@ -35,6 +36,12 @@ class PriceService {
     if (config.alphavantage.enabled) {
       providers.alphavantage = new AlphaVantageProvider();
       console.log("✅ Alpha Vantage Provider initialized");
+    }
+
+    // Finnhub (optionnel, uniquement avec FINNHUB_API_KEY) : secours US avant Yahoo
+    if (config.finnhub.enabled) {
+      providers.finnhub = new FinnhubProvider();
+      console.log("✅ Finnhub Provider initialized");
     }
 
     // Yahoo Finance (secours à couverture mondiale, sans clé)
@@ -181,12 +188,12 @@ class PriceService {
       }
     }
 
-    // FMP a donné le cours mais pas le profil ou les dividendes (souvent un 402 de l'offre gratuite) :
-    // on complète avec Yahoo, sans rien écraser de ce qu'FMP a fourni.
+    // FMP a donné le cours mais pas le profil ou les dividendes (souvent un 402 de l'offre gratuite),
+    // ou Finnhub (cours seul) : on complète avec Yahoo, sans rien écraser du cours obtenu.
     const missingProfile = !quote.sector || quote.sector === "Unknown";
     const missingDividends = quote.type !== "Crypto" && !quote.dividendsUpdatedAt &&
       !(previous?.dividendsUpdatedAt && Date.now() - new Date(previous.dividendsUpdatedAt).getTime() < 7 * 86400000);
-    if (!live && usedProvider === "fmp" && this.providers.yahoo && quote.type !== "Crypto" && (missingProfile || missingDividends)) {
+    if (!live && (usedProvider === "fmp" || usedProvider === "finnhub") && this.providers.yahoo && quote.type !== "Crypto" && (missingProfile || missingDividends)) {
       try {
         const extra = await this.providers.yahoo.getQuote(ticker, { previous });
         if (missingProfile) {
@@ -311,8 +318,9 @@ class PriceService {
       ];
     }
 
-    // Sinon, l'ordre de config.activeProviders, avec Yahoo en dernier recours
-    // (couverture mondiale : symboles hors offre FMP, places européennes, ETF…)
+    // Sinon, l'ordre de config.activeProviders, puis Finnhub (secours US, si une clé est configurée),
+    // puis Yahoo en dernier recours (couverture mondiale : symboles hors offre FMP, places européennes, ETF…)
+    if (this.providers.finnhub && !activeProviders.includes("finnhub")) activeProviders.push("finnhub");
     if (this.providers.yahoo && !activeProviders.includes("yahoo")) activeProviders.push("yahoo");
     return activeProviders;
   }

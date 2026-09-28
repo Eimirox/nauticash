@@ -10,7 +10,7 @@ Comparatif des sources gratuites utilisables par Nauticash et stratégie retenue
 |---|---|---|---|---|
 | **Financial Modeling Prep (FMP)** | ~250 appels/jour | Cours, profil (secteur, pays, ETF), dividendes ; API `/stable` | Couverture gratuite surtout US, données de fin de journée pour une partie des marchés | **Provider principal** (`services/providers/fmp.js`) |
 | **Alpha Vantage** | ~25 appels/jour, ~5/min | Actions européennes, historique mensuel ajusté (dividendes) | Quota très faible | Secours et enrichissement des dividendes (`services/providers/alphavantage.js`) |
-| **Finnhub** | ~60 appels/min | Cours US temps réel, profil, dividendes, actualités | International surtout payant | Candidat : fallback US optionnel (clé `FINNHUB_API_KEY`) |
+| **Finnhub** | ~60 appels/min | Cours US temps réel, profil, dividendes, actualités | International surtout payant | **Branché (optionnel)** : secours US entre FMP et Yahoo, actif seulement avec `FINNHUB_API_KEY` (`services/providers/finnhub.js`) |
 | **Twelve Data** | ~800 appels/jour, ~8/min | Bonne API, crypto, forex | Europe et ETF plutôt payants | Configuré mais non branché (`config/providers.js`) |
 | **Frankfurter** | Gratuit, sans clé | Taux de change de référence BCE, simple et fiable | Taux quotidiens uniquement | **Utilisé** : `GET /api/fx` (`services/fx.js`), cache 6 h, base EUR |
 | **Yahoo Finance (non officiel)** | Pas d'offre officielle | Couverture mondiale très large | Non documenté, peut casser ou bloquer sans préavis | Dernier recours uniquement, à éviter en production |
@@ -21,7 +21,15 @@ Comparatif des sources gratuites utilisables par Nauticash et stratégie retenue
 2. **Cron** toutes les 6 h (`jobs/updatePrices.js`) : réutilise les prix encore frais, ne rafraîchit pas les actions le week-end, s'arrête proprement quand le quota est atteint.
 3. **Coût par action** : 1 appel FMP (cours) dans la plupart des cas ; profil re-téléchargé tous les 30 jours, dividendes tous les 7 jours.
 4. **Quotas** comptés par appel HTTP réel (`services/apiUsage.js`), surchargeables par `FMP_DAILY_LIMIT` / `ALPHAVANTAGE_DAILY_LIMIT`.
-5. **Fallback** : ordre de `ACTIVE_PROVIDERS`, avec enrichissement des dividendes par Alpha Vantage si FMP n'a rien trouvé.
+5. **Fallback** : ordre de `ACTIVE_PROVIDERS`, puis Finnhub (si `FINNHUB_API_KEY`), puis Yahoo ; enrichissement des dividendes par Alpha Vantage si FMP n'a rien trouvé.
+
+## Finnhub (optionnel, depuis le 28/09/2026)
+
+- Activé uniquement si `FINNHUB_API_KEY` est renseignée (`FINNHUB_ENABLED=false` pour le couper). Sans clé : aucun changement, aucun appel.
+- Ordre des providers : `ACTIVE_PROVIDERS` (FMP) → **Finnhub** → Yahoo. Ne reçoit que les tickers américains (1 à 5 lettres, classe `BRK.B` acceptée) : jamais les places étrangères (`.PA`, `.L`…), les cryptos ni les indices.
+- Endpoint `/api/v1/quote` : cours, veille, plus haut/bas, heure de cotation, en USD. Pas de profil ni de dividendes : ils sont conservés depuis la base ou complétés par Yahoo (même logique que pour FMP).
+- Symbole inconnu (réponse à zéro), 429 ou 403 → passage à Yahoo. Quota : 55 appels/min (marge sur les ~60 de l'offre gratuite), aucun plafond journalier (`FINNHUB_DAILY_LIMIT` pour en fixer un).
+- Inclus dans `GET /api/admin/coverage` (`providers=finnhub`), statut `unsupported` hors US.
 
 ## Cohérence des données (vérifiée le 27/09/2026)
 
@@ -62,9 +70,11 @@ Yahoo est ajouté automatiquement en dernier recours (`YAHOO_ENABLED=false` pour
 
 À remplir après un appel en production (l'environnement de test n'a ni la base réelle ni les clés API) :
 
-| Date | Tickers testés | FMP | Yahoo | Alpha Vantage | Non couverts |
-|---|---|---|---|---|---|
-| _à mesurer_ | | | | | |
+| Date | Tickers testés | FMP | Yahoo | Finnhub | Alpha Vantage | Non couverts |
+|---|---|---|---|---|---|---|
+| _à mesurer_ | | | | | | |
+
+**Cours figé (diagnostic)** : `GET /api/admin/stats` → `livePrices.errors` liste, par ticker, la dernière erreur de l'actualisation intraday Yahoo (message, heure, nombre d'échecs consécutifs), effacée au premier succès.
 
 ## Rythme d'actualisation (28/09/2026)
 

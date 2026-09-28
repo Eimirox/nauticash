@@ -24,6 +24,10 @@ const TEST_ENV = {
   ALPHA_VANTAGE_API_KEY: "",
   TWELVE_DATA_ENABLED: "false",
   POLYGON_ENABLED: "false",
+  // Finnhub désactivé par défaut (sans clé) ; un fichier de test l'active en posant
+  // NAUTICASH_TEST_FINNHUB=1 avant de charger ce module.
+  FINNHUB_API_KEY: process.env.NAUTICASH_TEST_FINNHUB ? "finnhub_test_key" : "",
+  FINNHUB_ENABLED: "true",
   RATE_LIMITING_ENABLED: "true",
   FMP_DAILY_LIMIT: "",
   CRON_UPDATE_PRICES: "false",
@@ -80,6 +84,13 @@ const yahoo = {
   failWith: null,
 };
 
+// Finnhub simulé : endpoint /quote uniquement
+const finnhub = {
+  calls: [],        // { endpoint, symbol }
+  quotes: {},       // symbole -> { c, pc, d, dp, h, l, o, t } (absent = symbole inconnu, tout à 0)
+  failWith: null,   // code HTTP à renvoyer (ex. 429)
+};
+
 const mail = {
   sent: [],         // corps JSON envoyés à Resend
   failWith: null,   // code HTTP à renvoyer (ex. 500)
@@ -130,6 +141,18 @@ globalThis.fetch = async (input, init = {}) => {
       return jsonResponse(200, { quotes: yahoo.search[q] || [] });
     }
     return jsonResponse(404, {});
+  }
+
+  if (url.hostname === "finnhub.io") {
+    const endpoint = url.pathname.split("/").pop();
+    const symbol = url.searchParams.get("symbol");
+    finnhub.calls.push({ endpoint, symbol });
+    if (url.searchParams.get("token") !== process.env.FINNHUB_API_KEY) return jsonResponse(401, { error: "Invalid API key" });
+    if (finnhub.failWith) return jsonResponse(finnhub.failWith, { error: "simulated failure" });
+    if (endpoint === "quote") {
+      return jsonResponse(200, finnhub.quotes[symbol] || { c: 0, d: null, dp: null, h: 0, l: 0, o: 0, pc: 0, t: 0 });
+    }
+    return jsonResponse(404, { error: "unknown endpoint" });
   }
 
   if (url.hostname === "api.frankfurter.dev") {
@@ -296,6 +319,9 @@ function resetState() {
   yahoo.charts = {};
   yahoo.search = {};
   yahoo.failWith = null;
+  finnhub.calls.length = 0;
+  finnhub.quotes = {};
+  finnhub.failWith = null;
   fmp.history = {};
   fmp.notCovered = {};
   fx.failWith = null;
@@ -309,6 +335,7 @@ module.exports = {
   db,
   fmp,
   yahoo,
+  finnhub,
   fx,
   mail,
   start,
