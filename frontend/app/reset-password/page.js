@@ -48,10 +48,10 @@ function ResetPasswordForm() {
   if (!token) {
     return (
       <div className="space-y-5">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+        <div className="bg-loss/10 border border-loss/30 rounded-lg p-3 text-sm text-loss">
           Lien invalide. Refaites une demande de réinitialisation.
         </div>
-        <Link href="/forgot-password" className="block text-center text-sm font-semibold text-emerald-600 hover:text-emerald-700">
+        <Link href="/forgot-password" className="block text-center text-sm font-semibold text-accent hover:text-accent">
           Mot de passe oublié
         </Link>
       </div>
@@ -60,30 +60,30 @@ function ResetPasswordForm() {
 
   if (done) {
     return (
-      <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 text-sm text-emerald-800">
+      <div className="bg-accent/10 border border-accent/40 rounded-lg p-4 text-sm text-accent">
         {done} Redirection vers la connexion...
       </div>
     );
   }
 
   const inputClass =
-    "w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all";
+    "w-full px-4 py-3 border border-line rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent transition-all";
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       <div>
-        <label htmlFor="password" className="block text-sm font-semibold text-slate-700 mb-2">Nouveau mot de passe</label>
+        <label htmlFor="password" className="block text-sm font-semibold text-ink mb-2">Nouveau mot de passe</label>
         <div className="relative">
           <input id="password" type={showPassword ? "text" : "password"} value={password}
             onChange={(e) => setPassword(e.target.value)} required className={`${inputClass} pr-24`} />
           <button type="button" onClick={() => setShowPassword(!showPassword)}
-            className="absolute inset-y-0 right-0 pr-3 text-sm text-slate-500 hover:text-slate-700">
+            className="absolute inset-y-0 right-0 pr-3 text-sm text-ink-muted hover:text-ink">
             {showPassword ? "Masquer" : "Afficher"}
           </button>
         </div>
         <ul className="mt-2 grid grid-cols-2 gap-1 text-xs">
           {RULES.map((r) => (
-            <li key={r.label} className={r.test(password) ? "text-emerald-600" : "text-slate-400"}>
+            <li key={r.label} className={r.test(password) ? "text-accent" : "text-ink-muted/70"}>
               {r.test(password) ? "✓" : "•"} {r.label}
             </li>
           ))}
@@ -91,12 +91,12 @@ function ResetPasswordForm() {
       </div>
 
       <div>
-        <label htmlFor="confirm" className="block text-sm font-semibold text-slate-700 mb-2">Confirmer le mot de passe</label>
+        <label htmlFor="confirm" className="block text-sm font-semibold text-ink mb-2">Confirmer le mot de passe</label>
         <input id="confirm" type={showPassword ? "text" : "password"} value={confirm}
           onChange={(e) => setConfirm(e.target.value)} required className={inputClass} />
       </div>
 
-      {error && <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">{error}</div>}
+      {error && <div className="bg-loss/10 border border-loss/30 rounded-lg p-3 text-sm text-loss">{error}</div>}
 
       <button type="submit" disabled={loading}
         className="w-full py-3 px-4 bg-gradient-to-r from-emerald-600 to-blue-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100">
@@ -108,28 +108,28 @@ function ResetPasswordForm() {
 
 export default function ResetPassword() {
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50 flex items-center justify-center p-4">
+    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50 dark:from-bg dark:via-bg dark:to-surface flex items-center justify-center p-4">
       <div className="relative w-full max-w-md">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-3 group mb-2">
             <img src="/logo_nauticash.webp?v=2" alt="Logo Nauticash" width={40} height={40}
               className="rounded-lg shadow-md group-hover:scale-110 transition-transform" />
-            <span className="text-3xl font-bold bg-gradient-to-r from-slate-900 via-emerald-600 to-blue-600 bg-clip-text text-transparent">
+            <span className="text-3xl font-bold bg-gradient-to-r from-slate-900 via-emerald-600 to-blue-600 dark:from-white dark:via-emerald-300 dark:to-sky-300 bg-clip-text text-transparent">
               Nauticash
             </span>
           </Link>
-          <h1 className="text-2xl font-bold text-slate-900 mt-6 mb-2">Nouveau mot de passe</h1>
-          <p className="text-slate-600">Choisissez un nouveau mot de passe pour votre compte.</p>
+          <h1 className="text-2xl font-bold text-ink mt-6 mb-2">Nouveau mot de passe</h1>
+          <p className="text-ink-muted">Choisissez un nouveau mot de passe pour votre compte.</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8">
-          <Suspense fallback={<p className="text-sm text-slate-500">Chargement...</p>}>
+        <div className="bg-surface rounded-2xl shadow-xl border border-line p-8">
+          <Suspense fallback={<p className="text-sm text-ink-muted">Chargement...</p>}>
             <ResetPasswordForm />
           </Suspense>
         </div>
 
         <div className="mt-6 text-center">
-          <Link href="/login" className="text-sm text-slate-600 hover:text-slate-900 transition">← Retour à la connexion</Link>
+          <Link href="/login" className="text-sm text-ink-muted hover:text-ink transition">← Retour à la connexion</Link>
         </div>
       </div>
     </main>

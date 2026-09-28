@@ -270,7 +270,7 @@ export default function DividendesPage() {
                 </div>
                 <div className="space-y-3">
                   {dividendData.calendar.slice(0, 10).map((item, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-3 bg-surface-2 rounded-lg hover:bg-slate-100 transition">
+                    <div key={idx} className="flex items-center justify-between p-3 bg-surface-2 rounded-lg hover:bg-line/60 transition">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-emerald-100 dark:bg-accent/20 rounded-full flex items-center justify-center">
                           <span className="text-accent font-bold text-sm">{item.ticker.slice(0, 2)}</span>

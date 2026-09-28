@@ -27,24 +27,24 @@ export default function ForgotPassword() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50 flex items-center justify-center p-4">
+    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50 dark:from-bg dark:via-bg dark:to-surface flex items-center justify-center p-4">
       <div className="relative w-full max-w-md">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-3 group mb-2">
             <img src="/logo_nauticash.webp?v=2" alt="Logo Nauticash" width={40} height={40}
               className="rounded-lg shadow-md group-hover:scale-110 transition-transform" />
-            <span className="text-3xl font-bold bg-gradient-to-r from-slate-900 via-emerald-600 to-blue-600 bg-clip-text text-transparent">
+            <span className="text-3xl font-bold bg-gradient-to-r from-slate-900 via-emerald-600 to-blue-600 dark:from-white dark:via-emerald-300 dark:to-sky-300 bg-clip-text text-transparent">
               Nauticash
             </span>
           </Link>
-          <h1 className="text-2xl font-bold text-slate-900 mt-6 mb-2">Mot de passe oublié</h1>
-          <p className="text-slate-600">Entrez votre email, nous vous enverrons un lien pour le réinitialiser.</p>
+          <h1 className="text-2xl font-bold text-ink mt-6 mb-2">Mot de passe oublié</h1>
+          <p className="text-ink-muted">Entrez votre email, nous vous enverrons un lien pour le réinitialiser.</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8">
+        <div className="bg-surface rounded-2xl shadow-xl border border-line p-8">
           {sent ? (
             <div className="space-y-5">
-              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 text-sm text-emerald-800">
+              <div className="bg-accent/10 border border-accent/40 rounded-lg p-4 text-sm text-accent">
                 {sent} Pensez à vérifier vos spams. Le lien est valable 1 heure.
               </div>
               <Link href="/login"
@@ -55,14 +55,14 @@ export default function ForgotPassword() {
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label htmlFor="email" className="block text-sm font-semibold text-slate-700 mb-2">Email</label>
+                <label htmlFor="email" className="block text-sm font-semibold text-ink mb-2">Email</label>
                 <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)}
                   placeholder="email@exemple.com" required
-                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all" />
+                  className="w-full px-4 py-3 border border-line rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent transition-all" />
               </div>
 
               {error && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">{error}</div>
+                <div className="bg-loss/10 border border-loss/30 rounded-lg p-3 text-sm text-loss">{error}</div>
               )}
 
               <button type="submit" disabled={loading}
@@ -74,7 +74,7 @@ export default function ForgotPassword() {
         </div>
 
         <div className="mt-6 text-center">
-          <Link href="/login" className="text-sm text-slate-600 hover:text-slate-900 transition">← Retour à la connexion</Link>
+          <Link href="/login" className="text-sm text-ink-muted hover:text-ink transition">← Retour à la connexion</Link>
         </div>
       </div>
     </main>

@@ -412,7 +412,7 @@ export default function PortfolioHistoryChart() {
                   setShowManualEdit(false);
                   setManualForm({ date: "", value: "" });
                 }}
-                className="px-4 py-2 bg-surface-2 text-ink text-sm font-medium rounded-lg hover:bg-slate-300 transition"
+                className="px-4 py-2 bg-surface-2 text-ink text-sm font-medium rounded-lg hover:bg-line transition"
               >
                 Annuler
               </button>
