@@ -342,3 +342,27 @@ describe("Enveloppes (PEA, CTO, assurance-vie…)", () => {
     assert.equal((await getPortfolio(token)).stocks[0].account, null);
   });
 });
+
+describe("Frais annuels (TER)", () => {
+  test("saisis à l'ajout ou par PATCH, retirés avec une valeur vide", async () => {
+    const { token } = await h.registerUser();
+    assert.equal((await addStock(token, { ticker: "AAPL", quantity: 1, fees: "0,38" })).status, 201);
+    assert.equal((await getPortfolio(token)).stocks[0].fees, 0.38);
+
+    const patch = (body) => h.request("PATCH", "/api/user/portfolio/AAPL", { token, body });
+    assert.equal((await patch({ fees: 0.2 })).status, 200);
+    assert.equal((await getPortfolio(token)).stocks[0].fees, 0.2);
+    assert.equal((await patch({ fees: "" })).status, 200);
+    assert.equal((await getPortfolio(token)).stocks[0].fees, null);
+  });
+
+  test("refuse des frais négatifs ou supérieurs à 10 %", async () => {
+    const { token } = await h.registerUser();
+    await addStock(token, { ticker: "AAPL", quantity: 1 });
+    for (const fees of [-1, 12, "abc"]) {
+      const res = await h.request("PATCH", "/api/user/portfolio/AAPL", { token, body: { fees } });
+      assert.equal(res.status, 400, String(fees));
+    }
+    assert.equal((await addStock(token, { ticker: "MSFT", quantity: 1, fees: 50 })).status, 400);
+  });
+});

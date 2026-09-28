@@ -11,6 +11,8 @@ const UserSchema = new mongoose.Schema({
       pru:      { type: Number, default: 0 },
       // Enveloppe : PEA, CTO, AV (assurance-vie), PER, CRYPTO ou null
       account:  { type: String, default: null },
+      // Frais annuels (TER) en %, saisis par l'utilisateur pour ses ETF / fonds
+      fees:     { type: Number, default: null },
     }
   ],
 
