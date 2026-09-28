@@ -13,6 +13,7 @@ import { quoteFreshness } from "@/lib/quoteTime";
 import { useFxRates, toCurrency, currencySymbol } from "@/lib/fx";
 import { useBaseCurrency, useProfile } from "@/lib/profile";
 import GoalGauge from "../components/GoalGauge";
+import EmergencyFund from "../components/EmergencyFund";
 
 // Enveloppes proposées (doivent correspondre à ACCOUNTS côté backend)
 const ACCOUNT_LABELS = { PEA: "PEA", CTO: "Compte-titres", AV: "Assurance-vie", PER: "PER", CRYPTO: "Crypto" };
@@ -873,6 +874,15 @@ export default function Portfolio() {
         {/* Objectif de patrimoine (profil) */}
         {stocks.length > 0 && summary.ready && (
           <GoalGauge current={summary.total} goalAmount={profile.goalAmount} goalDate={profile.goalDate} symbol={baseSymbol} />
+        )}
+
+        {/* Fonds de précaution : cash comparé aux dépenses mensuelles du profil */}
+        {stocks.length > 0 && summary.ready && cash.amount >= 0 && (
+          <EmergencyFund
+            cash={toBase(Number(cash.amount) || 0, cash.currency) ?? 0}
+            monthlyExpenses={profile.monthlyExpenses}
+            symbol={baseSymbol}
+          />
         )}
 
         {/* KPI Cards */}
