@@ -4,7 +4,7 @@ import { useState } from "react";
 import AppHeader from "../components/AppHeader";
 import ProfileForm from "../components/ProfileForm";
 import { Card, Button, ConfirmModal, useToast } from "../components/ui";
-import { apiFetch, logout } from "@/lib/api";
+import { apiFetch, apiDownload, logout } from "@/lib/api";
 
 // Mêmes règles que le backend (routes/auth.js)
 const RULES = [
@@ -38,6 +38,27 @@ export default function MonProfil() {
   const [show, setShow] = useState(false);
   const [saving, setSaving] = useState(false);
   const [pwError, setPwError] = useState(null);
+
+  // Export des données (RGPD)
+  const [exporting, setExporting] = useState(null);
+
+  const exportData = async (kind) => {
+    const day = new Date().toISOString().slice(0, 10);
+    const files = {
+      json: ["/api/user/export?format=json", `nauticash-export-${day}.json`],
+      positions: ["/api/user/export?format=csv&dataset=positions", `nauticash-positions-${day}.csv`],
+      history: ["/api/user/export?format=csv&dataset=history", `nauticash-historique-${day}.csv`],
+    };
+    setExporting(kind);
+    try {
+      await apiDownload(...files[kind]);
+      toast.success("Export téléchargé.");
+    } catch (err) {
+      if (err.status !== 401) toast.error(err.message);
+    } finally {
+      setExporting(null);
+    }
+  };
 
   // Suppression du compte
   const [deletePassword, setDeletePassword] = useState("");
@@ -151,6 +172,25 @@ export default function MonProfil() {
 
             <Button type="submit" loading={saving} className="w-full sm:w-auto">Enregistrer le mot de passe</Button>
           </form>
+        </Card>
+
+        <Card as="section" aria-labelledby="export-title">
+          <h2 id="export-title" className="mb-1 text-lg font-semibold">Exporter mes données</h2>
+          <p className="mb-5 text-sm text-ink-muted">
+            Téléchargez une copie de vos données : profil, positions, cash, historique de valeur et transactions.
+            Le fichier JSON contient tout ; les CSV s&apos;ouvrent directement dans un tableur.
+          </p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <Button variant="secondary" loading={exporting === "json"} disabled={Boolean(exporting)} onClick={() => exportData("json")}>
+              Tout exporter (JSON)
+            </Button>
+            <Button variant="secondary" loading={exporting === "positions"} disabled={Boolean(exporting)} onClick={() => exportData("positions")}>
+              Positions et cash (CSV)
+            </Button>
+            <Button variant="secondary" loading={exporting === "history"} disabled={Boolean(exporting)} onClick={() => exportData("history")}>
+              Historique quotidien (CSV)
+            </Button>
+          </div>
         </Card>
 
         <Card as="section" aria-labelledby="delete-title" className="border-loss/30">

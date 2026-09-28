@@ -89,6 +89,10 @@ Yahoo est ajouté automatiquement en dernier recours (`YAHOO_ENABLED=false` pour
 
 **Place de cotation et logo** : `exchange` (libellé lisible : NASDAQ, NYSE, Euronext Paris, XETRA…) et `logo` (images publiques FMP, initiales en secours) sont renvoyés pour chaque position et chaque suggestion de recherche.
 
+## Export des données du compte (RGPD, depuis le 28/09/2026)
+
+`GET /api/user/export` (connecté) : `format=json` (par défaut) renvoie tout ce qui est rattaché au compte — e-mail, dates, profil, positions, cash, historique mensuel et quotidien, transactions — sans mot de passe hashé ni jeton de réinitialisation ; `format=csv&dataset=positions|history` renvoie les positions (+ ligne CASH) ou l'historique quotidien en CSV compatible Excel français (séparateur `;`, virgule décimale, BOM UTF-8, formules neutralisées). Réponse en pièce jointe, `Cache-Control: no-store`. Aucun appel aux API de cotation. Boutons sur la page « Mon profil ».
+
 ## Pistes (voir `docs/AMELIORATIONS.md`)
 
 - Reporter ci-dessus les résultats de `GET /api/admin/coverage` en production.

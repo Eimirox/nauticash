@@ -8,6 +8,7 @@ const priceStore = require("../services/priceStore");
 const { validateProfilePatch, readProfile } = require("../services/profile");
 const { resolveCountry } = require("../services/countries");
 const { exchangeLabel, logoUrl } = require("../services/exchanges");
+const { buildExport, CSV_DATASETS } = require("../services/accountExport");
 
 const MONTH_MS = 30.44 * 24 * 60 * 60 * 1000;
 
@@ -375,6 +376,36 @@ router.patch("/profile", auth, async (req, res) => {
     res.json({ email: user.email, profile: readProfile(user) });
   } catch (err) {
     console.error("❌ Error PATCH /profile:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// =============================================================================
+// EXPORT RGPD : GET /api/user/export?format=json
+//               GET /api/user/export?format=csv&dataset=positions|history
+// =============================================================================
+router.get("/export", auth, async (req, res) => {
+  try {
+    const format = String(req.query.format || "json").toLowerCase();
+    const dataset = String(req.query.dataset || "positions").toLowerCase();
+    if (!["json", "csv"].includes(format)) return res.status(400).json({ error: "Format invalide (json ou csv)." });
+    if (format === "csv" && !CSV_DATASETS[dataset]) {
+      return res.status(400).json({ error: "Jeu de données invalide (positions ou history)." });
+    }
+
+    const data = await buildExport(req.user.userId);
+    if (!data) return res.status(404).json({ error: "User not found" });
+
+    const day = data.exportedAt.slice(0, 10);
+    res.set("Cache-Control", "no-store");
+    if (format === "json") {
+      res.set("Content-Disposition", `attachment; filename="nauticash-export-${day}.json"`);
+      return res.type("application/json").send(JSON.stringify(data, null, 2));
+    }
+    res.set("Content-Disposition", `attachment; filename="nauticash-${dataset}-${day}.csv"`);
+    res.type("text/csv; charset=utf-8").send(CSV_DATASETS[dataset](data));
+  } catch (err) {
+    console.error("❌ Error GET /export:", err);
     res.status(500).json({ error: "Server error" });
   }
 });
