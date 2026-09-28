@@ -13,6 +13,9 @@ import { quoteFreshness } from "@/lib/quoteTime";
 import { useFxRates, toCurrency, currencySymbol } from "@/lib/fx";
 import { useBaseCurrency } from "@/lib/profile";
 
+// Enveloppes proposées (doivent correspondre à ACCOUNTS côté backend)
+const ACCOUNT_LABELS = { PEA: "PEA", CTO: "Compte-titres", AV: "Assurance-vie", PER: "PER", CRYPTO: "Crypto" };
+
 export default function Portfolio() {
   const router = useRouter();
   const [ticker, setTicker] = useState("");
@@ -197,6 +200,17 @@ export default function Portfolio() {
     />
   );
 
+  // Enveloppe (PEA, CTO…) : enregistrée immédiatement
+  const handleUpdateAccount = (ticker, account) => {
+    setStocks((prev) => prev.map((s) => (s.ticker === ticker ? { ...s, account: account || null } : s)));
+    apiFetch(`/api/user/portfolio/${encodeURIComponent(ticker)}`, { method: "PATCH", body: { account: account || null } }).catch(
+      (err) => {
+        setError(`Enveloppe non enregistrée : ${err.message}`);
+        fetchPortfolio();
+      }
+    );
+  };
+
   const handleUpdateStock = (ticker, field, value) => {
     if (!Number.isFinite(value) || value < 0) {
       setError("La quantité et le PRU doivent être des nombres positifs.");
@@ -282,6 +296,20 @@ export default function Portfolio() {
       gainPct: cost > 0 ? ((costedValue - cost) / cost) * 100 : null,
     };
   })();
+  // Filtre et sous-totaux par enveloppe (dans la devise de référence)
+  const [accountFilter, setAccountFilter] = useState("all");
+  const accountTotals = stocks.reduce((acc, s) => {
+    const key = s.account || "NONE";
+    const v = toBase((s.close || 0) * (Number(s.quantity) || 0), s.currency) ?? 0;
+    acc[key] = (acc[key] || 0) + v;
+    return acc;
+  }, {});
+  const hasAccounts = stocks.some((s) => s.account);
+  // Si la dernière position d'une enveloppe change d'enveloppe, on revient à « Toutes »
+  const activeFilter = accountFilter !== "all" && accountTotals[accountFilter] === undefined ? "all" : accountFilter;
+  const visibleStocks =
+    activeFilter === "all" ? stocks : stocks.filter((s) => (s.account || "NONE") === activeFilter);
+
   const signed = (n) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${nf2.format(Math.abs(n))} ${baseSymbol}`;
 
   const typeBadge = (type) => {
@@ -332,6 +360,21 @@ export default function Portfolio() {
       );
     return "";
   };
+
+  // Sélecteur d'enveloppe compact, sous le ticker
+  const AccountSelect = ({ stock, className = "" }) => (
+    <select
+      aria-label={`Enveloppe de ${stock.ticker}`}
+      value={stock.account || ""}
+      onChange={(e) => handleUpdateAccount(stock.ticker, e.target.value)}
+      className={`rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 ${className}`}
+    >
+      <option value="">Sans enveloppe</option>
+      {Object.entries(ACCOUNT_LABELS).map(([k, label]) => (
+        <option key={k} value={k}>{label}</option>
+      ))}
+    </select>
+  );
 
   // Heure de cotation sous le prix ; badge orange si le cours date de plus de 3 jours ouvrés
   const QuoteTime = ({ stock }) => {
@@ -414,7 +457,7 @@ export default function Portfolio() {
         </div>
       ) : (
         <ul className="divide-y divide-slate-100">
-          {stocks.map((stock) => {
+          {visibleStocks.map((stock) => {
             const perf = stock.pru > 0 ? ((stock.close - stock.pru) / stock.pru) * 100 : null;
             const total =
               typeof stock.close === "number" && typeof stock.quantity === "number" ? stock.close * stock.quantity : null;
@@ -427,6 +470,7 @@ export default function Portfolio() {
                       <span className="text-base font-bold text-slate-900">{stock.ticker}</span>
                       {typeBadge(stock.type)}
                     </div>
+                    <AccountSelect stock={stock} className="mt-1" />
                     <p className="truncate text-xs text-slate-500">
                       {stock.name && stock.name !== stock.ticker ? `${stock.name} · ` : ""}
                       {exchangeToCountry[stock.country] || stock.country}
@@ -581,7 +625,7 @@ export default function Portfolio() {
               </td>
             </tr>
           ) : stocks.length ? (
-            stocks.map((stock) => {
+            visibleStocks.map((stock) => {
               const perf =
                 stock.pru > 0
                   ? ((stock.close - stock.pru) / stock.pru) * 100
@@ -599,6 +643,7 @@ export default function Portfolio() {
                 >
                   <td className="px-6 py-4 font-bold text-slate-900 text-base">
                     {stock.ticker}
+                    <AccountSelect stock={stock} className="mt-1 block" />
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-600">
                     {exchangeToCountry[stock.country] || stock.country}
@@ -992,6 +1037,34 @@ export default function Portfolio() {
             </span>
           </button>
         </div>
+
+        {/* Enveloppes : filtre et sous-totaux */}
+        {hasAccounts && (
+          <div className="mb-4 flex gap-2 overflow-x-auto pb-1" role="group" aria-label="Filtrer par enveloppe">
+            {[["all", "Toutes"], ...Object.entries(ACCOUNT_LABELS), ["NONE", "Sans enveloppe"]]
+              .filter(([k]) => k === "all" || accountTotals[k] !== undefined)
+              .map(([k, label]) => {
+                const active = activeFilter === k;
+                const amount = k === "all" ? summary.invested : accountTotals[k];
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setAccountFilter(k)}
+                    className={`shrink-0 rounded-xl border px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
+                      active ? "border-emerald-500 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-white text-slate-700 hover:border-emerald-300"
+                    }`}
+                  >
+                    <span className="block text-xs font-semibold">{label}</span>
+                    <span className="money block text-sm font-bold tabular-nums">
+                      {nf2.format(amount || 0)} {baseSymbol}
+                    </span>
+                  </button>
+                );
+              })}
+          </div>
+        )}
 
         {/* Table */}
         <div className="bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">

@@ -9,6 +9,8 @@ const UserSchema = new mongoose.Schema({
       ticker:   { type: String, required: true },
       quantity: { type: Number, default: 0 },
       pru:      { type: Number, default: 0 },
+      // Enveloppe : PEA, CTO, AV (assurance-vie), PER, CRYPTO ou null
+      account:  { type: String, default: null },
     }
   ],
 

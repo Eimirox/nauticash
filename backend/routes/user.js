@@ -55,6 +55,7 @@ function enrich(position, priceInfo) {
       name: position.ticker,
       quantity: position.quantity,
       pru: position.pru,
+      account: position.account || null,
       close: 0,
       currency: "USD",
       performance: 0,
@@ -74,6 +75,7 @@ function enrich(position, priceInfo) {
     name: priceInfo.name || position.ticker,
     quantity: position.quantity,
     pru: position.pru,
+    account: position.account || null,
     close,
     currency: priceInfo.currency || "USD",
     performance: position.pru > 0 ? ((close - position.pru) / position.pru) * 100 : 0,
@@ -96,6 +98,17 @@ function enrich(position, priceInfo) {
     lastUpdate: priceInfo.lastUpdate,
     source: priceInfo.source,
   };
+}
+
+// Enveloppes fiscales / comptes (champ optionnel de chaque position)
+const ACCOUNTS = ["PEA", "CTO", "AV", "PER", "CRYPTO"];
+
+/** undefined = champ absent ; null = aucune enveloppe ; false = valeur invalide */
+function readAccount(value) {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  const v = String(value).toUpperCase();
+  return ACCOUNTS.includes(v) ? v : false;
 }
 
 // =============================================================================
@@ -128,7 +141,9 @@ router.post("/portfolio", auth, async (req, res) => {
     const ticker = normalizeTicker(req.body.ticker);
     const quantity = req.body.quantity === undefined ? 0 : toNumber(req.body.quantity);
     const pru = req.body.pru === undefined ? 0 : toNumber(req.body.pru);
+    const account = readAccount(req.body.account);
 
+    if (account === false) return res.status(400).json({ error: "Enveloppe invalide." });
     if (!TICKER_RE.test(ticker)) return res.status(400).json({ error: "Ticker invalide." });
     if (!isValidAmount(quantity) || !isValidAmount(pru)) {
       return res.status(400).json({ error: "Quantité ou PRU invalide." });
@@ -148,12 +163,12 @@ router.post("/portfolio", auth, async (req, res) => {
     }
 
     await users().updateOne(userFilter(req), {
-      $push: { portfolio: { _id: new mongoose.Types.ObjectId(), ticker, quantity, pru } },
+      $push: { portfolio: { _id: new mongoose.Types.ObjectId(), ticker, quantity, pru, account: account ?? null } },
     });
 
     res.status(201).json({
       message: "Stock added successfully",
-      stock: enrich({ ticker, quantity, pru }, doc),
+      stock: enrich({ ticker, quantity, pru, account: account ?? null }, doc),
     });
   } catch (err) {
     console.error("❌ Error POST /portfolio:", err);
@@ -162,7 +177,7 @@ router.post("/portfolio", auth, async (req, res) => {
 });
 
 // =============================================================================
-// PATCH /api/user/portfolio/:ticker  { quantity?, pru? }
+// PATCH /api/user/portfolio/:ticker  { quantity?, pru?, account? }
 // =============================================================================
 router.patch("/portfolio/:ticker", auth, async (req, res) => {
   try {
@@ -175,6 +190,9 @@ router.patch("/portfolio/:ticker", auth, async (req, res) => {
       if (!isValidAmount(value)) return res.status(400).json({ error: `${field} invalide.` });
       $set[`portfolio.$.${field}`] = value;
     }
+    const account = readAccount(req.body.account);
+    if (account === false) return res.status(400).json({ error: "Enveloppe invalide." });
+    if (account !== undefined) $set["portfolio.$.account"] = account;
     if (!Object.keys($set).length) return res.status(400).json({ error: "Rien à mettre à jour." });
 
     const result = await users().updateOne({ ...userFilter(req), "portfolio.ticker": ticker }, { $set });
