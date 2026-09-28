@@ -9,6 +9,7 @@ import { getPerformanceClass } from "./utils/styles";
 import { apiFetch, logout as apiLogout } from "@/lib/api";
 import AppHeader from "../components/AppHeader";
 import { ConfirmModal, useToast, Delta } from "../components/ui";
+import { quoteFreshness } from "@/lib/quoteTime";
 import { useFxRates, toCurrency, currencySymbol } from "@/lib/fx";
 import { useBaseCurrency } from "@/lib/profile";
 
@@ -34,6 +35,8 @@ export default function Portfolio() {
     switch (key) {
       case "price":
         return typeof stock.close === "number" ? stock.close : null;
+      case "day":
+        return Number.isFinite(stock.dayChangePercent) ? stock.dayChangePercent : null;
       case "performance": {
         const perf =
           stock.pru > 0 ? ((stock.close - stock.pru) / stock.pru) * 100 : null;
@@ -330,6 +333,34 @@ export default function Portfolio() {
     return "";
   };
 
+  // Heure de cotation sous le prix ; badge orange si le cours date de plus de 3 jours ouvrés
+  const QuoteTime = ({ stock }) => {
+    const f = quoteFreshness(stock.priceTime);
+    if (!f) return null;
+    return f.stale ? (
+      <span title={f.title} className="mt-1 inline-block whitespace-nowrap rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">
+        cours du {f.label}
+      </span>
+    ) : (
+      <span title={f.title} className="mt-0.5 block text-[11px] font-normal text-slate-400 tabular-nums">
+        {f.label}
+      </span>
+    );
+  };
+
+  // Variation du jour : pourcentage + montant pour la position
+  const DayChange = ({ stock, cur }) => (
+    <span className="inline-flex flex-col items-end">
+      <Delta value={stock.dayChangePercent} className="whitespace-nowrap text-sm" />
+      {Number.isFinite(stock.dayChangeValue) && (
+        <span className="money whitespace-nowrap text-[11px] text-slate-500 tabular-nums">
+          {stock.dayChangeValue > 0 ? "+" : stock.dayChangeValue < 0 ? "−" : ""}
+          {nf2.format(Math.abs(stock.dayChangeValue))} {cur}
+        </span>
+      )}
+    </span>
+  );
+
   // Champ numérique éditable (quantité / PRU), enregistré à la sortie du champ
   const EditableNumber = ({ stock, field, label, className = "" }) => (
     <input
@@ -367,6 +398,8 @@ export default function Portfolio() {
           <option value="total:desc">Montant (décroissant)</option>
           <option value="performance:desc">Performance (meilleure)</option>
           <option value="performance:asc">Performance (pire)</option>
+          <option value="day:desc">Variation du jour (meilleure)</option>
+          <option value="day:asc">Variation du jour (pire)</option>
           <option value="yield:desc">Rendement (décroissant)</option>
           <option value="ticker:asc">Ticker (A → Z)</option>
         </select>
@@ -406,6 +439,11 @@ export default function Portfolio() {
                     <p className={`text-sm font-semibold tabular-nums ${getPerformanceClass(perf)}`}>
                       {perf != null ? `${perf > 0 ? "▲ +" : perf < 0 ? "▼ " : ""}${nf2.format(perf)} %` : "--"}
                     </p>
+                    {Number.isFinite(stock.dayChangePercent) && (
+                      <p className="text-xs text-slate-500">
+                        <Delta value={stock.dayChangePercent} className="text-xs" /> aujourd&apos;hui
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -413,6 +451,7 @@ export default function Portfolio() {
                   <div>
                     <p className="mb-1 text-slate-500">Prix</p>
                     <p className="font-medium tabular-nums text-slate-900">{nf2.format(stock.close)} {cur}</p>
+                    <QuoteTime stock={stock} />
                   </div>
                   <div>
                     <p className="mb-1 text-slate-500">Quantité</p>
@@ -467,6 +506,12 @@ export default function Portfolio() {
             >
               Prix {caret("price")}
             </th>
+            <th
+              className="px-6 py-4 text-right text-xs font-semibold text-slate-700 uppercase tracking-wider cursor-pointer hover:text-emerald-600 transition select-none"
+              onClick={() => toggleSort("day")}
+            >
+              Jour {caret("day")}
+            </th>
             <th className="px-6 py-4 text-right text-xs font-semibold text-slate-700 uppercase tracking-wider">
               Quantité
             </th>
@@ -506,7 +551,7 @@ export default function Portfolio() {
           {loading ? (
             <tr>
               <td
-                colSpan="11"
+                colSpan="12"
                 className="px-6 py-20 text-center text-slate-500"
               >
                 <div className="flex flex-col items-center gap-3">
@@ -560,8 +605,13 @@ export default function Portfolio() {
                   </td>
                   <td className="px-6 py-4">{typeBadge(stock.type)}</td>
                   <td className="px-6 py-4 text-right text-slate-900 font-medium">
-                    {nf2.format(stock.close)}{" "}
-                    {formatCurrencySymbol(stock.currency)}
+                    <span className="whitespace-nowrap">
+                      {nf2.format(stock.close)} {formatCurrencySymbol(stock.currency)}
+                    </span>
+                    <QuoteTime stock={stock} />
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <DayChange stock={stock} cur={formatCurrencySymbol(stock.currency)} />
                   </td>
                   
                   {/* QUANTITÉ - VERSION SIMPLE AVEC defaultValue */}
@@ -649,7 +699,7 @@ export default function Portfolio() {
           ) : (
             <tr>
               <td
-                colSpan="11"
+                colSpan="12"
                 className="px-6 py-20 text-center text-slate-500"
               >
                 <div className="flex flex-col items-center gap-3">
