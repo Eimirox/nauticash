@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { apiFetch } from "@/lib/api";
 import { useFxRates, toCurrency, ratePer, currencySymbol } from "@/lib/fx";
 import { useBaseCurrency } from "@/lib/profile";
+import DiversificationCard from "../components/DiversificationCard";
 import AppHeader from "../components/AppHeader";
 import Link from "next/link";
 import { Pie } from "react-chartjs-2";
@@ -336,6 +337,19 @@ export default function Analytics() {
                 </span>
               </div>
             )}
+
+            {/* Score de diversification */}
+            <DiversificationCard
+              positions={stocks.map((s) => ({
+                ticker: s.ticker,
+                value: inBase((s.close || 0) * (s.quantity || 0), s.currency),
+                sector: s.sector,
+                country: s.country,
+                currency: s.currency,
+                type: s.type,
+                composition: s.composition,
+              }))}
+            />
 
             {/* Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
