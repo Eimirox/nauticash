@@ -40,20 +40,20 @@ export default function BenchmarkChart({ daily }) {
   const label = OPTIONS.find((o) => o.key === key)?.label;
 
   return (
-    <section aria-labelledby="benchmark-title" className="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-lg">
+    <section aria-labelledby="benchmark-title" className="mb-6 rounded-xl border border-line bg-surface p-6 shadow-lg">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 id="benchmark-title" className="text-lg font-bold text-slate-900">
+        <h2 id="benchmark-title" className="text-lg font-bold text-ink">
           Comparaison à un indice
         </h2>
-        <div role="group" aria-label="Indice de comparaison" className="flex gap-1 rounded-xl bg-slate-100 p-1">
+        <div role="group" aria-label="Indice de comparaison" className="flex gap-1 rounded-xl bg-surface-2 p-1">
           {OPTIONS.map((o) => (
             <button
               key={o.key}
               type="button"
               aria-pressed={key === o.key}
               onClick={() => setKey(o.key)}
-              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
-                key === o.key ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                key === o.key ? "bg-surface text-ink shadow-sm" : "text-ink-muted hover:text-ink"
               }`}
             >
               {o.label}
@@ -63,30 +63,30 @@ export default function BenchmarkChart({ daily }) {
       </div>
 
       {!daily || daily.length < 2 ? (
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-ink-muted">
           La comparaison s&apos;affichera dès que deux jours d&apos;historique auront été enregistrés.
         </p>
       ) : status === "error" ? (
-        <p className="text-sm text-slate-500">Les données de l&apos;indice sont momentanément indisponibles.</p>
+        <p className="text-sm text-ink-muted">Les données de l&apos;indice sont momentanément indisponibles.</p>
       ) : status === "loading" || !cmp ? (
-        <div className="h-64 animate-pulse rounded-lg bg-slate-50" aria-label="Chargement" />
+        <div className="h-64 animate-pulse rounded-lg bg-surface-2" aria-label="Chargement" />
       ) : (
         <>
           <div className="mb-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
-            <span className="text-slate-600">
+            <span className="text-ink-muted">
               Portefeuille <Delta value={cmp.portfolioPct} className="ml-1" />
             </span>
-            <span className="text-slate-600">
+            <span className="text-ink-muted">
               {label} <Delta value={cmp.indexPct} className="ml-1" />
             </span>
-            <span className="text-slate-400">depuis le {new Date(`${cmp.from}T12:00:00Z`).toLocaleDateString("fr-FR")}</span>
+            <span className="text-ink-muted/70">depuis le {new Date(`${cmp.from}T12:00:00Z`).toLocaleDateString("fr-FR")}</span>
           </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={cmp.series} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="date" tickFormatter={shortDate} tick={{ fontSize: 11, fill: "#64748b" }} minTickGap={24} />
-                <YAxis domain={["auto", "auto"]} tick={{ fontSize: 11, fill: "#64748b" }} width={48} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#94A3B8" strokeOpacity={0.25} />
+                <XAxis dataKey="date" tickFormatter={shortDate} tick={{ fontSize: 11, fill: "#8A9AA9" }} minTickGap={24} />
+                <YAxis domain={["auto", "auto"]} tick={{ fontSize: 11, fill: "#8A9AA9" }} width={48} />
                 <Tooltip
                   labelFormatter={(d) => new Date(`${d}T12:00:00Z`).toLocaleDateString("fr-FR")}
                   formatter={(v, name) => [`${Number(v).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}`, name]}
@@ -97,7 +97,7 @@ export default function BenchmarkChart({ daily }) {
               </LineChart>
             </ResponsiveContainer>
           </div>
-          <p className="mt-2 text-[11px] text-slate-400">
+          <p className="mt-2 text-[11px] text-ink-muted/70">
             Base 100 au premier jour commun. L&apos;indice est suivi dans sa devise ({bench.currency}), hors dividendes ; la
             courbe du portefeuille inclut vos achats et ventes.
             {bench.stale && " Données de l'indice non actualisées (service momentanément indisponible)."}

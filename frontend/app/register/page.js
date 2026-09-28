@@ -61,9 +61,9 @@ export default function Register() {
   };
 
   const getStrengthColor = () => {
-    if (strength < 40) return "bg-red-500";
+    if (strength < 40) return "bg-loss/100";
     if (strength < 80) return "bg-yellow-500";
-    return "bg-emerald-500";
+    return "bg-accent/100";
   };
 
   const getStrengthText = () => {
@@ -73,7 +73,7 @@ export default function Register() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50 flex items-center justify-center p-4 py-12">
+    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50 dark:from-bg dark:via-bg dark:to-surface flex items-center justify-center p-4 py-12">
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-[0.03]">
         <div
@@ -97,29 +97,29 @@ export default function Register() {
               height={40}
               className="rounded-lg shadow-md group-hover:scale-110 transition-transform"
             />
-            <span className="text-3xl font-bold bg-gradient-to-r from-slate-900 via-emerald-600 to-blue-600 bg-clip-text text-transparent">
+            <span className="text-3xl font-bold bg-gradient-to-r from-slate-900 via-emerald-600 to-blue-600 dark:from-white dark:via-emerald-300 dark:to-sky-300 bg-clip-text text-transparent">
               Nauticash
             </span>
           </Link>
-          <h1 className="text-2xl font-bold text-slate-900 mt-6 mb-2">
+          <h1 className="text-2xl font-bold text-ink mt-6 mb-2">
             Créer un compte
           </h1>
-          <p className="text-slate-600">
+          <p className="text-ink-muted">
             Commencez à gérer votre portefeuille gratuitement
           </p>
         </div>
 
         {/* Card */}
-        <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8">
+        <div className="bg-surface rounded-2xl shadow-xl border border-line p-8">
           <form onSubmit={handleRegister} className="space-y-5" noValidate>
             {/* Email */}
             <div>
-              <label htmlFor="email" className="block text-sm font-semibold text-slate-700 mb-2">
+              <label htmlFor="email" className="block text-sm font-semibold text-ink mb-2">
                 Email
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg className="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="h-5 w-5 text-ink-muted/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -132,7 +132,7 @@ export default function Register() {
                   id="email"
                   type="email"
                   placeholder="email@exemple.com"
-                  className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                  className="w-full pl-10 pr-4 py-3 border border-line rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
                   value={email}
                   onChange={(e) => setEmail(e.target.value.trim())}
                   required
@@ -142,12 +142,12 @@ export default function Register() {
 
             {/* Password */}
             <div>
-              <label htmlFor="password" className="block text-sm font-semibold text-slate-700 mb-2">
+              <label htmlFor="password" className="block text-sm font-semibold text-ink mb-2">
                 Mot de passe
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg className="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="h-5 w-5 text-ink-muted/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -160,7 +160,7 @@ export default function Register() {
                   id="password"
                   type={showPw ? "text" : "password"}
                   placeholder="••••••••••"
-                  className="w-full pl-10 pr-12 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                  className="w-full pl-10 pr-12 py-3 border border-line rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -170,7 +170,7 @@ export default function Register() {
                 <button
                   type="button"
                   onClick={() => setShowPw(!showPw)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-ink-muted/70 hover:text-ink-muted transition"
                 >
                   {showPw ? (
                     <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -199,14 +199,14 @@ export default function Register() {
               {password && (
                 <div className="mt-3">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-medium text-slate-600">Force du mot de passe</span>
+                    <span className="text-xs font-medium text-ink-muted">Force du mot de passe</span>
                     <span className={`text-xs font-semibold ${
-                      strength < 40 ? "text-red-600" : strength < 80 ? "text-yellow-600" : "text-emerald-600"
+                      strength < 40 ? "text-loss" : strength < 80 ? "text-yellow-600" : "text-accent"
                     }`}>
                       {getStrengthText()}
                     </span>
                   </div>
-                  <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
+                  <div className="h-2 w-full bg-surface-2 rounded-full overflow-hidden">
                     <div
                       className={`h-full transition-all duration-300 ${getStrengthColor()}`}
                       style={{ width: `${strength}%` }}
@@ -223,7 +223,7 @@ export default function Register() {
                     return (
                       <li key={r.id} className="flex items-center gap-2 text-xs">
                         {ok ? (
-                          <svg className="w-4 h-4 text-emerald-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <svg className="w-4 h-4 text-accent flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                             <path
                               fillRule="evenodd"
                               d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
@@ -231,7 +231,7 @@ export default function Register() {
                             />
                           </svg>
                         ) : (
-                          <svg className="w-4 h-4 text-slate-300 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <svg className="w-4 h-4 text-ink-muted/40 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                             <path
                               fillRule="evenodd"
                               d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z"
@@ -239,7 +239,7 @@ export default function Register() {
                             />
                           </svg>
                         )}
-                        <span className={ok ? "text-slate-700" : "text-slate-500"}>{r.label}</span>
+                        <span className={ok ? "text-ink" : "text-ink-muted"}>{r.label}</span>
                       </li>
                     );
                   })}
@@ -249,12 +249,12 @@ export default function Register() {
 
             {/* Confirm Password */}
             <div>
-              <label htmlFor="confirm" className="block text-sm font-semibold text-slate-700 mb-2">
+              <label htmlFor="confirm" className="block text-sm font-semibold text-ink mb-2">
                 Confirmer le mot de passe
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg className="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="h-5 w-5 text-ink-muted/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -267,7 +267,7 @@ export default function Register() {
                   id="confirm"
                   type={showConfirm ? "text" : "password"}
                   placeholder="••••••••••"
-                  className="w-full pl-10 pr-12 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                  className="w-full pl-10 pr-12 py-3 border border-line rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
                   required
@@ -276,7 +276,7 @@ export default function Register() {
                 <button
                   type="button"
                   onClick={() => setShowConfirm(!showConfirm)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-ink-muted/70 hover:text-ink-muted transition"
                 >
                   {showConfirm ? (
                     <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -301,7 +301,7 @@ export default function Register() {
                 </button>
               </div>
               {confirm && confirm !== password && (
-                <p className="text-xs text-red-600 mt-2 flex items-center gap-1">
+                <p className="text-xs text-loss mt-2 flex items-center gap-1">
                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                     <path
                       fillRule="evenodd"
@@ -313,7 +313,7 @@ export default function Register() {
                 </p>
               )}
               {confirm && confirm === password && password.length >= 10 && (
-                <p className="text-xs text-emerald-600 mt-2 flex items-center gap-1">
+                <p className="text-xs text-accent mt-2 flex items-center gap-1">
                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                     <path
                       fillRule="evenodd"
@@ -327,21 +327,21 @@ export default function Register() {
             </div>
 
             {/* Terms acceptance */}
-            <div className="flex items-start gap-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
+            <div className="flex items-start gap-3 p-4 bg-surface-2 rounded-lg border border-line">
               <input
                 id="accept"
                 type="checkbox"
                 checked={accepted}
                 onChange={(e) => setAccepted(e.target.checked)}
-                className="mt-0.5 w-4 h-4 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500"
+                className="mt-0.5 w-4 h-4 text-accent border-line rounded focus:ring-accent"
               />
-              <label htmlFor="accept" className="text-sm text-slate-700">
+              <label htmlFor="accept" className="text-sm text-ink">
                 J'accepte les{" "}
-                <a href="/cgu" target="_blank" className="text-emerald-600 hover:text-emerald-700 font-medium">
+                <a href="/cgu" target="_blank" className="text-accent hover:text-accent font-medium">
                   conditions d'utilisation
                 </a>{" "}
                 et la{" "}
-                <a href="/confidentialite" target="_blank" className="text-emerald-600 hover:text-emerald-700 font-medium">
+                <a href="/confidentialite" target="_blank" className="text-accent hover:text-accent font-medium">
                   politique de confidentialité
                 </a>
               </label>
@@ -349,15 +349,15 @@ export default function Register() {
 
             {/* Error Message */}
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
-                <svg className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <div className="bg-loss/10 border border-loss/30 rounded-lg p-3 flex items-start gap-2">
+                <svg className="w-5 h-5 text-loss mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                   <path
                     fillRule="evenodd"
                     d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
                     clipRule="evenodd"
                   />
                 </svg>
-                <p className="text-sm text-red-700">{error}</p>
+                <p className="text-sm text-loss">{error}</p>
               </div>
             )}
 
@@ -368,7 +368,7 @@ export default function Register() {
               className={`w-full py-3 px-4 text-white font-semibold rounded-lg shadow-lg transition-all ${
                 canSubmit
                   ? "bg-gradient-to-r from-emerald-600 to-blue-600 hover:shadow-xl hover:scale-[1.02]"
-                  : "bg-slate-300 cursor-not-allowed"
+                  : "bg-line text-ink-muted cursor-not-allowed"
               }`}
             >
               {loading ? (
@@ -392,17 +392,17 @@ export default function Register() {
           {/* Divider */}
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-200" />
+              <div className="w-full border-t border-line" />
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-slate-500">ou</span>
+              <span className="px-2 bg-surface text-ink-muted">ou</span>
             </div>
           </div>
 
           {/* Login link */}
           <div className="text-center">
-            <span className="text-sm text-slate-600">Déjà un compte ? </span>
-            <Link href="/login" className="text-sm font-semibold text-emerald-600 hover:text-emerald-700 transition">
+            <span className="text-sm text-ink-muted">Déjà un compte ? </span>
+            <Link href="/login" className="text-sm font-semibold text-accent hover:text-accent transition">
               Se connecter
             </Link>
           </div>
@@ -410,7 +410,7 @@ export default function Register() {
 
         {/* Back to home */}
         <div className="mt-6 text-center">
-          <Link href="/" className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 transition">
+          <Link href="/" className="inline-flex items-center gap-2 text-sm text-ink-muted hover:text-ink transition">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>

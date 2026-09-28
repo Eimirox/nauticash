@@ -25,8 +25,8 @@ export default function EmergencyFund({ cash, monthlyExpenses, symbol = "€" })
 
   if (months === null) {
     return (
-      <p className="mb-4 text-sm text-slate-500">
-        <Link href="/profil" className="font-medium text-emerald-700 underline-offset-2 hover:underline">
+      <p className="mb-4 text-sm text-ink-muted">
+        <Link href="/profil" className="font-medium text-accent underline-offset-2 hover:underline">
           Indiquez vos dépenses mensuelles
         </Link>{" "}
         pour vérifier votre fonds de précaution.
@@ -39,22 +39,22 @@ export default function EmergencyFund({ cash, monthlyExpenses, symbol = "€" })
   const pct = Math.min(100, (months / TARGET_MONTHS) * 100);
   const state = months < MIN_MONTHS ? "low" : months > HIGH_MONTHS ? "high" : "ok";
   const tone = {
-    low: { bar: "bg-amber-500", badge: "border-amber-200 bg-amber-50 text-amber-700", label: "À renforcer" },
-    ok: { bar: "bg-emerald-500", badge: "border-emerald-200 bg-emerald-50 text-emerald-700", label: "Constitué" },
-    high: { bar: "bg-sky-500", badge: "border-sky-200 bg-sky-50 text-sky-700", label: "Confortable" },
+    low: { bar: "bg-warn/100", badge: "border-warn/30 bg-warn/10 text-warn", label: "À renforcer" },
+    ok: { bar: "bg-accent/100", badge: "border-accent/40 bg-accent/10 text-accent", label: "Constitué" },
+    high: { bar: "bg-sky-500/100", badge: "border-sky-500/30 bg-sky-500/10 text-sky-600 dark:text-sky-300", label: "Confortable" },
   }[state];
 
   return (
-    <section aria-labelledby="emergency-title" className="mb-4 rounded-xl border border-slate-200 bg-white p-5 shadow-lg">
+    <section aria-labelledby="emergency-title" className="mb-4 rounded-xl border border-line bg-surface p-5 shadow-lg">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <h2 id="emergency-title" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <h2 id="emergency-title" className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
           Fonds de précaution
         </h2>
         <span className={`rounded-lg border px-2 py-0.5 text-xs font-semibold ${tone.badge}`}>{tone.label}</span>
       </div>
-      <p className="mb-2 text-sm text-slate-600">
+      <p className="mb-2 text-sm text-ink-muted">
         Votre cash couvre{" "}
-        <span className="font-bold text-slate-900 tabular-nums">{nf1.format(months)} mois</span> de dépenses (repère : {MIN_MONTHS} à{" "}
+        <span className="font-bold text-ink tabular-nums">{nf1.format(months)} mois</span> de dépenses (repère : {MIN_MONTHS} à{" "}
         {TARGET_MONTHS} mois, soit <span className="money font-semibold">{nf0.format(target)} {symbol}</span> pour {TARGET_MONTHS} mois).
       </p>
       <div
@@ -63,23 +63,23 @@ export default function EmergencyFund({ cash, monthlyExpenses, symbol = "€" })
         aria-valuemin={0}
         aria-valuemax={TARGET_MONTHS}
         aria-valuenow={Math.round(Math.min(months, TARGET_MONTHS) * 10) / 10}
-        className="relative h-3 w-full overflow-hidden rounded-full bg-slate-100"
+        className="relative h-3 w-full overflow-hidden rounded-full bg-surface-2"
       >
         <div className={`h-full rounded-full ${tone.bar}`} style={{ width: `${Math.max(pct, 2)}%` }} />
         {/* Repère des 3 mois */}
-        <span aria-hidden="true" className="absolute inset-y-0 w-px bg-slate-400" style={{ left: `${(MIN_MONTHS / TARGET_MONTHS) * 100}%` }} />
+        <span aria-hidden="true" className="absolute inset-y-0 w-px bg-ink-muted" style={{ left: `${(MIN_MONTHS / TARGET_MONTHS) * 100}%` }} />
       </div>
-      <p className="mt-2 text-xs text-slate-500">
+      <p className="mt-2 text-xs text-ink-muted">
         {state === "low" && (
           <>
-            Il manque environ <span className="money font-semibold text-slate-700">{nf0.format(missing)} {symbol}</span> pour atteindre{" "}
+            Il manque environ <span className="money font-semibold text-ink">{nf0.format(missing)} {symbol}</span> pour atteindre{" "}
             {MIN_MONTHS} mois : une réserve disponible immédiatement évite de vendre vos placements au mauvais moment.
           </>
         )}
         {state === "ok" && "Votre réserve de sécurité est en place : le reste peut être investi selon vos objectifs."}
         {state === "high" &&
           `Plus de ${HIGH_MONTHS} mois de dépenses en cash : une partie pourrait être placée si elle n'a pas d'usage prévu.`}{" "}
-        <Link href="/profil" className="whitespace-nowrap text-emerald-700 hover:underline">
+        <Link href="/profil" className="whitespace-nowrap text-accent hover:underline">
           Modifier mes dépenses
         </Link>
       </p>

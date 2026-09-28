@@ -123,7 +123,8 @@ export default function Analytics() {
         acc[sect] = (acc[sect] || 0) + (valBase * pct) / 100;
       });
     } else {
-      const sect = s.sector || "Unknown";
+      const sect =
+        s.sector && s.sector !== "Unknown" ? s.sector : String(s.type).toUpperCase() === "ETF" ? "ETF" : "Non renseigné";
       acc[sect] = (acc[sect] || 0) + valBase;
     }
     return acc;
@@ -189,6 +190,7 @@ export default function Analytics() {
       legend: { 
         position: "bottom",
         labels: {
+          color: "#8A9AA9", // lisible en clair comme en sombre
           padding: 15,
           font: {
             size: 12,
@@ -202,8 +204,10 @@ export default function Analytics() {
             const raw = ctx.parsed;
             const formatted = numberFormatter.format(raw);
             const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
-            const pct = total ? ((raw / total) * 100).toFixed(2) : 0;
-            return `${ctx.label}: ${formatted} (${pct}%)`;
+            const pct = total ? ((raw / total) * 100).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0";
+            // Mode discret : pourcentage seulement
+            if (document.documentElement.classList.contains("discreet")) return `${ctx.label} : ${pct} %`;
+            return `${ctx.label} : ${formatted} (${pct} %)`;
           },
         },
         backgroundColor: "rgba(0, 0, 0, 0.8)",
@@ -216,9 +220,9 @@ export default function Analytics() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+    <main className="min-h-screen bg-bg">
       {loadError && (
-        <div role="alert" className="mx-auto mt-4 max-w-7xl rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div role="alert" className="mx-auto mt-4 max-w-7xl rounded-lg border border-loss/30 bg-loss/10 px-4 py-3 text-sm text-loss">
           {loadError}
         </div>
       )}
@@ -228,10 +232,10 @@ export default function Analytics() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Title */}
         <div className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-2">
+          <h1 className="text-3xl md:text-4xl font-bold text-ink mb-2">
             Vue d'ensemble
           </h1>
-          <p className="text-slate-600">
+          <p className="text-ink-muted">
             Répartition de votre patrimoine par devise, type d'actif et secteur.
           </p>
         </div>
@@ -244,7 +248,7 @@ export default function Analytics() {
               {loading ? (
                 <div className="col-span-full flex justify-center py-10">
                   <svg
-                    className="animate-spin h-8 w-8 text-emerald-600"
+                    className="animate-spin h-8 w-8 text-accent"
                     fill="none"
                     viewBox="0 0 24 24"
                   >
@@ -266,13 +270,13 @@ export default function Analytics() {
               ) : (
                 <>
                   {/* Total dans la devise de référence (tout converti) */}
-                  <div className="relative p-6 bg-white border border-slate-200 shadow-lg rounded-xl overflow-hidden group hover:shadow-xl transition-all">
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-emerald-100 to-blue-100 rounded-full -mr-12 -mt-12 opacity-40 group-hover:opacity-60 transition-opacity" />
+                  <div className="relative p-6 bg-surface border border-line shadow-lg rounded-xl overflow-hidden group hover:shadow-xl transition-all">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-emerald-100 to-blue-100 dark:from-accent/20 dark:to-accent-2/20 rounded-full -mr-12 -mt-12 opacity-40 group-hover:opacity-60 transition-opacity" />
                     <div className="relative">
-                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                      <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1">
                         Total (converti en {base})
                       </p>
-                      <p className="text-3xl font-bold text-slate-900">
+                      <p className="text-3xl font-bold text-ink">
                         <span className="money">{numberFormatter.format(totalInBase)} {baseSymbol}</span>
                       </p>
                     </div>
@@ -282,18 +286,18 @@ export default function Analytics() {
                   {Object.entries(portfolioTotalsByCurrency).map(([cur, tot]) => (
                     <div
                       key={cur}
-                      className="relative p-6 bg-white border border-slate-200 shadow-lg rounded-xl overflow-hidden group hover:shadow-xl transition-all"
+                      className="relative p-6 bg-surface border border-line shadow-lg rounded-xl overflow-hidden group hover:shadow-xl transition-all"
                     >
-                      <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-emerald-100 to-blue-100 rounded-full -mr-12 -mt-12 opacity-40 group-hover:opacity-60 transition-opacity" />
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-emerald-100 to-blue-100 dark:from-accent/20 dark:to-accent-2/20 rounded-full -mr-12 -mt-12 opacity-40 group-hover:opacity-60 transition-opacity" />
                       <div className="relative">
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                        <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1">
                           Positions {cur}
                         </p>
-                        <p className="text-2xl font-bold text-slate-900">
+                        <p className="text-2xl font-bold text-ink">
                           <span className="money">{numberFormatter.format(tot)} {formatCurrencySymbol(cur)}</span>
                         </p>
                         {cur !== base && (
-                          <p className="text-xs text-slate-500 mt-1">
+                          <p className="text-xs text-ink-muted mt-1">
                             ≈ <span className="money">{numberFormatter.format(inBase(tot, cur))} {baseSymbol}</span>
                           </p>
                         )}
@@ -303,16 +307,16 @@ export default function Analytics() {
 
                   {/* Cash Card */}
                   {cash.amount !== 0 && (
-                    <div className="relative p-6 bg-gradient-to-br from-emerald-50 to-blue-50 border border-emerald-200 rounded-xl overflow-hidden">
+                    <div className="relative p-6 bg-gradient-to-br from-emerald-50 to-blue-50 dark:from-accent/10 dark:to-accent-2/10 border border-accent/40 rounded-xl overflow-hidden">
                       <div className="relative">
-                        <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1">
+                        <p className="text-xs font-semibold text-accent uppercase tracking-wide mb-1">
                           {cash.amount < 0 ? "Dette" : "Cash"}
                         </p>
-                        <p className="text-2xl font-bold text-emerald-900">
+                        <p className="text-2xl font-bold text-accent">
                           <span className="money">{numberFormatter.format(Math.abs(cash.amount))} {formatCurrencySymbol(cash.currency)}</span>
                         </p>
                         {cash.currency !== base && (
-                          <p className="text-xs text-emerald-700 mt-1">
+                          <p className="text-xs text-accent mt-1">
                             ≈ <span className="money">{numberFormatter.format(inBase(Math.abs(cash.amount), cash.currency))} {baseSymbol}</span>
                           </p>
                         )}
@@ -325,14 +329,14 @@ export default function Analytics() {
 
             {/* Info taux de change */}
             {Object.keys(portfolioTotalsByCurrency).some((c) => c !== base) && (
-              <div className="mb-6 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700 flex items-center gap-2">
+              <div className="mb-6 px-4 py-2 bg-blue-50 dark:bg-sky-500/10 border border-blue-200 dark:border-sky-500/30 rounded-lg text-xs text-blue-700 dark:text-sky-200 flex items-center gap-2">
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                 </svg>
                 <span>
                   Taux de référence BCE{fxDate ? ` du ${new Date(fxDate).toLocaleDateString("fr-FR")}` : ""} :{" "}
                   {Object.keys(portfolioTotalsByCurrency).filter((c) => c !== base).map((c) => (
-                    <strong key={c} className="mr-2">1 {c} = {ratePer(c, base, rates)?.toFixed(4) ?? "?"} {baseSymbol}</strong>
+                    <strong key={c} className="mr-2">1 {c} = {ratePer(c, base, rates)?.toLocaleString("fr-FR", { maximumFractionDigits: 4 }) ?? "?"} {baseSymbol}</strong>
                   ))}
                   {fxStale && "(taux approximatifs, service indisponible)"}
                 </span>
@@ -370,10 +374,10 @@ export default function Analytics() {
             {/* Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
               {/* Répartition Devise */}
-              <div className="bg-white border border-slate-200 rounded-xl shadow-lg p-6">
+              <div className="bg-surface border border-line rounded-xl shadow-lg p-6">
                 <div className="flex items-center gap-2 mb-6">
                   <svg
-                    className="w-5 h-5 text-emerald-600"
+                    className="w-5 h-5 text-accent"
                     fill="currentColor"
                     viewBox="0 0 20 20"
                   >
@@ -384,7 +388,7 @@ export default function Analytics() {
                       clipRule="evenodd"
                     />
                   </svg>
-                  <h3 className="text-lg font-bold text-slate-900">
+                  <h3 className="text-lg font-bold text-ink">
                     Répartition par Devise
                   </h3>
                 </div>
@@ -394,16 +398,16 @@ export default function Analytics() {
               </div>
 
               {/* Répartition Sectorielle */}
-              <div className="bg-white border border-slate-200 rounded-xl shadow-lg p-6">
+              <div className="bg-surface border border-line rounded-xl shadow-lg p-6">
                 <div className="flex items-center gap-2 mb-6">
                   <svg
-                    className="w-5 h-5 text-emerald-600"
+                    className="w-5 h-5 text-accent"
                     fill="currentColor"
                     viewBox="0 0 20 20"
                   >
                     <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
                   </svg>
-                  <h3 className="text-lg font-bold text-slate-900">
+                  <h3 className="text-lg font-bold text-ink">
                     Répartition Sectorielle
                   </h3>
                 </div>
@@ -414,10 +418,10 @@ export default function Analytics() {
             </div>
 
             {/* Evolution Chart */}
-            <div className="bg-white border border-slate-200 rounded-xl shadow-lg p-6">
+            <div className="bg-surface border border-line rounded-xl shadow-lg p-6">
               <div className="flex items-center gap-2 mb-6">
                 <svg
-                  className="w-5 h-5 text-emerald-600"
+                  className="w-5 h-5 text-accent"
                   fill="currentColor"
                   viewBox="0 0 20 20"
                 >
@@ -427,7 +431,7 @@ export default function Analytics() {
                     clipRule="evenodd"
                   />
                 </svg>
-                <h3 className="text-lg font-bold text-slate-900">
+                <h3 className="text-lg font-bold text-ink">
                   Évolution de la Valeur du Portefeuille
                 </h3>
               </div>
@@ -438,9 +442,9 @@ export default function Analytics() {
 
         {activeTab !== "vue" && (
           <section>
-            <div className="bg-white border border-slate-200 rounded-xl shadow-lg p-12 text-center">
+            <div className="bg-surface border border-line rounded-xl shadow-lg p-12 text-center">
               <svg
-                className="w-16 h-16 mx-auto mb-4 text-slate-300"
+                className="w-16 h-16 mx-auto mb-4 text-ink-muted/40"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -452,10 +456,10 @@ export default function Analytics() {
                   d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
                 />
               </svg>
-              <h3 className="text-xl font-bold text-slate-900 mb-2">
+              <h3 className="text-xl font-bold text-ink mb-2">
                 Section en développement
               </h3>
-              <p className="text-slate-600">
+              <p className="text-ink-muted">
                 Le contenu "{activeTab}" sera disponible prochainement.
               </p>
             </div>

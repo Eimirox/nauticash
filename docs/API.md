@@ -38,6 +38,17 @@ Chaque soir à 21:45 UTC (`CRON_HISTORY_SCHEDULE`, désactivable avec `CRON_DAIL
 
 `GET /api/market/benchmarks/:key` (CAC40 = `^FCHI`, SP500 = `^GSPC`, MSCIWORLD = ETF `URTH`) renvoie ≈ 400 jours de clôtures via l'endpoint FMP `historical-price-eod/light`. Les points sont gardés en base (collection `benchmarks`) 12 h et partagés entre tous les utilisateurs : au plus 2 appels par indice et par jour, soit 6 appels/jour au maximum. En cas d'échec FMP, les dernières données connues sont renvoyées avec `stale: true`.
 
+## Couverture des symboles (28/09/2026)
+
+**Constat** : l'offre gratuite FMP ne couvre qu'environ 90 symboles (« Symbol limited to AAPL, TSLA, AMZN and 84 more » sur la grille tarifaire). Pour les autres (GOOG, la plupart des actions européennes…), FMP répond `402` : le titre ne pouvait pas être ajouté, ou le cours arrivait sans profil ni dividendes (secteur « Unknown », pays deviné, analyse faussée). V (Visa) fait partie des symboles couverts, d'où la différence.
+
+**Correctif** : 402 = `NOT_COVERED` (et non quota). `services/providers/yahoo.js` (Yahoo Finance, sans clé, couverture mondiale) prend le relais :
+- cours absent chez FMP → cours, veille, devise, place, dividendes 1 an (`v8/finance/chart`) + nom, type, secteur, industrie (`v1/finance/search`) ; le refus FMP est mémorisé 7 jours (`fmpNotCoveredAt`) pour ne plus gaspiller le quota ;
+- cours FMP mais profil/dividendes refusés → complétés par Yahoo sans écraser le cours FMP.
+Yahoo est ajouté automatiquement en dernier recours (`YAHOO_ENABLED=false` pour le couper). API non officielle : si elle devenait indisponible, l'alternative est l'offre FMP Starter (tous les symboles US) ou supérieure.
+
+**Autocomplétion** : `GET /api/market/search?q=` fusionne une liste locale de titres courants (`services/popularTickers.js`, instantanée, sans appel) et la recherche Yahoo mise en cache 7 jours par requête ; indices exclus ; 60 recherches/min/IP.
+
 ## Pistes (voir `docs/AMELIORATIONS.md`)
 
 - Route admin qui mesure, pour les tickers réellement détenus, quel provider les couvre (résultats à reporter ici).

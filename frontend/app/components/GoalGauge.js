@@ -21,8 +21,8 @@ export default function GoalGauge({ current, goalAmount, goalDate, symbol = "€
 
   if (!g) {
     return (
-      <p className="mb-4 text-sm text-slate-500">
-        <Link href="/profil" className="font-medium text-emerald-700 underline-offset-2 hover:underline">
+      <p className="mb-4 text-sm text-ink-muted">
+        <Link href="/profil" className="font-medium text-accent underline-offset-2 hover:underline">
           Fixez-vous un objectif de patrimoine
         </Link>{" "}
         pour suivre votre progression ici.
@@ -40,33 +40,33 @@ export default function GoalGauge({ current, goalAmount, goalDate, symbol = "€
     detail = (
       <>
         Échéance dépassée ({deadline}) : il reste{" "}
-        <span className="money font-semibold text-slate-700">{nf0.format(g.remaining)} {symbol}</span> à constituer.
+        <span className="money font-semibold text-ink">{nf0.format(g.remaining)} {symbol}</span> à constituer.
       </>
     );
   else if (g.perMonth != null)
     detail = (
       <>
-        Il reste <span className="money font-semibold text-slate-700">{nf0.format(g.remaining)} {symbol}</span> d&apos;ici{" "}
+        Il reste <span className="money font-semibold text-ink">{nf0.format(g.remaining)} {symbol}</span> d&apos;ici{" "}
         {deadline} ({formatMonths(g.monthsLeft)}), soit environ{" "}
-        <span className="money font-semibold text-slate-700">{nf0.format(g.perMonth)} {symbol}</span> par mois, hors rendement.
+        <span className="money font-semibold text-ink">{nf0.format(g.perMonth)} {symbol}</span> par mois, hors rendement.
       </>
     );
   else
     detail = (
       <>
-        Il reste <span className="money font-semibold text-slate-700">{nf0.format(g.remaining)} {symbol}</span>. Ajoutez une
+        Il reste <span className="money font-semibold text-ink">{nf0.format(g.remaining)} {symbol}</span>. Ajoutez une
         échéance dans votre profil pour connaître le rythme d&apos;épargne nécessaire.
       </>
     );
 
   return (
-    <section aria-labelledby="goal-title" className="mb-4 rounded-xl border border-slate-200 bg-white p-5 shadow-lg">
+    <section aria-labelledby="goal-title" className="mb-4 rounded-xl border border-line bg-surface p-5 shadow-lg">
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="goal-title" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <h2 id="goal-title" className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
           Objectif de patrimoine
         </h2>
-        <p className="text-sm text-slate-600">
-          <span className="font-bold text-slate-900 tabular-nums">{g.pct.toFixed(g.pct < 10 ? 1 : 0)} %</span> de{" "}
+        <p className="text-sm text-ink-muted">
+          <span className="font-bold text-ink tabular-nums">{g.pct.toFixed(g.pct < 10 ? 1 : 0)} %</span> de{" "}
           <span className="money font-semibold tabular-nums">{nf0.format(Number(goalAmount))} {symbol}</span>
           {deadline && !g.reached && <> · échéance {deadline}</>}
         </p>
@@ -77,18 +77,18 @@ export default function GoalGauge({ current, goalAmount, goalDate, symbol = "€
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.round(g.pct)}
-        className="h-3 w-full overflow-hidden rounded-full bg-slate-100"
+        className="h-3 w-full overflow-hidden rounded-full bg-surface-2"
       >
         <div
           className={`h-full rounded-full transition-[width] duration-700 ${
-            g.reached ? "bg-emerald-500" : g.overdue ? "bg-amber-500" : "bg-gradient-to-r from-emerald-500 to-sky-500"
+            g.reached ? "bg-accent/100" : g.overdue ? "bg-warn/100" : "bg-gradient-to-r from-emerald-500 to-sky-500"
           }`}
           style={{ width: `${Math.max(g.pct, 2)}%` }}
         />
       </div>
-      <p className="mt-2 text-xs text-slate-500">
+      <p className="mt-2 text-xs text-ink-muted">
         {detail}{" "}
-        <Link href="/profil" className="whitespace-nowrap text-emerald-700 hover:underline">
+        <Link href="/profil" className="whitespace-nowrap text-accent hover:underline">
           Modifier
         </Link>
       </p>

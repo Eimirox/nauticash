@@ -13,6 +13,7 @@ import { quoteFreshness } from "@/lib/quoteTime";
 import { useFxRates, toCurrency, currencySymbol } from "@/lib/fx";
 import { useBaseCurrency, useProfile } from "@/lib/profile";
 import GoalGauge from "../components/GoalGauge";
+import TickerSearch from "../components/TickerSearch";
 import EmergencyFund from "../components/EmergencyFund";
 
 // Enveloppes proposées (doivent correspondre à ACCOUNTS côté backend)
@@ -154,8 +155,8 @@ export default function Portfolio() {
 
   const [adding, setAdding] = useState(false);
 
-  const addStock = async () => {
-    const t = ticker.trim().toUpperCase();
+  const addStock = async (symbol) => {
+    const t = (typeof symbol === "string" ? symbol : ticker).trim().toUpperCase();
     if (!t || adding) return;
     setError(null);
     setAdding(true);
@@ -163,8 +164,13 @@ export default function Portfolio() {
       await apiFetch("/api/user/portfolio", { method: "POST", body: { ticker: t } });
       await fetchPortfolio();
       setTicker("");
+      toast.success(`${t} ajouté au portefeuille.`);
     } catch (err) {
-      setError(err.message);
+      setError(
+        /introuvable/i.test(err.message)
+          ? `${err.message}. Tapez le nom de l'entreprise pour voir les suggestions (ex. « google » → GOOG, « airbus » → AIR.PA).`
+          : err.message
+      );
     } finally {
       setAdding(false);
     }
@@ -321,10 +327,10 @@ export default function Portfolio() {
     const raw = (type || "UNKNOWN").toUpperCase();
     const t = ALIASES[raw] || raw;
     const map = {
-      ETF: "bg-purple-50 text-purple-700 border-purple-200",
-      CRYPTOCURRENCY: "bg-orange-50 text-orange-700 border-orange-200",
-      EQUITY: "bg-blue-50 text-blue-700 border-blue-200",
-      UNKNOWN: "bg-slate-100 text-slate-600 border-slate-200",
+      ETF: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-500/15 dark:text-purple-300 dark:border-purple-500/30",
+      CRYPTOCURRENCY: "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-500/15 dark:text-orange-300 dark:border-orange-500/30",
+      EQUITY: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/15 dark:text-blue-300 dark:border-blue-500/30",
+      UNKNOWN: "bg-surface-2 text-ink-muted border-line",
     };
     const label =
       t === "EQUITY" ? "Action" : t === "CRYPTOCURRENCY" ? "Crypto" : t;
@@ -370,7 +376,7 @@ export default function Portfolio() {
       aria-label={`Enveloppe de ${stock.ticker}`}
       value={stock.account || ""}
       onChange={(e) => handleUpdateAccount(stock.ticker, e.target.value)}
-      className={`rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 ${className}`}
+      className={`rounded-md border border-line bg-surface px-1.5 py-0.5 text-[11px] font-medium text-ink-muted focus:outline-none focus:ring-2 focus:ring-accent ${className}`}
     >
       <option value="">Sans enveloppe</option>
       {Object.entries(ACCOUNT_LABELS).map(([k, label]) => (
@@ -384,11 +390,11 @@ export default function Portfolio() {
     const f = quoteFreshness(stock.priceTime);
     if (!f) return null;
     return f.stale ? (
-      <span title={f.title} className="mt-1 inline-block whitespace-nowrap rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">
+      <span title={f.title} className="mt-1 inline-block whitespace-nowrap rounded-md border border-warn/30 bg-warn/10 px-1.5 py-0.5 text-[11px] font-medium text-warn">
         cours du {f.label}
       </span>
     ) : (
-      <span title={f.title} className="mt-0.5 block text-[11px] font-normal text-slate-400 tabular-nums">
+      <span title={f.title} className="mt-0.5 block text-[11px] font-normal text-ink-muted/70 tabular-nums">
         {f.label}
       </span>
     );
@@ -399,7 +405,7 @@ export default function Portfolio() {
     <span className="inline-flex flex-col items-end">
       <Delta value={stock.dayChangePercent} className="whitespace-nowrap text-sm" />
       {Number.isFinite(stock.dayChangeValue) && (
-        <span className="money whitespace-nowrap text-[11px] text-slate-500 tabular-nums">
+        <span className="money whitespace-nowrap text-[11px] text-ink-muted tabular-nums">
           {stock.dayChangeValue > 0 ? "+" : stock.dayChangeValue < 0 ? "−" : ""}
           {nf2.format(Math.abs(stock.dayChangeValue))} {cur}
         </span>
@@ -422,15 +428,15 @@ export default function Portfolio() {
         if (!isNaN(val) && val !== stock[field]) handleUpdateStock(stock.ticker, field, val);
       }}
       onKeyDown={(e) => e.key === "Enter" && e.target.blur()}
-      className={`px-3 py-2 text-right text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all ${field === "quantity" ? "money" : ""} ${className}`}
+      className={`px-3 py-2 text-right text-sm border border-line rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent transition-all ${field === "quantity" ? "money" : ""} ${className}`}
     />
   );
 
   // Vue mobile (< 768 px) : une carte par position, sans défilement horizontal
   const MobileCards = () => (
     <div className="md:hidden">
-      <div className="flex items-center justify-end gap-2 border-b border-slate-100 px-4 py-3">
-        <label htmlFor="mobile-sort" className="text-xs font-medium text-slate-500">Trier par</label>
+      <div className="flex items-center justify-end gap-2 border-b border-line px-4 py-3">
+        <label htmlFor="mobile-sort" className="text-xs font-medium text-ink-muted">Trier par</label>
         <select
           id="mobile-sort"
           value={sort.key ? `${sort.key}:${sort.dir}` : ""}
@@ -438,7 +444,7 @@ export default function Portfolio() {
             const [key, dir] = e.target.value.split(":");
             setSort(key ? { key, dir } : { key: null, dir: SORT_DIR.NONE });
           }}
-          className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+          className="rounded-lg border border-line px-2 py-1.5 text-sm"
         >
           <option value="">Ordre d'ajout</option>
           <option value="total:desc">Montant (décroissant)</option>
@@ -452,14 +458,14 @@ export default function Portfolio() {
       </div>
 
       {loading ? (
-        <p className="px-4 py-16 text-center text-sm text-slate-500">Chargement de votre portefeuille...</p>
+        <p className="px-4 py-16 text-center text-sm text-ink-muted">Chargement de votre portefeuille...</p>
       ) : !stocks.length ? (
         <div className="px-4 py-16 text-center">
-          <p className="mb-1 text-base font-medium text-slate-700">Aucune position</p>
-          <p className="text-sm text-slate-500">Ajoutez votre première action pour commencer</p>
+          <p className="mb-1 text-base font-medium text-ink">Aucune position</p>
+          <p className="text-sm text-ink-muted">Ajoutez votre première action pour commencer</p>
         </div>
       ) : (
-        <ul className="divide-y divide-slate-100">
+        <ul className="divide-y divide-line">
           {visibleStocks.map((stock) => {
             const perf = stock.pru > 0 ? ((stock.close - stock.pru) / stock.pru) * 100 : null;
             const total =
@@ -470,24 +476,24 @@ export default function Portfolio() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-base font-bold text-slate-900">{stock.ticker}</span>
+                      <span className="text-base font-bold text-ink">{stock.ticker}</span>
                       {typeBadge(stock.type)}
                     </div>
                     <AccountSelect stock={stock} className="mt-1" />
-                    <p className="truncate text-xs text-slate-500">
+                    <p className="truncate text-xs text-ink-muted">
                       {stock.name && stock.name !== stock.ticker ? `${stock.name} · ` : ""}
                       {exchangeToCountry[stock.country] || stock.country}
                     </p>
                   </div>
                   <div className="shrink-0 text-right">
-                    <p className="money text-base font-semibold tabular-nums text-slate-900">
+                    <p className="money text-base font-semibold tabular-nums text-ink">
                       {total != null ? `${nf2.format(total)} ${cur}` : "--"}
                     </p>
                     <p className={`text-sm font-semibold tabular-nums ${getPerformanceClass(perf)}`}>
                       {perf != null ? `${perf > 0 ? "▲ +" : perf < 0 ? "▼ " : ""}${nf2.format(perf)} %` : "--"}
                     </p>
                     {Number.isFinite(stock.dayChangePercent) && (
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-ink-muted">
                         <Delta value={stock.dayChangePercent} className="text-xs" /> aujourd&apos;hui
                       </p>
                     )}
@@ -496,28 +502,28 @@ export default function Portfolio() {
 
                 <div className="grid grid-cols-3 gap-2 text-xs">
                   <div>
-                    <p className="mb-1 text-slate-500">Prix</p>
-                    <p className="font-medium tabular-nums text-slate-900">{nf2.format(stock.close)} {cur}</p>
+                    <p className="mb-1 text-ink-muted">Prix</p>
+                    <p className="font-medium tabular-nums text-ink">{nf2.format(stock.close)} {cur}</p>
                     <QuoteTime stock={stock} />
                   </div>
                   <div>
-                    <p className="mb-1 text-slate-500">Quantité</p>
+                    <p className="mb-1 text-ink-muted">Quantité</p>
                     <EditableNumber stock={stock} field="quantity" label="Quantité" className="w-full" />
                   </div>
                   <div>
-                    <p className="mb-1 text-slate-500">PRU</p>
+                    <p className="mb-1 text-ink-muted">PRU</p>
                     <EditableNumber stock={stock} field="pru" label="PRU" className="w-full" />
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between text-xs text-slate-500">
+                <div className="flex items-center justify-between text-xs text-ink-muted">
                   <span>
                     Dividende : {stock.dividend != null ? `${nf2.format(stock.dividend)} ${cur}` : "--"}
                     {stock.myDividendYield != null && ` · ${nf2.format(stock.myDividendYield)} %`}
                   </span>
                   <button
                     onClick={() => removeStock(stock.ticker)}
-                    className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-600 transition hover:bg-red-600 hover:text-white"
+                    className="rounded-lg border border-loss/30 bg-loss/10 px-3 py-2 text-xs font-medium text-loss transition hover:bg-loss hover:text-white"
                   >
                     Supprimer
                   </button>
@@ -536,60 +542,60 @@ export default function Portfolio() {
     <MobileCards />
     <div className="hidden md:block overflow-x-auto">
       <table className="w-full">
-        <thead className="bg-slate-50 border-b-2 border-slate-200">
+        <thead className="bg-surface-2 border-b-2 border-line">
           <tr>
-            <th className="px-6 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+            <th className="px-6 py-4 text-left text-xs font-semibold text-ink uppercase tracking-wider">
               Ticker
             </th>
-            <th className="px-6 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+            <th className="px-6 py-4 text-left text-xs font-semibold text-ink uppercase tracking-wider">
               Pays
             </th>
-            <th className="px-6 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+            <th className="px-6 py-4 text-left text-xs font-semibold text-ink uppercase tracking-wider">
               Type
             </th>
             <th
-              className="px-6 py-4 text-right text-xs font-semibold text-slate-700 uppercase tracking-wider cursor-pointer hover:text-emerald-600 transition select-none"
+              className="px-6 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider cursor-pointer hover:text-accent transition select-none"
               onClick={() => toggleSort("price")}
             >
               Prix {caret("price")}
             </th>
             <th
-              className="px-6 py-4 text-right text-xs font-semibold text-slate-700 uppercase tracking-wider cursor-pointer hover:text-emerald-600 transition select-none"
+              className="px-6 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider cursor-pointer hover:text-accent transition select-none"
               onClick={() => toggleSort("day")}
             >
               Jour {caret("day")}
             </th>
-            <th className="px-6 py-4 text-right text-xs font-semibold text-slate-700 uppercase tracking-wider">
+            <th className="px-6 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider">
               Quantité
             </th>
-            <th className="px-6 py-4 text-right text-xs font-semibold text-slate-700 uppercase tracking-wider">
+            <th className="px-6 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider">
               PRU
             </th>
             <th
-              className="px-6 py-4 text-right text-xs font-semibold text-slate-700 uppercase tracking-wider cursor-pointer hover:text-emerald-600 transition select-none"
+              className="px-6 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider cursor-pointer hover:text-accent transition select-none"
               onClick={() => toggleSort("performance")}
             >
               Performance {caret("performance")}
             </th>
             <th
-              className="px-6 py-4 text-right text-xs font-semibold text-slate-700 uppercase tracking-wider cursor-pointer hover:text-emerald-600 transition select-none"
+              className="px-6 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider cursor-pointer hover:text-accent transition select-none"
               onClick={() => toggleSort("dividend")}
             >
               Dividende {caret("dividend")}
             </th>
             <th
-              className="px-6 py-4 text-right text-xs font-semibold text-slate-700 uppercase tracking-wider cursor-pointer hover:text-emerald-600 transition select-none"
+              className="px-6 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider cursor-pointer hover:text-accent transition select-none"
               onClick={() => toggleSort("yield")}
             >
               Rendement {caret("yield")}
             </th>
             <th
-              className="px-6 py-4 text-right text-xs font-semibold text-slate-700 uppercase tracking-wider cursor-pointer hover:text-emerald-600 transition select-none"
+              className="px-6 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider cursor-pointer hover:text-accent transition select-none"
               onClick={() => toggleSort("total")}
             >
               Total {caret("total")}
             </th>
-            <th className="px-6 py-4 text-xs font-semibold text-slate-700 uppercase tracking-wider">
+            <th className="px-6 py-4 text-xs font-semibold text-ink uppercase tracking-wider">
               Actions
             </th>
           </tr>
@@ -599,11 +605,11 @@ export default function Portfolio() {
             <tr>
               <td
                 colSpan="12"
-                className="px-6 py-20 text-center text-slate-500"
+                className="px-6 py-20 text-center text-ink-muted"
               >
                 <div className="flex flex-col items-center gap-3">
                   <svg
-                    className="animate-spin h-8 w-8 text-emerald-600"
+                    className="animate-spin h-8 w-8 text-accent"
                     fill="none"
                     viewBox="0 0 24 24"
                   >
@@ -642,17 +648,17 @@ export default function Portfolio() {
               return (
                 <tr
                   key={stock.ticker}
-                  className="border-b border-slate-100 hover:bg-slate-50 transition-colors"
+                  className="border-b border-line hover:bg-surface-2 transition-colors"
                 >
-                  <td className="px-6 py-4 font-bold text-slate-900 text-base">
+                  <td className="px-6 py-4 font-bold text-ink text-base">
                     {stock.ticker}
                     <AccountSelect stock={stock} className="mt-1 block" />
                   </td>
-                  <td className="px-6 py-4 text-sm text-slate-600">
+                  <td className="px-6 py-4 text-sm text-ink-muted">
                     {exchangeToCountry[stock.country] || stock.country}
                   </td>
                   <td className="px-6 py-4">{typeBadge(stock.type)}</td>
-                  <td className="px-6 py-4 text-right text-slate-900 font-medium">
+                  <td className="px-6 py-4 text-right text-ink font-medium">
                     <span className="whitespace-nowrap">
                       {nf2.format(stock.close)} {formatCurrencySymbol(stock.currency)}
                     </span>
@@ -679,7 +685,7 @@ export default function Portfolio() {
                           e.target.blur();
                         }
                       }}
-                      className="money w-24 px-3 py-2 text-right text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                      className="money w-24 px-3 py-2 text-right text-sm border border-line rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
                     />
                   </td>
                   
@@ -700,7 +706,7 @@ export default function Portfolio() {
                           e.target.blur();
                         }
                       }}
-                      className="w-24 px-3 py-2 text-right text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                      className="w-24 px-3 py-2 text-right text-sm border border-line rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
                     />
                   </td>
                   
@@ -715,28 +721,28 @@ export default function Portfolio() {
                         {nf2.format(perf)} %
                       </>
                     ) : (
-                      <span className="text-slate-400">--</span>
+                      <span className="text-ink-muted/70">--</span>
                     )}
                   </td>
-                  <td className="px-6 py-4 text-right text-sm text-slate-700">
+                  <td className="px-6 py-4 text-right text-sm text-ink">
                     {stock.dividend != null
                       ? `${nf2.format(stock.dividend)} ${formatCurrencySymbol(
                           stock.currency
                         )}`
                       : "--"}
                   </td>
-                  <td className="px-6 py-4 text-right text-sm text-slate-700">
+                  <td className="px-6 py-4 text-right text-sm text-ink">
                     {stock.myDividendYield != null
                       ? `${nf2.format(stock.myDividendYield)} %`
                       : "--"}
                   </td>
-                  <td className="px-6 py-4 text-right font-semibold text-slate-900">
+                  <td className="px-6 py-4 text-right font-semibold text-ink">
                     <span className="money">{total != null ? nf2.format(total) : "--"}</span>
                   </td>
                   <td className="px-6 py-4">
                     <button
                       onClick={() => removeStock(stock.ticker)}
-                      className="px-3 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-600 hover:text-white transition-all text-sm font-medium"
+                      className="px-3 py-2 bg-loss/10 text-loss border border-loss/30 rounded-lg hover:bg-loss hover:text-white transition-all text-sm font-medium"
                     >
                       Supprimer
                     </button>
@@ -748,11 +754,11 @@ export default function Portfolio() {
             <tr>
               <td
                 colSpan="12"
-                className="px-6 py-20 text-center text-slate-500"
+                className="px-6 py-20 text-center text-ink-muted"
               >
                 <div className="flex flex-col items-center gap-3">
                   <svg
-                    className="w-16 h-16 text-slate-300"
+                    className="w-16 h-16 text-ink-muted/40"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -765,10 +771,10 @@ export default function Portfolio() {
                     />
                   </svg>
                   <div>
-                    <p className="text-lg font-medium text-slate-700 mb-1">
+                    <p className="text-lg font-medium text-ink mb-1">
                       Aucune position
                     </p>
-                    <p className="text-sm text-slate-500">
+                    <p className="text-sm text-ink-muted">
                       Ajoutez votre première action pour commencer
                     </p>
                   </div>
@@ -785,7 +791,7 @@ export default function Portfolio() {
   // Mode Plein Écran
   if (fullscreenTable) {
     return (
-      <div className="fixed inset-0 z-50 bg-white overflow-auto">
+      <div className="fixed inset-0 z-50 bg-surface overflow-auto">
         <div className="sticky top-0 z-10 bg-gradient-to-r from-slate-900 to-slate-800 px-6 py-4 flex items-center justify-between shadow-lg">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
@@ -810,7 +816,7 @@ export default function Portfolio() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+    <main className="min-h-screen bg-bg">
       {/* Header */}
       <AppHeader
         actions={
@@ -831,9 +837,9 @@ export default function Portfolio() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+          <div className="mb-6 p-4 bg-loss/10 border border-loss/30 rounded-lg flex items-start gap-3">
             <svg
-              className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0"
+              className="w-5 h-5 text-loss mt-0.5 flex-shrink-0"
               fill="currentColor"
               viewBox="0 0 20 20"
             >
@@ -843,29 +849,29 @@ export default function Portfolio() {
                 clipRule="evenodd"
               />
             </svg>
-            <p className="text-sm text-red-700">{error}</p>
+            <p className="text-sm text-loss">{error}</p>
           </div>
         )}
 
         {/* Synthèse dans la devise de référence */}
         {stocks.length > 0 && summary.ready && (
-          <div className="mb-4 p-5 bg-white border border-slate-200 shadow-lg rounded-xl grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="mb-4 p-5 bg-surface border border-line shadow-lg rounded-xl grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Patrimoine total</p>
-              <p className="money text-3xl font-bold text-slate-900 tabular-nums">{nf2.format(summary.total)} {baseSymbol}</p>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1">Patrimoine total</p>
+              <p className="money text-3xl font-bold text-ink tabular-nums">{nf2.format(summary.total)} {baseSymbol}</p>
+              <p className="text-xs text-ink-muted mt-1">
                 Positions et cash convertis en {base} (taux BCE)
                 {summary.missing && " — une devise n'a pas pu être convertie"}
               </p>
             </div>
             <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Aujourd&apos;hui</p>
-              <p className="money text-xl font-bold text-slate-900 tabular-nums">{signed(summary.dayChange)}</p>
+              <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1">Aujourd&apos;hui</p>
+              <p className="money text-xl font-bold text-ink tabular-nums">{signed(summary.dayChange)}</p>
               <Delta value={summary.dayChangePct} className="text-sm" />
             </div>
             <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Plus-value latente</p>
-              <p className="money text-xl font-bold text-slate-900 tabular-nums">{signed(summary.gain)}</p>
+              <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1">Plus-value latente</p>
+              <p className="money text-xl font-bold text-ink tabular-nums">{signed(summary.gain)}</p>
               <Delta value={summary.gainPct} suffix=" depuis l'achat" className="text-sm" />
             </div>
           </div>
@@ -890,14 +896,14 @@ export default function Portfolio() {
           {Object.entries(portfolioTotalsByCurrency).map(([cur, tot]) => (
             <div
               key={cur}
-              className="relative p-5 bg-white border border-slate-200 shadow-lg rounded-xl overflow-hidden group hover:shadow-xl transition-all"
+              className="relative p-5 bg-surface border border-line shadow-lg rounded-xl overflow-hidden group hover:shadow-xl transition-all"
             >
-              <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-emerald-100 to-blue-100 rounded-full -mr-10 -mt-10 opacity-40 group-hover:opacity-60 transition-opacity" />
+              <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-emerald-100 to-blue-100 dark:from-accent/20 dark:to-accent-2/20 rounded-full -mr-10 -mt-10 opacity-40 group-hover:opacity-60 transition-opacity" />
               <div className="relative">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1">
                   Positions {cur}
                 </p>
-                <p className="text-2xl font-bold text-slate-900">
+                <p className="text-2xl font-bold text-ink">
                   <span className="money">{nf2.format(Number(tot))} {formatCurrencySymbol(cur)}</span>
                 </p>
               </div>
@@ -906,19 +912,19 @@ export default function Portfolio() {
 
           <button
             onClick={() => setShowCashSection(!showCashSection)}
-            className="relative p-5 bg-gradient-to-br from-emerald-50 to-blue-50 border-2 border-dashed border-emerald-300 rounded-xl hover:border-emerald-400 transition-all group"
+            className="relative p-5 bg-gradient-to-br from-emerald-50 to-blue-50 dark:from-accent/10 dark:to-accent-2/10 border-2 border-dashed border-accent/40 rounded-xl hover:border-accent/50 transition-all group"
           >
             <div className="flex items-center justify-between">
               <div className="text-left">
-                <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1">
+                <p className="text-xs font-semibold text-accent uppercase tracking-wide mb-1">
                   Cash / Dette
                 </p>
-                <p className="money text-lg font-bold text-emerald-900">
+                <p className="money text-lg font-bold text-accent">
                   {nf2.format(cash.amount)} {formatCurrencySymbol(cash.currency)}
                 </p>
               </div>
               <svg
-                className={`w-5 h-5 text-emerald-600 transition-transform ${
+                className={`w-5 h-5 text-accent transition-transform ${
                   showCashSection ? "rotate-180" : ""
                 }`}
                 fill="none"
@@ -937,10 +943,10 @@ export default function Portfolio() {
         </div>
 
         {showCashSection && (
-          <div className="mb-6 p-5 bg-gradient-to-br from-emerald-50 to-blue-50 border border-emerald-200 rounded-xl animate-fade-in-up">
+          <div className="mb-6 p-5 bg-gradient-to-br from-emerald-50 to-blue-50 dark:from-accent/10 dark:to-accent-2/10 border border-accent/40 rounded-xl animate-fade-in-up">
             <div className="flex items-center gap-2 mb-4">
               <svg
-                className="w-5 h-5 text-emerald-600"
+                className="w-5 h-5 text-accent"
                 fill="currentColor"
                 viewBox="0 0 20 20"
               >
@@ -951,16 +957,16 @@ export default function Portfolio() {
                   clipRule="evenodd"
                 />
               </svg>
-              <h3 className="text-sm font-bold text-slate-900">
+              <h3 className="text-sm font-bold text-ink">
                 Gérer le cash disponible
               </h3>
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-ink-muted">
                 (Optionnel - Non inclus dans les totaux de positions)
               </span>
             </div>
             <div className="flex flex-wrap gap-4">
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                <label className="block text-xs font-medium text-ink mb-1.5">
                   Montant
                 </label>
                 <input
@@ -972,11 +978,11 @@ export default function Portfolio() {
                   }}
                   onBlur={() => syncCashUpdate(cash.amount, cash.currency)}
                   onKeyDown={(e) => e.key === "Enter" && e.target.blur()}
-                  className="money w-32 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                  className="money w-32 px-3 py-2 text-sm border border-line rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                <label className="block text-xs font-medium text-ink mb-1.5">
                   Devise
                 </label>
                 <select
@@ -986,7 +992,7 @@ export default function Portfolio() {
                     setCash((prev) => ({ ...prev, currency: newCurrency }));
                     syncCashUpdate(cash.amount, newCurrency);
                   }}
-                  className="w-24 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                  className="w-24 px-3 py-2 text-sm border border-line rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
                 >
                   <option value="EUR">EUR</option>
                   <option value="USD">USD</option>
@@ -995,7 +1001,7 @@ export default function Portfolio() {
                 </select>
               </div>
               <div className="flex items-end">
-                <div className="flex items-center gap-2 px-3 py-2 bg-white/60 rounded-lg text-xs text-slate-600">
+                <div className="flex items-center gap-2 px-3 py-2 bg-surface/60 rounded-lg text-xs text-ink-muted">
                   <span className="text-base">
                     {cash.amount < 0 ? "💸" : "💰"}
                   </span>
@@ -1007,32 +1013,16 @@ export default function Portfolio() {
         )}
 
         {/* Add Stock */}
-        <div className="mb-6 flex flex-wrap items-center gap-3 p-4 bg-white border border-slate-200 rounded-xl shadow">
-          <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-            <svg
-              className="w-5 h-5 text-slate-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-            <input
-              type="text"
-              value={ticker}
-              onChange={(e) => setTicker(e.target.value.toUpperCase())}
-              onKeyDown={(e) => e.key === "Enter" && addStock()}
-              placeholder="Ajouter un ticker (AAPL, BTC-USD...)"
-              className="flex-1 px-3 py-2 border-0 focus:outline-none text-sm placeholder:text-slate-400"
-            />
-          </div>
+        <div className="mb-6 flex flex-wrap items-center gap-3 p-4 bg-surface border border-line rounded-xl shadow">
+          <TickerSearch
+            value={ticker}
+            onChange={setTicker}
+            onSelect={addStock}
+            disabled={adding}
+            existing={stocks.map((s) => s.ticker)}
+          />
           <button
-            onClick={addStock}
+            onClick={() => addStock()}
             disabled={adding}
             className="disabled:opacity-50 disabled:cursor-wait px-5 py-2 bg-gradient-to-r from-emerald-600 to-blue-600 text-white text-sm font-semibold rounded-lg hover:shadow-lg hover:scale-105 transition-all"
           >
@@ -1069,8 +1059,8 @@ export default function Portfolio() {
                     type="button"
                     aria-pressed={active}
                     onClick={() => setAccountFilter(k)}
-                    className={`shrink-0 rounded-xl border px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
-                      active ? "border-emerald-500 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-white text-slate-700 hover:border-emerald-300"
+                    className={`shrink-0 rounded-xl border px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                      active ? "border-accent bg-accent/10 text-accent" : "border-line bg-surface text-ink hover:border-accent/40"
                     }`}
                   >
                     <span className="block text-xs font-semibold">{label}</span>
@@ -1084,7 +1074,7 @@ export default function Portfolio() {
         )}
 
         {/* Table */}
-        <div className="bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">
+        <div className="bg-surface border border-line rounded-xl shadow-xl overflow-hidden">
           <div className="px-6 py-4 bg-gradient-to-r from-slate-900 to-slate-800 flex items-center justify-between">
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
               <svg

@@ -541,3 +541,16 @@ select:focus-visible {
   color: transparent;
   text-shadow: 0 0 8px rgb(100 116 139);
 }
+
+/* Mode sombre : champs de saisie lisibles sur toutes les pages (fond de surface, texte clair) */
+.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.dark select,
+.dark textarea {
+  background-color: rgb(var(--surface));
+  color: rgb(var(--text));
+  border-color: rgb(var(--border));
+}
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: rgb(var(--text-muted) / 0.7);
+}

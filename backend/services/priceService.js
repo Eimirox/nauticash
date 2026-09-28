@@ -6,9 +6,12 @@ const apiUsage = require("./apiUsage");
 const { detectQuoteCurrency, normalizeQuoteUnits, toMajorUnit } = require("./currency");
 const FMPProvider = require("./providers/fmp");
 const AlphaVantageProvider = require("./providers/alphavantage");
+const YahooProvider = require("./providers/yahoo");
 // À ajouter plus tard :
 // const TwelveDataProvider = require("./providers/twelvedata");
 // const PolygonProvider = require("./providers/polygon");
+
+const NOT_COVERED_TTL = 7 * 24 * 60 * 60 * 1000;
 
 class PriceService {
   constructor() {
@@ -32,6 +35,12 @@ class PriceService {
     if (config.alphavantage.enabled) {
       providers.alphavantage = new AlphaVantageProvider();
       console.log("✅ Alpha Vantage Provider initialized");
+    }
+
+    // Yahoo Finance (secours à couverture mondiale, sans clé)
+    if (config.yahoo.enabled) {
+      providers.yahoo = new YahooProvider();
+      console.log("✅ Yahoo Provider initialized");
     }
 
     // Twelve Data (à activer plus tard)
@@ -65,7 +74,15 @@ class PriceService {
     }
 
     // 2. Déterminer l'ordre des providers à essayer
-    const providersToTry = this.getProviderOrder(ticker, preferredProvider);
+    let providersToTry = this.getProviderOrder(ticker, preferredProvider);
+
+    // Symbole que l'offre FMP ne couvre pas (402 constaté il y a moins de 7 jours) :
+    // on ne gaspille plus de quota FMP dessus.
+    const fmpRefusedAt = previous?.fmpNotCoveredAt ? new Date(previous.fmpNotCoveredAt).getTime() : 0;
+    if (Date.now() - fmpRefusedAt < NOT_COVERED_TTL && providersToTry.length > 1) {
+      providersToTry = providersToTry.filter((p) => p !== "fmp");
+    }
+    let fmpNotCovered = false;
 
     // 3. Essayer chaque provider dans l'ordre
     let quote = null;
@@ -101,6 +118,7 @@ class PriceService {
         break; // On a réussi, sortir de la boucle
       } catch (error) {
         console.error(`❌ ${providerName} failed for ${ticker}:`, error.message);
+        if (providerName === "fmp" && error.code === "NOT_COVERED") fmpNotCovered = true;
 
         // Si c'est le dernier provider, throw l'erreur
         if (providerName === providersToTry[providersToTry.length - 1]) {
@@ -159,6 +177,33 @@ class PriceService {
         console.log(`⚠️ Could not enrich dividends for ${ticker}: ${error.message}`);
       }
     }
+
+    // FMP a donné le cours mais pas le profil ou les dividendes (souvent un 402 de l'offre gratuite) :
+    // on complète avec Yahoo, sans rien écraser de ce qu'FMP a fourni.
+    const missingProfile = !quote.sector || quote.sector === "Unknown";
+    const missingDividends = quote.type !== "Crypto" && !quote.dividendsUpdatedAt &&
+      !(previous?.dividendsUpdatedAt && Date.now() - new Date(previous.dividendsUpdatedAt).getTime() < 7 * 86400000);
+    if (usedProvider === "fmp" && this.providers.yahoo && quote.type !== "Crypto" && (missingProfile || missingDividends)) {
+      try {
+        const extra = await this.providers.yahoo.getQuote(ticker, { previous });
+        if (missingProfile) {
+          for (const f of ["sector", "industry"]) if (extra[f]) quote[f] = extra[f];
+          if (extra.name && (!quote.name || quote.name === ticker)) quote.name = extra.name;
+          if (extra.type && extra.type !== "Stock") quote.type = extra.type;
+          if (extra.profileUpdatedAt) quote.profileUpdatedAt = extra.profileUpdatedAt;
+        }
+        if (missingDividends && extra.dividendsUpdatedAt) {
+          for (const f of ["dividend", "dividendRate", "dividendYield", "exDividendDate", "dividendsUpdatedAt"]) quote[f] = extra[f];
+        }
+      } catch (error) {
+        console.log(`⚠️ Could not enrich ${ticker} from Yahoo: ${error.message}`);
+      }
+    }
+
+    // Mémoriser qu'FMP ne couvre pas ce symbole (ou qu'il le couvre à nouveau)
+    if (fmpNotCovered) quote.fmpNotCoveredAt = new Date();
+    else if (usedProvider === "fmp") quote.fmpNotCoveredAt = null;
+    else if (previous?.fmpNotCoveredAt) quote.fmpNotCoveredAt = previous.fmpNotCoveredAt;
 
     // 5. Mettre en cache
     this.saveToCache(ticker, quote);
@@ -263,7 +308,9 @@ class PriceService {
       ];
     }
 
-    // Sinon, utiliser l'ordre de config.activeProviders
+    // Sinon, l'ordre de config.activeProviders, avec Yahoo en dernier recours
+    // (couverture mondiale : symboles hors offre FMP, places européennes, ETF…)
+    if (this.providers.yahoo && !activeProviders.includes("yahoo")) activeProviders.push("yahoo");
     return activeProviders;
   }
 

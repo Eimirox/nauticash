@@ -60,6 +60,7 @@ const fmp = {
   quotes: {},       // symbol -> objet "quote" FMP
   profiles: {},     // symbol -> objet "profile" FMP
   dividends: {},    // symbol -> tableau de dividendes FMP
+  notCovered: {},   // symbol -> true | ["profile", "dividends"] : réponses 402 simulées
   history: {},      // symbol -> historique de fin de journée (endpoint historical-price-eod/light)
   failWith: null,   // code HTTP à renvoyer pour tous les appels (ex. 500)
 };
@@ -68,6 +69,14 @@ const fx = {
   calls: 0,
   failWith: null,
   body: { amount: 1, base: "EUR", date: "2026-09-25", rates: { USD: 1.14, GBP: 0.86, CHF: 0.94, JPY: 180 } },
+};
+
+// Yahoo Finance simulé : graphiques (cours + dividendes) et recherche
+const yahoo = {
+  calls: [],        // { endpoint: "chart" | "search", symbol }
+  charts: {},       // symbole -> { meta, indicators?, events? }
+  search: {},       // requête en minuscules -> tableau « quotes »
+  failWith: null,
 };
 
 const mail = {
@@ -91,6 +100,11 @@ globalThis.fetch = async (input, init = {}) => {
     fmp.calls.push({ endpoint, symbol });
     if (url.searchParams.get("apikey") !== process.env.FMP_API_KEY) return jsonResponse(401, { error: "bad key" });
     if (fmp.failWith) return jsonResponse(fmp.failWith, { error: "simulated failure" });
+    // Offre gratuite FMP : symbole hors offre → 402 (tous les endpoints ou certains seulement)
+    const refused = fmp.notCovered[symbol];
+    if (refused === true || (Array.isArray(refused) && refused.includes(endpoint))) {
+      return jsonResponse(402, { "Error Message": "Premium Query Parameter: not available under your current subscription" });
+    }
     if (endpoint === "quote") {
       return jsonResponse(200, symbol.split(",").map((s) => fmp.quotes[s]).filter(Boolean));
     }
@@ -98,6 +112,23 @@ globalThis.fetch = async (input, init = {}) => {
     if (endpoint === "dividends") return jsonResponse(200, fmp.dividends[symbol] || []);
     if (endpoint === "light") return jsonResponse(200, fmp.history[symbol] || []);
     return jsonResponse(404, { error: "unknown endpoint" });
+  }
+
+  if (url.hostname === "query1.finance.yahoo.com") {
+    if (yahoo.failWith) return jsonResponse(yahoo.failWith, { error: "simulated failure" });
+    if (url.pathname.startsWith("/v8/finance/chart/")) {
+      const symbol = decodeURIComponent(url.pathname.split("/").pop());
+      yahoo.calls.push({ endpoint: "chart", symbol });
+      const r = yahoo.charts[symbol];
+      if (!r) return jsonResponse(404, { chart: { result: null, error: { code: "Not Found", description: "No data found, symbol may be delisted" } } });
+      return jsonResponse(200, { chart: { result: [r], error: null } });
+    }
+    if (url.pathname === "/v1/finance/search") {
+      const q = String(url.searchParams.get("q") || "").toLowerCase();
+      yahoo.calls.push({ endpoint: "search", symbol: q });
+      return jsonResponse(200, { quotes: yahoo.search[q] || [] });
+    }
+    return jsonResponse(404, {});
   }
 
   if (url.hostname === "api.frankfurter.dev") {
@@ -260,6 +291,12 @@ function resetState() {
   mail.sent.length = 0;
   mail.failWith = null;
   fx.calls = 0;
+  yahoo.calls.length = 0;
+  yahoo.charts = {};
+  yahoo.search = {};
+  yahoo.failWith = null;
+  fmp.history = {};
+  fmp.notCovered = {};
   fx.failWith = null;
   require("../../services/fx")._reset();
   require("../../services/priceService").clearCache();
@@ -270,6 +307,7 @@ module.exports = {
   app,
   db,
   fmp,
+  yahoo,
   fx,
   mail,
   start,
