@@ -30,6 +30,10 @@ Comparatif des sources gratuites utilisables par Nauticash et stratégie retenue
 - Dividende annuel = somme des N derniers versements, N = fréquence annuelle (`services/dividends.js`), et non « tout ce qui tombe dans 365 jours ».
 - Un prix nul n'est jamais enregistré ; l'heure de cotation FMP est conservée (`marketTime`).
 
+## Historique quotidien (depuis le 28/09/2026)
+
+Chaque soir à 21:45 UTC (`CRON_HISTORY_SCHEDULE`, désactivable avec `CRON_DAILY_HISTORY=false`), `jobs/dailySnapshot.js` enregistre pour chaque utilisateur la valeur du portefeuille en euros (cours en cache × quantités + cash, taux BCE du jour) dans la collection `history_daily` (`{ userId, date: "AAAA-MM-JJ", value, invested, cash, missing }`). Aucun appel aux API de cotation : seuls les cours déjà en base sont utilisés. Le relevé mensuel (`history`) est tenu à jour automatiquement (`auto: true`), sauf si l'utilisateur a saisi une valeur à la main pour ce mois. Lecture : `GET /api/user/history/daily?days=365`.
+
 ## Pistes (voir `docs/AMELIORATIONS.md`)
 
 - Route admin qui mesure, pour les tickers réellement détenus, quel provider les couvre (résultats à reporter ici).

@@ -27,6 +27,7 @@ const TEST_ENV = {
   RATE_LIMITING_ENABLED: "true",
   FMP_DAILY_LIMIT: "",
   CRON_UPDATE_PRICES: "false",
+  CRON_DAILY_HISTORY: "false",
   HEALTHCHECK_ON_START: "false",
 };
 
