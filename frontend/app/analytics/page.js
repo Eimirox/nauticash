@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { apiFetch } from "@/lib/api";
 import { useFxRates, toCurrency, ratePer, currencySymbol } from "@/lib/fx";
 import { useBaseCurrency } from "@/lib/profile";
+import DiversificationCard from "../components/DiversificationCard";
+import FeesCard from "../components/FeesCard";
 import AppHeader from "../components/AppHeader";
 import Link from "next/link";
 import { Pie } from "react-chartjs-2";
@@ -336,6 +338,34 @@ export default function Analytics() {
                 </span>
               </div>
             )}
+
+            {/* Score de diversification */}
+            <DiversificationCard
+              positions={stocks.map((s) => ({
+                ticker: s.ticker,
+                value: inBase((s.close || 0) * (s.quantity || 0), s.currency),
+                sector: s.sector,
+                country: s.country,
+                currency: s.currency,
+                type: s.type,
+                composition: s.composition,
+              }))}
+            />
+
+            {/* Frais des ETF et fonds */}
+            <FeesCard
+              symbol={baseSymbol}
+              positions={stocks.map((s) => ({
+                ticker: s.ticker,
+                name: s.name,
+                type: s.type,
+                fees: s.fees ?? null,
+                value: inBase((s.close || 0) * (s.quantity || 0), s.currency),
+              }))}
+              onFeesChange={(ticker, fees) =>
+                setStocks((prev) => prev.map((s) => (s.ticker === ticker ? { ...s, fees } : s)))
+              }
+            />
 
             {/* Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">

@@ -56,6 +56,7 @@ function enrich(position, priceInfo) {
       quantity: position.quantity,
       pru: position.pru,
       account: position.account || null,
+      fees: position.fees ?? null,
       close: 0,
       currency: "USD",
       performance: 0,
@@ -76,6 +77,7 @@ function enrich(position, priceInfo) {
     quantity: position.quantity,
     pru: position.pru,
     account: position.account || null,
+    fees: position.fees ?? null,
     close,
     currency: priceInfo.currency || "USD",
     performance: position.pru > 0 ? ((close - position.pru) / position.pru) * 100 : 0,
@@ -111,6 +113,14 @@ function readAccount(value) {
   return ACCOUNTS.includes(v) ? v : false;
 }
 
+/** Frais annuels (TER) en % : undefined = absent ; null = retirés ; false = invalide (0 à 10 %) */
+function readFees(value) {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  const n = toNumber(typeof value === "string" ? value.trim().replace(",", ".") : value);
+  return Number.isFinite(n) && n >= 0 && n <= 10 ? Math.round(n * 1000) / 1000 : false;
+}
+
 // =============================================================================
 // GET /api/user/portfolio
 // =============================================================================
@@ -144,6 +154,8 @@ router.post("/portfolio", auth, async (req, res) => {
     const account = readAccount(req.body.account);
 
     if (account === false) return res.status(400).json({ error: "Enveloppe invalide." });
+    const fees = readFees(req.body.fees);
+    if (fees === false) return res.status(400).json({ error: "Frais annuels invalides (entre 0 et 10 %)." });
     if (!TICKER_RE.test(ticker)) return res.status(400).json({ error: "Ticker invalide." });
     if (!isValidAmount(quantity) || !isValidAmount(pru)) {
       return res.status(400).json({ error: "Quantité ou PRU invalide." });
@@ -163,12 +175,12 @@ router.post("/portfolio", auth, async (req, res) => {
     }
 
     await users().updateOne(userFilter(req), {
-      $push: { portfolio: { _id: new mongoose.Types.ObjectId(), ticker, quantity, pru, account: account ?? null } },
+      $push: { portfolio: { _id: new mongoose.Types.ObjectId(), ticker, quantity, pru, account: account ?? null, fees: fees ?? null } },
     });
 
     res.status(201).json({
       message: "Stock added successfully",
-      stock: enrich({ ticker, quantity, pru, account: account ?? null }, doc),
+      stock: enrich({ ticker, quantity, pru, account: account ?? null, fees: fees ?? null }, doc),
     });
   } catch (err) {
     console.error("❌ Error POST /portfolio:", err);
@@ -177,7 +189,7 @@ router.post("/portfolio", auth, async (req, res) => {
 });
 
 // =============================================================================
-// PATCH /api/user/portfolio/:ticker  { quantity?, pru?, account? }
+// PATCH /api/user/portfolio/:ticker  { quantity?, pru?, account?, fees? }
 // =============================================================================
 router.patch("/portfolio/:ticker", auth, async (req, res) => {
   try {
@@ -193,6 +205,9 @@ router.patch("/portfolio/:ticker", auth, async (req, res) => {
     const account = readAccount(req.body.account);
     if (account === false) return res.status(400).json({ error: "Enveloppe invalide." });
     if (account !== undefined) $set["portfolio.$.account"] = account;
+    const fees = readFees(req.body.fees);
+    if (fees === false) return res.status(400).json({ error: "Frais annuels invalides (entre 0 et 10 %)." });
+    if (fees !== undefined) $set["portfolio.$.fees"] = fees;
     if (!Object.keys($set).length) return res.status(400).json({ error: "Rien à mettre à jour." });
 
     const result = await users().updateOne({ ...userFilter(req), "portfolio.ticker": ticker }, { $set });

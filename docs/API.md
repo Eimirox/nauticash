@@ -34,6 +34,10 @@ Comparatif des sources gratuites utilisables par Nauticash et stratégie retenue
 
 Chaque soir à 21:45 UTC (`CRON_HISTORY_SCHEDULE`, désactivable avec `CRON_DAILY_HISTORY=false`), `jobs/dailySnapshot.js` enregistre pour chaque utilisateur la valeur du portefeuille en euros (cours en cache × quantités + cash, taux BCE du jour) dans la collection `history_daily` (`{ userId, date: "AAAA-MM-JJ", value, invested, cash, missing }`). Aucun appel aux API de cotation : seuls les cours déjà en base sont utilisés. Le relevé mensuel (`history`) est tenu à jour automatiquement (`auto: true`), sauf si l'utilisateur a saisi une valeur à la main pour ce mois. Lecture : `GET /api/user/history/daily?days=365`.
 
+## Indices de référence (depuis le 28/09/2026)
+
+`GET /api/market/benchmarks/:key` (CAC40 = `^FCHI`, SP500 = `^GSPC`, MSCIWORLD = ETF `URTH`) renvoie ≈ 400 jours de clôtures via l'endpoint FMP `historical-price-eod/light`. Les points sont gardés en base (collection `benchmarks`) 12 h et partagés entre tous les utilisateurs : au plus 2 appels par indice et par jour, soit 6 appels/jour au maximum. En cas d'échec FMP, les dernières données connues sont renvoyées avec `stale: true`.
+
 ## Pistes (voir `docs/AMELIORATIONS.md`)
 
 - Route admin qui mesure, pour les tickers réellement détenus, quel provider les couvre (résultats à reporter ici).
