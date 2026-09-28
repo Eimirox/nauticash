@@ -74,3 +74,28 @@ export function headingAngle(pct) {
   const clamped = Math.max(-3, Math.min(3, pct));
   return -(clamped / 3) * 60;
 }
+
+/**
+ * Répartition des positions par pays (hors cash), triée par montant décroissant :
+ * les `top` premiers pays, puis le reste regroupé dans « Autres ».
+ * Les cryptos sont regroupées sous « Crypto », les positions sans pays sous « Non renseigné ».
+ * @returns [{ label, value, share }] (share entre 0 et 1)
+ */
+export function allocationByCountry(stocks, toBase, top = 5) {
+  const acc = {};
+  for (const s of stocks || []) {
+    const v = toBase((s.close || 0) * (Number(s.quantity) || 0), s.currency);
+    if (!(v > 0)) continue;
+    const isCrypto = assetTypeLabel(s.type) === "Crypto";
+    const key = isCrypto ? "Crypto" : s.country && s.country !== "Inconnu" ? s.country : "Non renseigné";
+    acc[key] = (acc[key] || 0) + v;
+  }
+  const total = Object.values(acc).reduce((a, b) => a + b, 0);
+  if (!total) return [];
+  const sorted = Object.entries(acc).sort((a, b) => b[1] - a[1]);
+  const head = sorted.slice(0, top);
+  const rest = sorted.slice(top).reduce((sum, [, v]) => sum + v, 0);
+  const rows = head.map(([label, value]) => ({ label, value, share: value / total }));
+  if (rest > 0) rows.push({ label: "Autres", value: rest, share: rest / total });
+  return rows;
+}
