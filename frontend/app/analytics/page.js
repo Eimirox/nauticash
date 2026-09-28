@@ -271,7 +271,7 @@ export default function Analytics() {
                         Total (converti en {base})
                       </p>
                       <p className="text-3xl font-bold text-slate-900">
-                        {numberFormatter.format(totalInBase)} {baseSymbol}
+                        <span className="money">{numberFormatter.format(totalInBase)} {baseSymbol}</span>
                       </p>
                     </div>
                   </div>
@@ -288,12 +288,11 @@ export default function Analytics() {
                           Positions {cur}
                         </p>
                         <p className="text-2xl font-bold text-slate-900">
-                          {numberFormatter.format(tot)}{" "}
-                          {formatCurrencySymbol(cur)}
+                          <span className="money">{numberFormatter.format(tot)} {formatCurrencySymbol(cur)}</span>
                         </p>
                         {cur !== base && (
                           <p className="text-xs text-slate-500 mt-1">
-                            ≈ {numberFormatter.format(inBase(tot, cur))} {baseSymbol}
+                            ≈ <span className="money">{numberFormatter.format(inBase(tot, cur))} {baseSymbol}</span>
                           </p>
                         )}
                       </div>
@@ -308,12 +307,11 @@ export default function Analytics() {
                           {cash.amount < 0 ? "Dette" : "Cash"}
                         </p>
                         <p className="text-2xl font-bold text-emerald-900">
-                          {numberFormatter.format(Math.abs(cash.amount))}{" "}
-                          {formatCurrencySymbol(cash.currency)}
+                          <span className="money">{numberFormatter.format(Math.abs(cash.amount))} {formatCurrencySymbol(cash.currency)}</span>
                         </p>
                         {cash.currency !== base && (
                           <p className="text-xs text-emerald-700 mt-1">
-                            ≈ {numberFormatter.format(inBase(Math.abs(cash.amount), cash.currency))} {baseSymbol}
+                            ≈ <span className="money">{numberFormatter.format(inBase(Math.abs(cash.amount), cash.currency))} {baseSymbol}</span>
                           </p>
                         )}
                       </div>

@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { logout } from "@/lib/api";
 import { cx } from "./ui/cx";
 import { Avatar } from "./Avatar";
-import { useProfile } from "@/lib/profile";
+import { useProfile, useDiscreet } from "@/lib/profile";
 
 // Adresse qui reçoit les retours de la bêta (variable Vercel NEXT_PUBLIC_CONTACT_EMAIL) ;
 // sans elle, le lien « Donner mon avis » n'est pas affiché.
@@ -37,6 +37,7 @@ function isActive(pathname, { href, exact }) {
 export default function AppHeader({ actions }) {
   const pathname = usePathname() || "";
   const { email, profile, loading: profileLoading } = useProfile();
+  const [discreet, toggleDiscreet] = useDiscreet();
   const firstName = (profile.displayName || "").trim().split(/\s+/)[0];
 
   const links = NAV.map((item) => {
@@ -70,7 +71,7 @@ export default function AppHeader({ actions }) {
               Nauticash
             </span>
             <span
-              className="rounded-md border border-accent/30 bg-accent/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-accent"
+              className="hidden rounded-md border border-accent/30 bg-accent/10 px-1.5 py-0.5 text-[10px] min-[400px]:inline font-semibold uppercase tracking-wider text-accent"
               title="Nauticash est en version bêta : certaines fonctionnalités peuvent évoluer."
             >
               Bêta
@@ -95,6 +96,28 @@ export default function AppHeader({ actions }) {
                 <span className="hidden xl:inline">Donner mon avis</span>
               </a>
             )}
+            <button
+              type="button"
+              onClick={toggleDiscreet}
+              aria-pressed={discreet}
+              aria-label={discreet ? "Afficher les montants" : "Masquer les montants (mode discret)"}
+              title={discreet ? "Afficher les montants" : "Masquer les montants"}
+              className={cx(
+                "inline-flex h-10 w-10 items-center justify-center rounded-xl border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+                discreet ? "border-accent/40 bg-accent/10 text-accent" : "border-line bg-surface text-ink-muted hover:text-ink"
+              )}
+            >
+              {discreet ? (
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18M10.6 10.6a2 2 0 002.8 2.8M9.9 5.1A9.8 9.8 0 0112 5c5 0 9 4.5 10 7a13 13 0 01-2.9 4.1M6.6 6.6C4.4 8 2.8 10.2 2 12c1 2.5 5 7 10 7 1.6 0 3.1-.5 4.4-1.2" />
+                </svg>
+              ) : (
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2 12c1-2.5 5-7 10-7s9 4.5 10 7c-1 2.5-5 7-10 7S3 14.5 2 12z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              )}
+            </button>
             <Link
               href="/profil"
               aria-label={firstName ? `Mon profil (${firstName})` : "Mon profil"}

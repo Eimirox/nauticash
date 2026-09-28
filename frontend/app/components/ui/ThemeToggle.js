@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 // Script à injecter dans <head> : applique le thème mémorisé avant l'affichage (évite le flash)
 // Valeurs : "dark", "light" ou "system" (suit l'appareil).
-export const themeInitScript = `try{var t=localStorage.getItem("theme");if(t==="dark"||(t==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}`;
+export const themeInitScript = `try{var t=localStorage.getItem("theme");if(t==="dark"||(t==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark");if(localStorage.getItem("discreet")==="1")document.documentElement.classList.add("discreet")}catch(e){}`;
 
 // Applique et mémorise un thème choisi dans le profil
 export function applyTheme(theme) {

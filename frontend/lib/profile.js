@@ -20,8 +20,18 @@ let shared = null; // promesse partagée { email, profile }
 let current = null; // dernière valeur connue
 const listeners = new Set();
 
+/** Mode discret : classe « discreet » sur <html> (voir globals.css), mémorisée sur l'appareil */
+export function applyDiscreet(on) {
+  if (typeof document === "undefined") return;
+  document.documentElement.classList.toggle("discreet", Boolean(on));
+  try {
+    localStorage.setItem("discreet", on ? "1" : "0");
+  } catch {}
+}
+
 function publish(data) {
   current = data;
+  applyDiscreet(data.profile.discreetMode);
   listeners.forEach((fn) => fn(data));
 }
 
@@ -83,4 +93,27 @@ export function useProfile() {
 /** Devise de référence choisie dans le profil (EUR par défaut) */
 export function useBaseCurrency() {
   return useProfile().profile.baseCurrency || "EUR";
+}
+
+/**
+ * [discret, basculer] — masque les montants (« •••• ») sur toutes les pages.
+ * Le changement est immédiat puis enregistré dans le profil ; annulé si l'enregistrement échoue.
+ */
+export function useDiscreet() {
+  const { email, profile } = useProfile();
+  const on = Boolean(profile.discreetMode);
+
+  const toggle = async () => {
+    const before = { email, profile };
+    const next = !on;
+    setCachedProfile({ email, profile: { ...profile, discreetMode: next } });
+    try {
+      const saved = await apiFetch("/api/user/profile", { method: "PATCH", body: { discreetMode: next } });
+      setCachedProfile(saved);
+    } catch {
+      setCachedProfile(before);
+    }
+  };
+
+  return [on, toggle];
 }

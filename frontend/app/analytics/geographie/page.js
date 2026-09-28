@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { apiFetch } from "@/lib/api";
 import { useFxRates, toCurrency, currencySymbol } from "@/lib/fx";
-import { useBaseCurrency } from "@/lib/profile";
+import { useBaseCurrency, useDiscreet } from "@/lib/profile";
 import AppHeader from "../../components/AppHeader";
 import Link from "next/link";
 import {
@@ -65,6 +65,7 @@ export default function GeographiePage() {
   const { rates, stale: fxStale } = useFxRates();
   // Montants convertis dans la devise de référence du profil (EUR par défaut)
   const base = useBaseCurrency();
+  const [discreet] = useDiscreet();
   const inBase = (value, currency) => toCurrency(value, currency, base, rates) ?? ((currency || "EUR") === base ? value : 0);
 
   // Fetch portfolio
@@ -320,7 +321,9 @@ export default function GeographiePage() {
                               onMouseEnter={() => {
                                 if (countryData) {
                                   setTooltipContent(
-                                    `${countryData.country}: ${formatCurrency(countryData.valueBase)} (${formatPercent(countryData.valueBase, geoData.total)})`
+                                    discreet
+                                      ? `${countryData.country} (${formatPercent(countryData.valueBase, geoData.total)})`
+                                      : `${countryData.country}: ${formatCurrency(countryData.valueBase)} (${formatPercent(countryData.valueBase, geoData.total)})`
                                   );
                                 }
                               }}
@@ -375,7 +378,7 @@ export default function GeographiePage() {
                           </div>
                         </td>
                         <td className="text-right py-3 px-4 text-sm font-bold text-emerald-600">
-                          {formatCurrency(item.valueBase)}
+                          <span className="money">{formatCurrency(item.valueBase)}</span>
                         </td>
                         <td className="text-right py-3 px-4">
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">

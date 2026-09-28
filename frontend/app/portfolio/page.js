@@ -345,7 +345,7 @@ export default function Portfolio() {
         if (!isNaN(val) && val !== stock[field]) handleUpdateStock(stock.ticker, field, val);
       }}
       onKeyDown={(e) => e.key === "Enter" && e.target.blur()}
-      className={`px-3 py-2 text-right text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all ${className}`}
+      className={`px-3 py-2 text-right text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all ${field === "quantity" ? "money" : ""} ${className}`}
     />
   );
 
@@ -400,7 +400,7 @@ export default function Portfolio() {
                     </p>
                   </div>
                   <div className="shrink-0 text-right">
-                    <p className="text-base font-semibold tabular-nums text-slate-900">
+                    <p className="money text-base font-semibold tabular-nums text-slate-900">
                       {total != null ? `${nf2.format(total)} ${cur}` : "--"}
                     </p>
                     <p className={`text-sm font-semibold tabular-nums ${getPerformanceClass(perf)}`}>
@@ -581,7 +581,7 @@ export default function Portfolio() {
                           e.target.blur();
                         }
                       }}
-                      className="w-24 px-3 py-2 text-right text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                      className="money w-24 px-3 py-2 text-right text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                     />
                   </td>
                   
@@ -633,7 +633,7 @@ export default function Portfolio() {
                       : "--"}
                   </td>
                   <td className="px-6 py-4 text-right font-semibold text-slate-900">
-                    {total != null ? nf2.format(total) : "--"}
+                    <span className="money">{total != null ? nf2.format(total) : "--"}</span>
                   </td>
                   <td className="px-6 py-4">
                     <button
@@ -754,7 +754,7 @@ export default function Portfolio() {
           <div className="mb-4 p-5 bg-white border border-slate-200 shadow-lg rounded-xl grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Patrimoine total</p>
-              <p className="text-3xl font-bold text-slate-900 tabular-nums">{nf2.format(summary.total)} {baseSymbol}</p>
+              <p className="money text-3xl font-bold text-slate-900 tabular-nums">{nf2.format(summary.total)} {baseSymbol}</p>
               <p className="text-xs text-slate-500 mt-1">
                 Positions et cash convertis en {base} (taux BCE)
                 {summary.missing && " — une devise n'a pas pu être convertie"}
@@ -762,12 +762,12 @@ export default function Portfolio() {
             </div>
             <div>
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Aujourd&apos;hui</p>
-              <p className="text-xl font-bold text-slate-900 tabular-nums">{signed(summary.dayChange)}</p>
+              <p className="money text-xl font-bold text-slate-900 tabular-nums">{signed(summary.dayChange)}</p>
               <Delta value={summary.dayChangePct} className="text-sm" />
             </div>
             <div>
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Plus-value latente</p>
-              <p className="text-xl font-bold text-slate-900 tabular-nums">{signed(summary.gain)}</p>
+              <p className="money text-xl font-bold text-slate-900 tabular-nums">{signed(summary.gain)}</p>
               <Delta value={summary.gainPct} suffix=" depuis l'achat" className="text-sm" />
             </div>
           </div>
@@ -786,7 +786,7 @@ export default function Portfolio() {
                   Positions {cur}
                 </p>
                 <p className="text-2xl font-bold text-slate-900">
-                  {nf2.format(Number(tot))} {formatCurrencySymbol(cur)}
+                  <span className="money">{nf2.format(Number(tot))} {formatCurrencySymbol(cur)}</span>
                 </p>
               </div>
             </div>
@@ -801,7 +801,7 @@ export default function Portfolio() {
                 <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1">
                   Cash / Dette
                 </p>
-                <p className="text-lg font-bold text-emerald-900">
+                <p className="money text-lg font-bold text-emerald-900">
                   {nf2.format(cash.amount)} {formatCurrencySymbol(cash.currency)}
                 </p>
               </div>
@@ -860,7 +860,7 @@ export default function Portfolio() {
                   }}
                   onBlur={() => syncCashUpdate(cash.amount, cash.currency)}
                   onKeyDown={(e) => e.key === "Enter" && e.target.blur()}
-                  className="w-32 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                  className="money w-32 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                 />
               </div>
               <div>

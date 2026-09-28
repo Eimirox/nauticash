@@ -159,9 +159,9 @@ export default function DividendesPage() {
               {Object.entries(dividendData.totalsByCurrency).map(([cur, tot]) => (
                 <div key={cur} className="bg-white border border-slate-200 rounded-xl shadow-lg p-6">
                   <h3 className="text-sm font-semibold text-slate-600 uppercase mb-3">Dividendes {cur}</h3>
-                  <p className="text-3xl font-bold text-emerald-600 mb-1">{formatCurrency(tot, cur)}</p>
+                  <p className="money text-3xl font-bold text-emerald-600 mb-1">{formatCurrency(tot, cur)}</p>
                   <p className="text-xs text-slate-500">
-                    {cur === base ? "par an" : `≈ ${formatCurrency(inBase(tot, cur), base)} / an`}
+                    {cur === base ? "par an" : <>≈ <span className="money">{formatCurrency(inBase(tot, cur), base)}</span> / an</>}
                   </p>
                 </div>
               ))}
@@ -169,11 +169,11 @@ export default function DividendesPage() {
               {/* Total Converti */}
               <div className="bg-gradient-to-br from-emerald-50 to-blue-50 border border-emerald-200 rounded-xl shadow-lg p-6">
                 <h3 className="text-sm font-semibold text-emerald-700 uppercase mb-3">Total ({base})</h3>
-                <p className="text-3xl font-bold text-emerald-600 mb-1">
+                <p className="money text-3xl font-bold text-emerald-600 mb-1">
                   {formatCurrency(dividendData.totalAnnualInBase, base)}
                 </p>
                 <p className="text-xs text-emerald-700">
-                  par an, soit {formatCurrency(dividendData.totalAnnualInBase / 12, base)} / mois
+                  par an, soit <span className="money">{formatCurrency(dividendData.totalAnnualInBase / 12, base)}</span> / mois
                 </p>
               </div>
 
@@ -232,13 +232,13 @@ export default function DividendesPage() {
                           </div>
                         </td>
                         <td className="text-right py-3 px-4 text-sm text-slate-600">
-                          {stock.quantity}
+                          <span className="money">{stock.quantity}</span>
                         </td>
                         <td className="text-right py-3 px-4 text-sm text-slate-600">
                           {formatCurrency(stock.divPerShare, stock.currency)}
                         </td>
                         <td className="text-right py-3 px-4 text-sm font-bold text-emerald-600">
-                          {formatCurrency(stock.totalAnnual, stock.currency)}
+                          <span className="money">{formatCurrency(stock.totalAnnual, stock.currency)}</span>
                         </td>
                         <td className="text-right py-3 px-4">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -282,7 +282,7 @@ export default function DividendesPage() {
                       </div>
                       <div className="text-right">
                         <div className="text-sm font-bold text-emerald-600">
-                          {formatCurrency(item.amount, item.currency)}
+                          <span className="money">{formatCurrency(item.amount, item.currency)}</span>
                         </div>
                         <div className="text-xs text-slate-500">
                           {item.paymentDate ? `versé le ${formatDate(item.paymentDate)}` : "par trimestre (est.)"}
