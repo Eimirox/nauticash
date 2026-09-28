@@ -12,6 +12,17 @@ import { Pie } from "react-chartjs-2";
 import Chart from "chart.js/auto";
 import { formatCurrencySymbol } from "../portfolio/utils/formats";
 import PortfolioHistoryChart from "./PortfolioHistoryChart";
+import WealthHero from "../components/WealthHero";
+import { wealthSummary, allocationByType } from "@/lib/wealth";
+
+// Types d'actif : ordre des séries de DESIGN.md (accent, accent-2, teintes intermédiaires)
+const TYPE_COLORS = {
+  "Actions": "#2563EB",
+  "ETF et fonds": "#059669",
+  "Crypto": "#0891B2",
+  "Cash": "#14B8A6",
+  "Autres": "#64748B",
+};
 
 // COULEURS SECTORIELLES FIXES - Optimisées pour contraste maximum
 const SECTOR_COLORS = {
@@ -137,6 +148,25 @@ export default function Analytics() {
     totalsPerSector[sectorName] = (totalsPerSector[sectorName] || 0) + cashBase;
   }
 
+  // Synthèse et répartition par type d'actif dans la devise de référence
+  const toBaseOrNull = (value, currency) => toCurrency(value, currency, base, rates);
+  const summary = wealthSummary(stocks, cash, toBaseOrNull);
+  const summaryReady =
+    Boolean(rates) || (stocks.every((s) => (s.currency || "EUR") === base) && (!cash.amount || cash.currency === base));
+  const totalsPerType = allocationByType(stocks, cash, toBaseOrNull);
+  const typeLabels = Object.keys(totalsPerType);
+  const pieType = {
+    labels: typeLabels,
+    datasets: [
+      {
+        data: typeLabels.map((t) => totalsPerType[t]),
+        backgroundColor: typeLabels.map((t) => TYPE_COLORS[t] || TYPE_COLORS.Autres),
+        borderWidth: 2,
+        borderColor: "#fff",
+      },
+    ],
+  };
+
   // Fonction pour obtenir la couleur d'un secteur
   const getSectorColor = (sector) => {
     return SECTOR_COLORS[sector] || SECTOR_COLORS["Unknown"];
@@ -236,15 +266,20 @@ export default function Analytics() {
             Vue d'ensemble
           </h1>
           <p className="text-ink-muted">
-            Répartition de votre patrimoine par devise, type d'actif et secteur.
+            Votre patrimoine en un coup d'œil : valeur totale, variation du jour et répartition par type d'actif, devise et secteur.
           </p>
         </div>
 
 
         {activeTab === "vue" && (
           <section>
+            {/* Synthèse : valeur totale, cap du jour, depuis l'achat */}
+            {!loading && summaryReady && (stocks.length > 0 || cash.amount !== 0) && (
+              <WealthHero summary={summary} symbol={baseSymbol} base={base} />
+            )}
+
             {/* KPI Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
               {loading ? (
                 <div className="col-span-full flex justify-center py-10">
                   <svg
@@ -269,19 +304,6 @@ export default function Analytics() {
                 </div>
               ) : (
                 <>
-                  {/* Total dans la devise de référence (tout converti) */}
-                  <div className="relative p-6 bg-surface border border-line shadow-lg rounded-xl overflow-hidden group hover:shadow-xl transition-all">
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-emerald-100 to-blue-100 dark:from-accent/20 dark:to-accent-2/20 rounded-full -mr-12 -mt-12 opacity-40 group-hover:opacity-60 transition-opacity" />
-                    <div className="relative">
-                      <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1">
-                        Total (converti en {base})
-                      </p>
-                      <p className="text-3xl font-bold text-ink">
-                        <span className="money">{numberFormatter.format(totalInBase)} {baseSymbol}</span>
-                      </p>
-                    </div>
-                  </div>
-
                   {/* Par devise originale */}
                   {Object.entries(portfolioTotalsByCurrency).map(([cur, tot]) => (
                     <div
@@ -372,7 +394,25 @@ export default function Analytics() {
             />
 
             {/* Charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
+              {/* Répartition par type d'actif */}
+              <div className="bg-surface border border-line rounded-xl shadow-lg p-6">
+                <div className="flex items-center gap-2 mb-6">
+                  <svg className="w-5 h-5 text-accent" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                    <path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z" />
+                    <path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z" />
+                  </svg>
+                  <h3 className="text-lg font-bold text-ink">Répartition par type d&apos;actif</h3>
+                </div>
+                <div style={{ height: 320 }}>
+                  {typeLabels.length > 0 ? (
+                    <Pie data={pieType} options={pieOptions} />
+                  ) : (
+                    <p className="text-sm text-ink-muted">Aucune position pour le moment.</p>
+                  )}
+                </div>
+              </div>
+
               {/* Répartition Devise */}
               <div className="bg-surface border border-line rounded-xl shadow-lg p-6">
                 <div className="flex items-center gap-2 mb-6">
@@ -389,7 +429,7 @@ export default function Analytics() {
                     />
                   </svg>
                   <h3 className="text-lg font-bold text-ink">
-                    Répartition par Devise
+                    Répartition par devise
                   </h3>
                 </div>
                 <div style={{ height: 320 }}>
@@ -408,7 +448,7 @@ export default function Analytics() {
                     <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
                   </svg>
                   <h3 className="text-lg font-bold text-ink">
-                    Répartition Sectorielle
+                    Répartition par secteur
                   </h3>
                 </div>
                 <div style={{ height: 320 }}>

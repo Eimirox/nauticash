@@ -15,6 +15,7 @@ import { useBaseCurrency, useProfile } from "@/lib/profile";
 import GoalGauge from "../components/GoalGauge";
 import TickerSearch from "../components/TickerSearch";
 import EmergencyFund from "../components/EmergencyFund";
+import { wealthSummary } from "@/lib/wealth";
 
 // Enveloppes proposées (doivent correspondre à ACCOUNTS côté backend)
 const ACCOUNT_LABELS = { PEA: "PEA", CTO: "Compte-titres", AV: "Assurance-vie", PER: "PER", CRYPTO: "Crypto" };
@@ -275,36 +276,10 @@ export default function Portfolio() {
   const { profile } = useProfile();
   const baseSymbol = currencySymbol(base);
   const toBase = (amount, currency) => toCurrency(amount, currency, base, rates);
-  const summary = (() => {
-    let value = 0, dayChange = 0, prevValue = 0, cost = 0, costedValue = 0, missing = false;
-    for (const s of stocks) {
-      const qty = Number(s.quantity) || 0;
-      const v = toBase((s.close || 0) * qty, s.currency);
-      if (v === null) { missing = true; continue; }
-      value += v;
-      if (Number.isFinite(s.dayChangeValue)) {
-        const d = toBase(s.dayChangeValue, s.currency) ?? 0;
-        dayChange += d;
-        prevValue += v - d;
-      }
-      if (s.pru > 0) {
-        cost += toBase(s.pru * qty, s.currency) ?? 0;
-        costedValue += v;
-      }
-    }
-    const cashBase = toBase(Number(cash.amount) || 0, cash.currency);
-    if (cashBase === null && cash.amount) missing = true;
-    return {
-      ready: Boolean(rates) || (stocks.every((s) => (s.currency || "EUR") === base) && (!cash.amount || cash.currency === base)),
-      missing,
-      total: value + (cashBase ?? 0),
-      invested: value,
-      dayChange,
-      dayChangePct: prevValue > 0 ? (dayChange / prevValue) * 100 : null,
-      gain: costedValue - cost,
-      gainPct: cost > 0 ? ((costedValue - cost) / cost) * 100 : null,
-    };
-  })();
+  const summary = {
+    ...wealthSummary(stocks, cash, toBase),
+    ready: Boolean(rates) || (stocks.every((s) => (s.currency || "EUR") === base) && (!cash.amount || cash.currency === base)),
+  };
   // Filtre et sous-totaux par enveloppe (dans la devise de référence)
   const [accountFilter, setAccountFilter] = useState("all");
   const accountTotals = stocks.reduce((acc, s) => {
