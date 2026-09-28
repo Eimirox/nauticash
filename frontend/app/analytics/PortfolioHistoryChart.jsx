@@ -260,7 +260,7 @@ export default function PortfolioHistoryChart() {
       {/* Controls */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-slate-700">
+          <span className="text-sm font-medium text-ink">
             Comparer :
           </span>
           {availableYears.map((year) => (
@@ -269,8 +269,8 @@ export default function PortfolioHistoryChart() {
               onClick={() => toggleYear(year)}
               className={`px-3 py-1.5 text-sm font-medium rounded-lg border-2 transition-all ${
                 selectedYears.includes(year)
-                  ? "bg-emerald-50 border-emerald-500 text-emerald-700"
-                  : "bg-white border-slate-200 text-slate-600 hover:border-slate-300"
+                  ? "bg-accent/10 border-accent text-accent"
+                  : "bg-surface border-line text-ink-muted hover:border-line"
               }`}
               style={
                 selectedYears.includes(year)
@@ -282,14 +282,14 @@ export default function PortfolioHistoryChart() {
             </button>
           ))}
           {availableYears.length === 0 && (
-            <span className="text-sm text-slate-500 italic">Aucune donnée</span>
+            <span className="text-sm text-ink-muted italic">Aucune donnée</span>
           )}
         </div>
 
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowManualEdit(!showManualEdit)}
-            className="px-4 py-2 bg-white border-2 border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-all flex items-center gap-2"
+            className="px-4 py-2 bg-surface border-2 border-line text-ink text-sm font-medium rounded-lg hover:bg-surface-2 transition-all flex items-center gap-2"
           >
             <svg
               className="w-4 h-4"
@@ -357,19 +357,19 @@ export default function PortfolioHistoryChart() {
       </div>
 
       {/* Info taux */}
-      <div className="mb-4 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700">
+      <div className="mb-4 px-3 py-2 bg-blue-50 dark:bg-sky-500/10 border border-blue-200 dark:border-sky-500/30 rounded-lg text-xs text-blue-700 dark:text-sky-200">
         Taux de change BCE (toutes devises){fxStale ? " : approximatifs, service indisponible" : ""}
       </div>
 
       {/* Édition manuelle */}
       {showManualEdit && (
-        <div className="mb-6 p-4 bg-slate-50 border border-slate-200 rounded-lg">
-          <h4 className="text-sm font-semibold text-slate-900 mb-3">
+        <div className="mb-6 p-4 bg-surface-2 border border-line rounded-lg">
+          <h4 className="text-sm font-semibold text-ink mb-3">
             Ajouter/Modifier
           </h4>
           <form onSubmit={saveManualSnapshot} className="flex flex-wrap gap-3">
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
+              <label className="block text-xs font-medium text-ink mb-1">
                 Date
               </label>
               <input
@@ -379,11 +379,11 @@ export default function PortfolioHistoryChart() {
                   setManualForm({ ...manualForm, date: e.target.value })
                 }
                 required
-                className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                className="px-3 py-2 border border-line rounded-lg text-sm"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
+              <label className="block text-xs font-medium text-ink mb-1">
                 Valeur (€)
               </label>
               <input
@@ -395,7 +395,7 @@ export default function PortfolioHistoryChart() {
                 }
                 required
                 placeholder="15000.00"
-                className="px-3 py-2 border border-slate-300 rounded-lg text-sm w-32"
+                className="px-3 py-2 border border-line rounded-lg text-sm w-32"
               />
             </div>
             <div className="flex items-end gap-2">
@@ -412,7 +412,7 @@ export default function PortfolioHistoryChart() {
                   setShowManualEdit(false);
                   setManualForm({ date: "", value: "" });
                 }}
-                className="px-4 py-2 bg-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-300 transition"
+                className="px-4 py-2 bg-surface-2 text-ink text-sm font-medium rounded-lg hover:bg-slate-300 transition"
               >
                 Annuler
               </button>
@@ -423,8 +423,8 @@ export default function PortfolioHistoryChart() {
 
       {/* Dernier snapshot */}
       {lastSnapshot && (
-        <div className="mb-6 p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between text-sm">
-          <div className="flex items-center gap-2 text-slate-600">
+        <div className="mb-6 p-3 bg-surface-2 border border-line rounded-lg flex items-center justify-between text-sm">
+          <div className="flex items-center gap-2 text-ink-muted">
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
               <path
                 fillRule="evenodd"
@@ -433,10 +433,13 @@ export default function PortfolioHistoryChart() {
               />
             </svg>
             <span>
-              Dernier : {lastSnapshot.month} {lastSnapshot.year}
+              Dernier relevé :{" "}
+              {MONTH_MAP[lastSnapshot.month]
+                ? new Date(lastSnapshot.year, MONTH_MAP[lastSnapshot.month] - 1, 1).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })
+                : `${lastSnapshot.month} ${lastSnapshot.year}`}
             </span>
           </div>
-          <span className="font-semibold text-slate-900">
+          <span className="font-semibold text-ink">
             {lastSnapshot.value.toLocaleString("fr-FR", {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
@@ -448,9 +451,9 @@ export default function PortfolioHistoryChart() {
 
       {/* Chart */}
       {!hasData ? (
-        <div className="flex flex-col items-center justify-center py-16 text-slate-500">
+        <div className="flex flex-col items-center justify-center py-16 text-ink-muted">
           <svg
-            className="w-16 h-16 mb-4 text-slate-300"
+            className="w-16 h-16 mb-4 text-ink-muted/40"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -476,16 +479,16 @@ export default function PortfolioHistoryChart() {
       ) : (
         <ResponsiveContainer width="100%" height={400}>
           <BarChart data={chartData} barGap={4}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#94A3B8" strokeOpacity={0.25} />
             <XAxis
               dataKey="month"
-              tick={{ fill: "#64748B", fontSize: 12 }}
+              tick={{ fill: "#8A9AA9", fontSize: 12 }}
             />
             <YAxis
-              tick={{ fill: "#64748B", fontSize: 12 }}
+              tick={{ fill: "#8A9AA9", fontSize: 12 }}
               tickFormatter={(value) => {
-                if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
-                if (value >= 1000) return `${(value / 1000).toFixed(0)}k`;
+                if (value >= 1000000) return `${(value / 1000000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} M`;
+                if (value >= 1000) return `${Math.round(value / 1000)} k`;
                 return `${value}`;
               }}
             />
@@ -508,10 +511,10 @@ export default function PortfolioHistoryChart() {
       )}
 
       {/* Astuce */}
-      <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+      <div className="mt-6 p-4 bg-blue-50 dark:bg-sky-500/10 border border-blue-200 dark:border-sky-500/30 rounded-lg">
         <div className="flex items-start gap-2">
           <svg
-            className="w-5 h-5 text-blue-600 mt-0.5"
+            className="w-5 h-5 text-blue-600 dark:text-sky-300 mt-0.5"
             fill="currentColor"
             viewBox="0 0 20 20"
           >
@@ -521,9 +524,9 @@ export default function PortfolioHistoryChart() {
               clipRule="evenodd"
             />
           </svg>
-          <div className="text-sm text-blue-900">
+          <div className="text-sm text-blue-900 dark:text-sky-200">
             <p className="font-semibold mb-1">💡 Snapshot mensuel</p>
-            <p className="text-blue-700">
+            <p className="text-blue-700 dark:text-sky-200">
               Le "Snapshot auto" calcule la valeur totale (stocks + cash) et
               convertit toutes les devises en euros (taux de référence BCE).
             </p>

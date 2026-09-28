@@ -36,14 +36,14 @@ export default function FeesCard({ positions, symbol = "€", onFeesChange }) {
   };
 
   return (
-    <section aria-labelledby="fees-title" className="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-lg">
+    <section aria-labelledby="fees-title" className="mb-6 rounded-xl border border-line bg-surface p-6 shadow-lg">
       <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="fees-title" className="text-lg font-bold text-slate-900">
+        <h2 id="fees-title" className="text-lg font-bold text-ink">
           Frais de vos ETF et fonds
         </h2>
         {a.weightedTer != null && (
-          <p className="text-sm text-slate-600">
-            Frais moyens : <span className="font-semibold text-slate-900">{nf2.format(a.weightedTer)} %</span> par an
+          <p className="text-sm text-ink-muted">
+            Frais moyens : <span className="font-semibold text-ink">{nf2.format(a.weightedTer)} %</span> par an
           </p>
         )}
       </div>
@@ -55,9 +55,9 @@ export default function FeesCard({ positions, symbol = "€", onFeesChange }) {
             ["Manque à gagner sur 10 ans", a.impact10],
             ["Manque à gagner sur 20 ans", a.impact20],
           ].map(([label, v]) => (
-            <div key={label} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-              <p className="money text-xl font-bold text-slate-900 tabular-nums">
+            <div key={label} className="rounded-lg border border-line bg-surface-2 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{label}</p>
+              <p className="money text-xl font-bold text-ink tabular-nums">
                 {nf0.format(v)} {symbol}
               </p>
             </div>
@@ -68,7 +68,7 @@ export default function FeesCard({ positions, symbol = "€", onFeesChange }) {
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+            <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-ink-muted">
               <th className="py-2 pr-4 font-semibold">Ligne</th>
               <th className="py-2 pr-4 text-right font-semibold">Valeur</th>
               <th className="py-2 pr-4 text-right font-semibold">Frais annuels (%)</th>
@@ -77,10 +77,10 @@ export default function FeesCard({ positions, symbol = "€", onFeesChange }) {
           </thead>
           <tbody>
             {a.rows.map((r) => (
-              <tr key={r.ticker} className="border-b border-slate-100 last:border-0">
+              <tr key={r.ticker} className="border-b border-line last:border-0">
                 <td className="py-2 pr-4">
-                  <span className="font-semibold text-slate-900">{r.ticker}</span>
-                  {r.name && r.name !== r.ticker && <span className="block max-w-[16rem] truncate text-xs text-slate-500">{r.name}</span>}
+                  <span className="font-semibold text-ink">{r.ticker}</span>
+                  {r.name && r.name !== r.ticker && <span className="block max-w-[16rem] truncate text-xs text-ink-muted">{r.name}</span>}
                 </td>
                 <td className="whitespace-nowrap py-2 pr-4 text-right tabular-nums">
                   <span className="money">{nf0.format(r.value)} {symbol}</span>
@@ -95,11 +95,11 @@ export default function FeesCard({ positions, symbol = "€", onFeesChange }) {
                     aria-label={`Frais annuels de ${r.ticker} en %`}
                     onBlur={(e) => save(r.ticker, e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-                    className="w-24 rounded-lg border border-slate-300 px-2 py-1 text-right tabular-nums focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-24 rounded-lg border border-line px-2 py-1 text-right tabular-nums focus:border-transparent focus:outline-none focus:ring-2 focus:ring-accent"
                   />
                 </td>
-                <td className="whitespace-nowrap py-2 text-right tabular-nums text-slate-700">
-                  {r.annualCost == null ? <span className="text-slate-400">—</span> : <span className="money">{nf2.format(r.annualCost)} {symbol}</span>}
+                <td className="whitespace-nowrap py-2 text-right tabular-nums text-ink">
+                  {r.annualCost == null ? <span className="text-ink-muted/70">—</span> : <span className="money">{nf2.format(r.annualCost)} {symbol}</span>}
                 </td>
               </tr>
             ))}
@@ -108,11 +108,11 @@ export default function FeesCard({ positions, symbol = "€", onFeesChange }) {
       </div>
 
       {error && (
-        <p role="alert" className="mt-3 text-sm text-red-600">
+        <p role="alert" className="mt-3 text-sm text-loss">
           {error}
         </p>
       )}
-      <p className="mt-3 text-[11px] text-slate-400">
+      <p className="mt-3 text-[11px] text-ink-muted/70">
         Saisissez les frais courants (TER) indiqués dans le document d&apos;informations clés de chaque ETF ou fonds
         {a.missing > 0 && ` (${a.missing} ligne${a.missing > 1 ? "s" : ""} sans frais renseignés)`}. Manque à gagner calculé
         sur la valeur actuelle, sans nouveaux versements, avec un rendement hypothétique de {Math.round(ASSUMED_RETURN * 100)} % par an

@@ -123,6 +123,8 @@ export default function GeographiePage() {
         };
       }
 
+      // Le code ISO peut manquer sur une ligne (ancienne donnée) : on garde le premier connu
+      if (!byCountry[country].countryCode && s.countryCode) byCountry[country].countryCode = s.countryCode;
       byCountry[country].valueBase += valueBase;
       byCountry[country].valueOriginal += value;
       byCountry[country].stocks.push({
@@ -139,7 +141,6 @@ export default function GeographiePage() {
     // Valeur max pour l'échelle de couleurs
     const maxValue = Math.max(...countryList.map(c => c.valueBase));
 
-    // Continent principal (simplifié)
     // Continent principal : somme des valeurs par continent
     const byContinent = {};
     for (const c of countryList) {
@@ -168,15 +169,15 @@ export default function GeographiePage() {
 
   const formatPercent = (value, total) => {
     if (total === 0) return "0%";
-    return ((value / total) * 100).toFixed(1) + "%";
+    return ((value / total) * 100).toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " %";
   };
 
   // Obtenir la couleur selon la valeur (gradient vert)
   const getColor = (isoCode) => {
-    if (!isoCode) return "#E5E7EB";
+    if (!isoCode) return "rgb(var(--surface-2))";
     
     const countryData = geoData.countryList.find(c => c.isoCode === isoCode);
-    if (!countryData) return "#E5E7EB";
+    if (!countryData) return "rgb(var(--surface-2))";
 
     const intensity = countryData.valueBase / geoData.maxValue;
     
@@ -189,9 +190,9 @@ export default function GeographiePage() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+    <main className="min-h-screen bg-bg">
       {loadError && (
-        <div role="alert" className="mx-auto mt-4 max-w-7xl rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div role="alert" className="mx-auto mt-4 max-w-7xl rounded-lg border border-loss/30 bg-loss/10 px-4 py-3 text-sm text-loss">
           {loadError}
         </div>
       )}
@@ -201,10 +202,10 @@ export default function GeographiePage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Title */}
         <div className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-2">
+          <h1 className="text-3xl md:text-4xl font-bold text-ink mb-2">
             Géographie
           </h1>
-          <p className="text-slate-600">
+          <p className="text-ink-muted">
             Exposition de votre portefeuille par pays et par continent.
           </p>
         </div>
@@ -212,7 +213,7 @@ export default function GeographiePage() {
 
         {loading ? (
           <div className="flex justify-center py-20">
-            <svg className="animate-spin h-10 w-10 text-emerald-600" fill="none" viewBox="0 0 24 24">
+            <svg className="animate-spin h-10 w-10 text-accent" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
             </svg>
@@ -222,61 +223,61 @@ export default function GeographiePage() {
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Pays représentés */}
-              <div className="bg-white border border-slate-200 rounded-xl shadow-lg p-6">
+              <div className="bg-surface border border-line rounded-xl shadow-lg p-6">
                 <div className="flex items-center gap-2 mb-3">
                   <svg className="w-5 h-5 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-2a1 1 0 00-1-1H9a1 1 0 00-1 1v2a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clipRule="evenodd" />
                   </svg>
-                  <h3 className="text-sm font-semibold text-slate-600 uppercase">Pays</h3>
+                  <h3 className="text-sm font-semibold text-ink-muted uppercase">Pays</h3>
                 </div>
-                <p className="text-3xl font-bold text-emerald-600">
+                <p className="text-3xl font-bold text-accent">
                   {geoData.countryList.filter(c => c.isoCode && c.isoCode !== "CRYPTO").length}
                 </p>
-                <p className="text-xs text-slate-500">pays représentés</p>
+                <p className="text-xs text-ink-muted">pays représentés</p>
               </div>
 
               {/* Continent principal */}
-              <div className="bg-white border border-slate-200 rounded-xl shadow-lg p-6">
+              <div className="bg-surface border border-line rounded-xl shadow-lg p-6">
                 <div className="flex items-center gap-2 mb-3">
-                  <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                  <svg className="w-5 h-5 text-blue-500 dark:text-sky-300" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M12 1.586l-4 4v12.828l4-4V1.586zM3.707 3.293A1 1 0 002 4v10a1 1 0 00.293.707L6 18.414V5.586L3.707 3.293zM17.707 5.293L14 1.586v12.828l2.293 2.293A1 1 0 0018 16V6a1 1 0 00-.293-.707z" clipRule="evenodd" />
                   </svg>
-                  <h3 className="text-sm font-semibold text-slate-600 uppercase">Zone principale</h3>
+                  <h3 className="text-sm font-semibold text-ink-muted uppercase">Zone principale</h3>
                 </div>
-                <p className="text-2xl font-bold text-blue-600">
+                <p className="text-2xl font-bold text-blue-600 dark:text-sky-300">
                   {geoData.topContinent}
                 </p>
-                <p className="text-xs text-slate-500">continent dominant</p>
+                <p className="text-xs text-ink-muted">continent dominant</p>
               </div>
 
               {/* Diversification */}
-              <div className="bg-gradient-to-br from-emerald-50 to-blue-50 border border-emerald-200 rounded-xl shadow-lg p-6">
+              <div className="bg-gradient-to-br from-emerald-50 to-blue-50 dark:from-accent/10 dark:to-accent-2/10 border border-accent/40 rounded-xl shadow-lg p-6">
                 <div className="flex items-center gap-2 mb-3">
-                  <svg className="w-5 h-5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
+                  <svg className="w-5 h-5 text-accent" fill="currentColor" viewBox="0 0 20 20">
                     <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
                   </svg>
-                  <h3 className="text-sm font-semibold text-emerald-700 uppercase">Diversification</h3>
+                  <h3 className="text-sm font-semibold text-accent uppercase">Diversification</h3>
                 </div>
-                <p className="text-2xl font-bold text-emerald-600">
+                <p className="text-2xl font-bold text-accent">
                   {geoData.countryList.length <= 2 ? "Faible" : geoData.countryList.length <= 4 ? "Moyenne" : "Élevée"}
                 </p>
-                <p className="text-xs text-emerald-700">
+                <p className="text-xs text-accent">
                   {geoData.countryList.length} zones distinctes
                 </p>
               </div>
             </div>
 
             {/* Carte du Monde */}
-            <div className="bg-white border border-slate-200 rounded-xl shadow-lg p-6">
+            <div className="bg-surface border border-line rounded-xl shadow-lg p-6">
               <div className="flex items-center gap-2 mb-6">
-                <svg className="w-5 h-5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-5 h-5 text-accent" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
                 </svg>
-                <h3 className="text-lg font-bold text-slate-900">Carte de l'Exposition Géographique</h3>
+                <h3 className="text-lg font-bold text-ink">Carte de l'Exposition Géographique</h3>
               </div>
 
               {/* Légende */}
-              <div className="mb-4 flex items-center gap-4 text-xs text-slate-600">
+              <div className="mb-4 flex items-center gap-4 text-xs text-ink-muted">
                 <span>Exposition :</span>
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 rounded" style={{ backgroundColor: "#A7F3D0" }}></div>
@@ -292,7 +293,7 @@ export default function GeographiePage() {
                 </div>
               </div>
 
-              <div className="relative bg-slate-50 rounded-lg overflow-hidden" style={{ height: "500px" }}>
+              <div className="relative bg-surface-2 rounded-lg overflow-hidden" style={{ height: "500px" }}>
                 <ComposableMap
                   projection="geoMercator"
                   projectionConfig={{
@@ -310,13 +311,12 @@ export default function GeographiePage() {
                             <Geography
                               key={geo.rsmKey}
                               geography={geo}
-                              fill={getColor(isoCode)}
-                              stroke="#FFFFFF"
                               strokeWidth={0.5}
                               style={{
-                                default: { outline: "none" },
+                                // Couleurs en style (et non en attribut) pour suivre les jetons clair/sombre
+                                default: { fill: getColor(isoCode), stroke: "rgb(var(--surface))", outline: "none" },
                                 hover: { fill: "#F59E0B", outline: "none", cursor: "pointer" },
-                                pressed: { outline: "none" }
+                                pressed: { fill: getColor(isoCode), outline: "none" }
                               }}
                               onMouseEnter={() => {
                                 if (countryData) {
@@ -348,44 +348,44 @@ export default function GeographiePage() {
             </div>
 
             {/* Tableau Top Pays */}
-            <div className="bg-white border border-slate-200 rounded-xl shadow-lg p-6">
+            <div className="bg-surface border border-line rounded-xl shadow-lg p-6">
               <div className="flex items-center gap-2 mb-6">
-                <svg className="w-5 h-5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-5 h-5 text-accent" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
                 </svg>
-                <h3 className="text-lg font-bold text-slate-900">Répartition par Pays</h3>
+                <h3 className="text-lg font-bold text-ink">Répartition par Pays</h3>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-slate-200">
-                      <th className="text-left py-3 px-4 text-sm font-semibold text-slate-600">Pays</th>
-                      <th className="text-right py-3 px-4 text-sm font-semibold text-slate-600">Valeur</th>
-                      <th className="text-right py-3 px-4 text-sm font-semibold text-slate-600">% Portfolio</th>
-                      <th className="text-right py-3 px-4 text-sm font-semibold text-slate-600">Actions</th>
+                    <tr className="border-b border-line">
+                      <th className="text-left py-3 px-4 text-sm font-semibold text-ink-muted">Pays</th>
+                      <th className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Valeur</th>
+                      <th className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">% Portfolio</th>
+                      <th className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {geoData.countryList.map((item, idx) => (
-                      <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50 transition">
+                      <tr key={idx} className="border-b border-line hover:bg-surface-2 transition">
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-2">
                             <div 
                               className="w-3 h-3 rounded-full" 
                               style={{ backgroundColor: getColor(item.isoCode) }}
                             ></div>
-                            <span className="text-sm font-medium text-slate-900">{item.country}</span>
+                            <span className="text-sm font-medium text-ink">{item.country}</span>
                           </div>
                         </td>
-                        <td className="text-right py-3 px-4 text-sm font-bold text-emerald-600">
+                        <td className="text-right py-3 px-4 text-sm font-bold text-accent">
                           <span className="money">{formatCurrency(item.valueBase)}</span>
                         </td>
                         <td className="text-right py-3 px-4">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 dark:bg-accent/20 text-accent">
                             {formatPercent(item.valueBase, geoData.total)}
                           </span>
                         </td>
-                        <td className="text-right py-3 px-4 text-sm text-slate-600">
+                        <td className="text-right py-3 px-4 text-sm text-ink-muted">
                           {item.stocks.length}
                         </td>
                       </tr>
@@ -396,14 +396,14 @@ export default function GeographiePage() {
             </div>
 
             {/* Info */}
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="p-4 bg-blue-50 dark:bg-sky-500/10 border border-blue-200 dark:border-sky-500/30 rounded-lg">
               <div className="flex items-start gap-2">
-                <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-5 h-5 text-blue-600 dark:text-sky-300 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                 </svg>
-                <div className="text-sm text-blue-900">
+                <div className="text-sm text-blue-900 dark:text-sky-200">
                   <p className="font-semibold mb-1">🌍 Exposition géographique</p>
-                  <p className="text-blue-700">
+                  <p className="text-blue-700 dark:text-sky-200">
                     La carte affiche votre exposition par pays. Survolez un pays coloré pour voir les détails. 
                     Une bonne diversification géographique réduit les risques liés à un seul marché.
                   </p>
