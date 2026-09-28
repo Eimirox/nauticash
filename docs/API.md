@@ -49,6 +49,19 @@ Yahoo est ajouté automatiquement en dernier recours (`YAHOO_ENABLED=false` pour
 
 **Autocomplétion** : `GET /api/market/search?q=` fusionne une liste locale de titres courants (`services/popularTickers.js`, instantanée, sans appel) et la recherche Yahoo mise en cache 7 jours par requête ; indices exclus ; 60 recherches/min/IP.
 
+## Rythme d'actualisation (28/09/2026)
+
+| Quand | Job | Source | Coût |
+|---|---|---|---|
+| Chaque minute, marché ouvert | `jobs/livePrices.js` | Yahoo (appel léger `range=1d`, sans dividendes ni profil) | 0 appel FMP ; au plus `LIVE_MAX_PER_RUN` (30) titres/min, un titre rafraîchi il y a < 55 s est ignoré ; titres détenus uniquement ; rien la nuit et le week-end sauf crypto (`services/marketHours.js`) |
+| 21:15 UTC chaque soir | `jobs/updatePrices.js` | FMP (symboles couverts) puis Yahoo | actualisation complète : cours de clôture, profil (30 j), dividendes (7 j) ; l'âge se mesure sur `fullUpdateAt` pour ne pas être masqué par les cours intraday |
+| 21:45 UTC chaque soir | `jobs/dailySnapshot.js` | base uniquement | 0 appel |
+| Toutes les 60 s, onglet ouvert | page Portefeuille | lit la base (`GET /api/user/portfolio`) | 0 appel fournisseur |
+
+**Veille (variation du jour) chez Yahoo** : en séance, la dernière barre quotidienne est celle du jour ; la clôture de la veille est la dernière barre d'un jour antérieur à `regularMarketTime` (corrige la variation ≈ 0 constatée sur NVDA).
+
+**Place de cotation et logo** : `exchange` (libellé lisible : NASDAQ, NYSE, Euronext Paris, XETRA…) et `logo` (images publiques FMP, initiales en secours) sont renvoyés pour chaque position et chaque suggestion de recherche.
+
 ## Pistes (voir `docs/AMELIORATIONS.md`)
 
 - Route admin qui mesure, pour les tickers réellement détenus, quel provider les couvre (résultats à reporter ici).

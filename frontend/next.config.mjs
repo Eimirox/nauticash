@@ -17,7 +17,7 @@ const csp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  "img-src 'self' data: blob: https://images.financialmodelingprep.com",
   "font-src 'self' data:",
   `connect-src 'self' ${apiOrigin}${isDev ? " ws: http://localhost:*" : ""}`,
   "frame-ancestors 'none'",

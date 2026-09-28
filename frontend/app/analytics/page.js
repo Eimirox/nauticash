@@ -6,12 +6,29 @@ import { useFxRates, toCurrency, ratePer, currencySymbol } from "@/lib/fx";
 import { useBaseCurrency } from "@/lib/profile";
 import DiversificationCard from "../components/DiversificationCard";
 import FeesCard from "../components/FeesCard";
+import DividendIncomeCard from "../components/DividendIncomeCard";
+import { estimateDividends } from "@/lib/dividendCalendar";
 import AppHeader from "../components/AppHeader";
 import Link from "next/link";
 import { Pie } from "react-chartjs-2";
 import Chart from "chart.js/auto";
 import { formatCurrencySymbol } from "../portfolio/utils/formats";
 import PortfolioHistoryChart from "./PortfolioHistoryChart";
+import WealthHero from "../components/WealthHero";
+import { wealthSummary, allocationByType, allocationByCountry } from "@/lib/wealth";
+
+// Types d'actif : ordre des séries de DESIGN.md (accent, accent-2, teintes intermédiaires)
+const TYPE_COLORS = {
+  "Actions": "#2563EB",
+  "ETF et fonds": "#059669",
+  "Crypto": "#0891B2",
+  "Cash": "#14B8A6",
+  "Autres": "#64748B",
+};
+
+// Pays : séries de DESIGN.md dans l'ordre, « Autres » en ardoise
+const COUNTRY_COLORS = ["#059669", "#2563EB", "#14B8A6", "#0891B2", "#4F46E5"];
+const OTHER_COLOR = "#64748B";
 
 // COULEURS SECTORIELLES FIXES - Optimisées pour contraste maximum
 const SECTOR_COLORS = {
@@ -137,6 +154,27 @@ export default function Analytics() {
     totalsPerSector[sectorName] = (totalsPerSector[sectorName] || 0) + cashBase;
   }
 
+  // Synthèse et répartition par type d'actif dans la devise de référence
+  const toBaseOrNull = (value, currency) => toCurrency(value, currency, base, rates);
+  const summary = wealthSummary(stocks, cash, toBaseOrNull);
+  const summaryReady =
+    Boolean(rates) || (stocks.every((s) => (s.currency || "EUR") === base) && (!cash.amount || cash.currency === base));
+  const totalsPerType = allocationByType(stocks, cash, toBaseOrNull);
+  const typeLabels = Object.keys(totalsPerType);
+  const countryRows = allocationByCountry(stocks, toBaseOrNull, 5);
+  const dividendEstimate = summaryReady ? estimateDividends(stocks, inBase) : null;
+  const pieType = {
+    labels: typeLabels,
+    datasets: [
+      {
+        data: typeLabels.map((t) => totalsPerType[t]),
+        backgroundColor: typeLabels.map((t) => TYPE_COLORS[t] || TYPE_COLORS.Autres),
+        borderWidth: 2,
+        borderColor: "#fff",
+      },
+    ],
+  };
+
   // Fonction pour obtenir la couleur d'un secteur
   const getSectorColor = (sector) => {
     return SECTOR_COLORS[sector] || SECTOR_COLORS["Unknown"];
@@ -236,15 +274,40 @@ export default function Analytics() {
             Vue d'ensemble
           </h1>
           <p className="text-ink-muted">
-            Répartition de votre patrimoine par devise, type d'actif et secteur.
+            Votre patrimoine en un coup d'œil : valeur totale, variation du jour, évolution et répartition par type d'actif, devise, secteur et pays.
           </p>
         </div>
 
 
         {activeTab === "vue" && (
           <section>
+            {/* Synthèse : valeur totale, cap du jour, depuis l'achat */}
+            {!loading && summaryReady && (stocks.length > 0 || cash.amount !== 0) && (
+              <WealthHero summary={summary} symbol={baseSymbol} base={base} />
+            )}
+
+            {/* Evolution Chart */}
+            <div className="bg-surface border border-line rounded-xl shadow-lg p-6 mb-8">
+              <div className="flex items-center gap-2 mb-6">
+                <svg
+                  className="w-5 h-5 text-accent"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M12 7a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0V8.414l-4.293 4.293a1 1 0 01-1.414 0L8 10.414l-4.293 4.293a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0L11 10.586 14.586 7H12z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                <h3 className="text-lg font-bold text-ink">
+                  Évolution de la valeur du portefeuille
+                </h3>
+              </div>
+              <PortfolioHistoryChart />
+            </div>
             {/* KPI Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
               {loading ? (
                 <div className="col-span-full flex justify-center py-10">
                   <svg
@@ -269,19 +332,6 @@ export default function Analytics() {
                 </div>
               ) : (
                 <>
-                  {/* Total dans la devise de référence (tout converti) */}
-                  <div className="relative p-6 bg-surface border border-line shadow-lg rounded-xl overflow-hidden group hover:shadow-xl transition-all">
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-emerald-100 to-blue-100 dark:from-accent/20 dark:to-accent-2/20 rounded-full -mr-12 -mt-12 opacity-40 group-hover:opacity-60 transition-opacity" />
-                    <div className="relative">
-                      <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1">
-                        Total (converti en {base})
-                      </p>
-                      <p className="text-3xl font-bold text-ink">
-                        <span className="money">{numberFormatter.format(totalInBase)} {baseSymbol}</span>
-                      </p>
-                    </div>
-                  </div>
-
                   {/* Par devise originale */}
                   {Object.entries(portfolioTotalsByCurrency).map(([cur, tot]) => (
                     <div
@@ -343,6 +393,9 @@ export default function Analytics() {
               </div>
             )}
 
+            {/* Revenus de dividendes : revenu annuel estimé et prochain versement */}
+            {!loading && <DividendIncomeCard estimate={dividendEstimate} portfolioValue={summary.invested} base={base} />}
+
             {/* Score de diversification */}
             <DiversificationCard
               positions={stocks.map((s) => ({
@@ -372,7 +425,25 @@ export default function Analytics() {
             />
 
             {/* Charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              {/* Répartition par type d'actif */}
+              <div className="bg-surface border border-line rounded-xl shadow-lg p-6">
+                <div className="flex items-center gap-2 mb-6">
+                  <svg className="w-5 h-5 text-accent" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                    <path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z" />
+                    <path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z" />
+                  </svg>
+                  <h3 className="text-lg font-bold text-ink">Répartition par type d&apos;actif</h3>
+                </div>
+                <div style={{ height: 320 }}>
+                  {typeLabels.length > 0 ? (
+                    <Pie data={pieType} options={pieOptions} />
+                  ) : (
+                    <p className="text-sm text-ink-muted">Aucune position pour le moment.</p>
+                  )}
+                </div>
+              </div>
+
               {/* Répartition Devise */}
               <div className="bg-surface border border-line rounded-xl shadow-lg p-6">
                 <div className="flex items-center gap-2 mb-6">
@@ -389,7 +460,7 @@ export default function Analytics() {
                     />
                   </svg>
                   <h3 className="text-lg font-bold text-ink">
-                    Répartition par Devise
+                    Répartition par devise
                   </h3>
                 </div>
                 <div style={{ height: 320 }}>
@@ -408,35 +479,67 @@ export default function Analytics() {
                     <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
                   </svg>
                   <h3 className="text-lg font-bold text-ink">
-                    Répartition Sectorielle
+                    Répartition par secteur
                   </h3>
                 </div>
                 <div style={{ height: 320 }}>
                   <Pie data={pieSecteur} options={pieOptions} />
                 </div>
               </div>
+
+              {/* Répartition par pays : 5 premiers + autres */}
+              <div className="bg-surface border border-line rounded-xl shadow-lg p-6">
+                <div className="flex items-center justify-between gap-2 mb-6">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-accent" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM4.332 8.027a6.012 6.012 0 011.912-2.706C6.512 5.73 6.974 6 7.5 6A1.5 1.5 0 019 7.5V8a2 2 0 004 0 2 2 0 011.523-1.943A5.977 5.977 0 0116 10c0 .34-.028.675-.083 1H15a2 2 0 00-2 2v2.197A5.973 5.973 0 0110 16v-2a2 2 0 00-2-2 2 2 0 01-2-2 2 2 0 00-1.668-1.973z" clipRule="evenodd" />
+                    </svg>
+                    <h3 className="text-lg font-bold text-ink">Répartition par pays</h3>
+                  </div>
+                  <Link href="/analytics/geographie" className="text-sm font-medium text-accent hover:underline">
+                    Voir la carte
+                  </Link>
+                </div>
+                {countryRows.length > 0 ? (
+                  <ul className="space-y-4">
+                    {countryRows.map((row, i) => {
+                      const color = row.label === "Autres" ? OTHER_COLOR : COUNTRY_COLORS[i % COUNTRY_COLORS.length];
+                      const pct = (row.share * 100).toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+                      return (
+                        <li key={row.label}>
+                          <div className="flex items-baseline justify-between gap-3 text-sm mb-1">
+                            <span className="flex items-center gap-2 font-medium text-ink min-w-0">
+                              <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} aria-hidden="true" />
+                              <span className="truncate">{row.label}</span>
+                            </span>
+                            <span className="shrink-0 tabular-nums text-ink-muted">
+                              <span className="money">{numberFormatter.format(row.value)} {baseSymbol}</span>
+                              <span className="ml-2 font-semibold text-ink">{pct} %</span>
+                            </span>
+                          </div>
+                          <div
+                            className="h-2 rounded-full bg-surface-2 overflow-hidden"
+                            role="progressbar"
+                            aria-label={`Part ${row.label}`}
+                            aria-valuenow={Math.round(row.share * 100)}
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                          >
+                            <div className="h-full rounded-full" style={{ width: `${Math.max(row.share * 100, 1)}%`, backgroundColor: color }} />
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-ink-muted">Aucune position pour le moment.</p>
+                )}
+                {countryRows.length > 0 && (
+                  <p className="mt-5 text-xs text-ink-muted">Hors cash. Pays du siège de l&apos;entreprise ; un ETF est compté dans le pays indiqué pour la ligne.</p>
+                )}
+              </div>
             </div>
 
-            {/* Evolution Chart */}
-            <div className="bg-surface border border-line rounded-xl shadow-lg p-6">
-              <div className="flex items-center gap-2 mb-6">
-                <svg
-                  className="w-5 h-5 text-accent"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M12 7a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0V8.414l-4.293 4.293a1 1 0 01-1.414 0L8 10.414l-4.293 4.293a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0L11 10.586 14.586 7H12z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                <h3 className="text-lg font-bold text-ink">
-                  Évolution de la Valeur du Portefeuille
-                </h3>
-              </div>
-              <PortfolioHistoryChart />
-            </div>
           </section>
         )}
 

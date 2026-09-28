@@ -554,3 +554,8 @@ select:focus-visible {
 .dark textarea::placeholder {
   color: rgb(var(--text-muted) / 0.7);
 }
+
+/* Mode discret : axes des graphiques de montants masqués */
+.discreet .money-chart .recharts-yAxis .recharts-cartesian-axis-tick {
+  visibility: hidden;
+}

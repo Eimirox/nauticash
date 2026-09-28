@@ -142,12 +142,21 @@ module.exports = {
     // Actualisation automatique des prix
     updatePrices: {
       enabled: process.env.CRON_UPDATE_PRICES !== "false",
-      // Toutes les 6 heures par défaut : "0 */6 * * *"
-      schedule: process.env.CRON_UPDATE_SCHEDULE || "0 */6 * * *",
+      // Actualisation complète (profil, dividendes, cours de clôture) chaque soir, avant
+      // l'enregistrement de l'historique quotidien (21:45 UTC) : "15 21 * * *" (UTC)
+      schedule: process.env.CRON_UPDATE_SCHEDULE || "15 21 * * *",
       // Limite de tickers à actualiser par run
       batchSize: parseInt(process.env.CRON_BATCH_SIZE) || 100,
       // Délai entre chaque requête (ms) pour respecter les rate limits
       delayBetweenRequests: parseInt(process.env.CRON_DELAY) || 1000,
+    },
+    // Cours en journée (marchés ouverts), via Yahoo uniquement : voir jobs/livePrices.js
+    livePrices: {
+      enabled: process.env.CRON_LIVE_PRICES !== "false",
+      schedule: process.env.LIVE_PRICES_SCHEDULE || "* * * * *",
+      maxPerRun: parseInt(process.env.LIVE_MAX_PER_RUN, 10) || 30,
+      minAgeMs: (parseInt(process.env.LIVE_MIN_AGE_SECONDS, 10) || 55) * 1000,
+      delayMs: parseInt(process.env.LIVE_DELAY_MS, 10) || 150,
     },
     // Valeur quotidienne des portefeuilles (après la clôture américaine, heure UTC)
     dailyHistory: {

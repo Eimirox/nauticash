@@ -4,6 +4,10 @@ import { useState, useEffect, useMemo } from "react";
 import { apiFetch } from "@/lib/api";
 import { useFxRates, toCurrency, ratePer, currencySymbol } from "@/lib/fx";
 import { useBaseCurrency } from "@/lib/profile";
+import { estimateDividends, FREQUENCY_LABELS } from "@/lib/dividendCalendar";
+import DividendCalendar from "../../components/DividendCalendar";
+import TickerLogo from "../../components/TickerLogo";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { formatCurrencySymbol } from "../../portfolio/utils/formats";
 import AppHeader from "../../components/AppHeader";
 import { useRouter } from "next/navigation";
@@ -38,58 +42,23 @@ export default function DividendesPage() {
 
   // Calculs des dividendes (toutes devises, converties dans la devise de référence avec les taux BCE)
   const dividendData = useMemo(() => {
-    const empty = { stocksWithDividends: [], totalsByCurrency: {}, totalAnnualInBase: 0, portfolioYield: 0, calendar: [], totalPortfolioValue: 0 };
-    if (!stocks || stocks.length === 0) return empty;
-
-    const stocksWithDividends = stocks
-      .filter((s) => s.dividend != null && s.dividend > 0)
-      .map((s) => {
-        const quantity = s.quantity || 0;
-        const annualDivPerShare = s.dividend;
-        const totalAnnual = annualDivPerShare * quantity;
-        // Rendement au cours actuel, en % (le backend le donne déjà en %)
-        const yieldPercent = s.close > 0 ? (annualDivPerShare / s.close) * 100 : Number(s.dividendYield) || 0;
-        return {
-          ticker: s.ticker,
-          name: s.name,
-          quantity,
-          divPerShare: annualDivPerShare,
-          totalAnnual,
-          totalAnnualBase: inBase(totalAnnual, s.currency),
-          yieldPercent,
-          yieldOnCost: s.pru > 0 ? (annualDivPerShare / s.pru) * 100 : null,
-          positionValue: (s.close || 0) * quantity,
-          currency: s.currency || "USD",
-          exDividendDate: s.exDividendDate,
-          paymentDate: s.paymentDate,
-          sector: s.sector,
-        };
-      })
-      .sort((a, b) => b.totalAnnualBase - a.totalAnnualBase);
-
+    const est = estimateDividends(stocks, inBase);
+    const stocksWithDividends = est.positions;
     const totalsByCurrency = stocksWithDividends.reduce((acc, s) => {
       acc[s.currency] = (acc[s.currency] || 0) + s.totalAnnual;
       return acc;
     }, {});
-    const totalAnnualInBase = stocksWithDividends.reduce((sum, s) => sum + s.totalAnnualBase, 0);
-
-    const totalPortfolioValue = stocks.reduce((sum, s) => sum + inBase((s.close || 0) * (s.quantity || 0), s.currency), 0);
-    const portfolioYield = totalPortfolioValue > 0 ? (totalAnnualInBase / totalPortfolioValue) * 100 : 0;
-
-    // Dernières dates de détachement (ISO « 2026-09-17 » ; anciennes données en secondes)
-    const parseDate = (d) => (typeof d === "number" ? new Date(d * 1000) : new Date(d));
-    const calendar = stocksWithDividends
-      .filter((s) => s.exDividendDate && !Number.isNaN(parseDate(s.exDividendDate).getTime()))
-      .map((s) => ({
-        ticker: s.ticker,
-        date: parseDate(s.exDividendDate),
-        paymentDate: s.paymentDate ? parseDate(s.paymentDate) : null,
-        amount: s.totalAnnual / 4,
-        currency: s.currency,
-      }))
-      .sort((a, b) => b.date - a.date);
-
-    return { stocksWithDividends, totalsByCurrency, totalAnnualInBase, portfolioYield, calendar, totalPortfolioValue };
+    const totalPortfolioValue = (stocks || []).reduce((sum, s) => sum + inBase((s.close || 0) * (s.quantity || 0), s.currency), 0);
+    const portfolioYield = totalPortfolioValue > 0 ? (est.annual / totalPortfolioValue) * 100 : 0;
+    return {
+      stocksWithDividends,
+      totalsByCurrency,
+      totalAnnualInBase: est.annual,
+      portfolioYield,
+      months: est.months,
+      next12: est.next12,
+      upcomingCount: est.upcoming.length,
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stocks, rates, base]);
 
@@ -98,14 +67,6 @@ export default function DividendesPage() {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     }) + " " + formatCurrencySymbol(currency);
-  };
-
-  const formatDate = (date) => {
-    return date.toLocaleDateString("fr-FR", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric"
-    });
   };
 
   return (
@@ -168,12 +129,12 @@ export default function DividendesPage() {
 
               {/* Total Converti */}
               <div className="bg-gradient-to-br from-emerald-50 to-blue-50 dark:from-accent/10 dark:to-accent-2/10 border border-accent/40 rounded-xl shadow-lg p-6">
-                <h3 className="text-sm font-semibold text-accent uppercase mb-3">Total ({base})</h3>
+                <h3 className="text-sm font-semibold text-accent uppercase mb-3">Revenu annuel estimé</h3>
                 <p className="money text-3xl font-bold text-accent mb-1">
                   {formatCurrency(dividendData.totalAnnualInBase, base)}
                 </p>
                 <p className="text-xs text-accent">
-                  par an, soit <span className="money">{formatCurrency(dividendData.totalAnnualInBase / 12, base)}</span> / mois
+                  par an ({base}), soit <span className="money">{formatCurrency(dividendData.totalAnnualInBase / 12, base)}</span> / mois en moyenne
                 </p>
               </div>
 
@@ -220,15 +181,22 @@ export default function DividendesPage() {
                       <th className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Div/Action</th>
                       <th className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Total Annuel</th>
                       <th className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Rendement</th>
+                      <th className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Sur PRU</th>
+                      <th className="text-left py-3 px-4 text-sm font-semibold text-ink-muted">Versement</th>
                     </tr>
                   </thead>
                   <tbody>
                     {dividendData.stocksWithDividends.map((stock, idx) => (
                       <tr key={idx} className="border-b border-line hover:bg-surface-2 transition">
                         <td className="py-3 px-4">
-                          <div>
-                            <div className="text-sm font-bold text-ink">{stock.ticker}</div>
-                            <div className="text-xs text-ink-muted">{stock.name}</div>
+                          <div className="flex items-center gap-3">
+                            <TickerLogo ticker={stock.ticker} logo={stock.logo} size={32} />
+                            <div className="min-w-0">
+                              <div className="text-sm font-bold text-ink">{stock.ticker}</div>
+                              <div className="max-w-[14rem] truncate text-xs text-ink-muted">
+                                {[stock.name !== stock.ticker && stock.name, stock.exchange].filter(Boolean).join(" · ")}
+                              </div>
+                            </div>
                           </div>
                         </td>
                         <td className="text-right py-3 px-4 text-sm text-ink-muted">
@@ -252,6 +220,20 @@ export default function DividendesPage() {
                             {stock.yieldPercent >= 3 && " 🏆"}
                           </span>
                         </td>
+                        <td className="text-right py-3 px-4 text-sm text-ink-muted tabular-nums">
+                          {stock.yieldOnCost != null
+                            ? `${stock.yieldOnCost.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} %`
+                            : "—"}
+                        </td>
+                        <td className="py-3 px-4 text-xs text-ink-muted">
+                          <span className="block font-medium text-ink">
+                            {FREQUENCY_LABELS[stock.frequency] || "—"}
+                            {stock.frequencyEstimated && " (est.)"}
+                          </span>
+                          {stock.nextExDividendDate && (
+                            <span>prochain vers le {new Date(`${stock.nextExDividendDate}T12:00:00`).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}</span>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -259,39 +241,45 @@ export default function DividendesPage() {
               </div>
             </div>
 
-            {/* Calendrier */}
-            {dividendData.calendar.length > 0 && (
+            {/* Revenus attendus sur 12 mois */}
+            {dividendData.months.some((m) => m.total > 0) && (
               <div className="bg-surface border border-line rounded-xl shadow-lg p-6">
-                <div className="flex items-center gap-2 mb-6">
-                  <svg className="w-5 h-5 text-accent" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-                  </svg>
-                  <h3 className="text-lg font-bold text-ink">Dernières Dates Ex-Dividende</h3>
+                <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+                  <h3 className="text-lg font-bold text-ink">Revenus attendus sur 12 mois</h3>
+                  <p className="text-xs text-ink-muted">Par mois de détachement, en {base} (estimation)</p>
                 </div>
-                <div className="space-y-3">
-                  {dividendData.calendar.slice(0, 10).map((item, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-3 bg-surface-2 rounded-lg hover:bg-line/60 transition">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-emerald-100 dark:bg-accent/20 rounded-full flex items-center justify-center">
-                          <span className="text-accent font-bold text-sm">{item.ticker.slice(0, 2)}</span>
-                        </div>
-                        <div>
-                          <div className="text-sm font-bold text-ink">{item.ticker}</div>
-                          <div className="text-xs text-ink-muted">{formatDate(item.date)}</div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm font-bold text-accent">
-                          <span className="money">{formatCurrency(item.amount, item.currency)}</span>
-                        </div>
-                        <div className="text-xs text-ink-muted">
-                          {item.paymentDate ? `versé le ${formatDate(item.paymentDate)}` : "par trimestre (est.)"}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                <div className="money-chart h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={dividendData.months} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#94A3B8" strokeOpacity={0.25} vertical={false} />
+                      <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#8A9AA9" }} interval="preserveStartEnd" minTickGap={6} />
+                      <YAxis tick={{ fontSize: 11, fill: "#8A9AA9" }} width={44} />
+                      <Tooltip
+                        cursor={{ fill: "rgba(148,163,184,0.12)" }}
+                        formatter={(v) => [
+                          document.documentElement.classList.contains("discreet") ? "••••" : formatCurrency(Number(v), base),
+                          "Dividendes",
+                        ]}
+                        labelFormatter={(l, p) => {
+                          const items = p?.[0]?.payload?.items || [];
+                          return `${l}${items.length ? " — " + items.map((x) => x.ticker).join(", ") : ""}`;
+                        }}
+                      />
+                      <Bar dataKey="total" fill="#10B981" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
               </div>
+            )}
+
+            {/* Calendrier des 12 prochains mois */}
+            {dividendData.upcomingCount > 0 && (
+              <DividendCalendar
+                months={dividendData.months}
+                next12={dividendData.next12}
+                base={base}
+                logos={Object.fromEntries(dividendData.stocksWithDividends.map((s) => [s.ticker, s.logo]))}
+              />
             )}
 
             {/* Info */}
@@ -303,8 +291,9 @@ export default function DividendesPage() {
                 <div className="text-sm text-blue-900 dark:text-sky-200">
                   <p className="font-semibold mb-1">💰 À propos des dividendes</p>
                   <p className="text-blue-700 dark:text-sky-200">
-                    Les montants affichés sont des estimations annuelles basées sur les derniers dividendes déclarés. 
-                    Les dates ex-dividende indiquent les derniers versements trimestriels. Les dividendes réels peuvent varier.
+                    Dividende annuel calculé sur les derniers versements (rythme actuel si le dividende vient d&apos;augmenter),
+                    fréquence déduite de l&apos;historique, prochaines dates estimées à partir du dernier détachement.
+                    « Sur PRU » : rendement par rapport à votre prix de revient. Les dividendes réels peuvent varier.
                   </p>
                 </div>
               </div>

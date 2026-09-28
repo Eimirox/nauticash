@@ -7,6 +7,20 @@ const auth = require("../middleware/auth");
 const priceStore = require("../services/priceStore");
 const { validateProfilePatch, readProfile } = require("../services/profile");
 const { resolveCountry } = require("../services/countries");
+const { exchangeLabel, logoUrl } = require("../services/exchanges");
+
+const MONTH_MS = 30.44 * 24 * 60 * 60 * 1000;
+
+/** Prochain détachement estimé : dernier détachement + 12/fréquence mois, jusqu'à dépasser aujourd'hui */
+function nextExDate(lastExDate, frequency) {
+  const f = Number(frequency);
+  const last = lastExDate ? new Date(lastExDate).getTime() : NaN;
+  if (!Number.isFinite(last) || !(f > 0) || Date.now() - last > 400 * 24 * 60 * 60 * 1000) return null;
+  const step = (12 / f) * MONTH_MS;
+  let next = last;
+  while (next <= Date.now()) next += step;
+  return new Date(next).toISOString().slice(0, 10);
+}
 
 const router = express.Router();
 
@@ -57,6 +71,8 @@ function enrich(position, priceInfo) {
       pru: position.pru,
       account: position.account || null,
       fees: position.fees ?? null,
+      exchange: exchangeLabel(position.ticker, null),
+      logo: logoUrl(position.ticker),
       close: 0,
       currency: "USD",
       performance: 0,
@@ -89,6 +105,10 @@ function enrich(position, priceInfo) {
     priceTime: priceInfo.marketTime || priceInfo.lastUpdate || null,
     dividend: priceInfo.dividend ?? null,
     dividendYield: priceInfo.dividendYield ?? null,
+    dividendFrequency: priceInfo.dividendFrequency ?? null,
+    nextExDividendDate: nextExDate(priceInfo.exDividendDate, priceInfo.dividendFrequency),
+    exchange: exchangeLabel(position.ticker, priceInfo.exchange, priceInfo.type),
+    logo: logoUrl(position.ticker),
     myDividendYield: priceInfo.dividend && close > 0 ? (priceInfo.dividend / close) * 100 : null,
     exDividendDate: priceInfo.exDividendDate || null,
     paymentDate: priceInfo.paymentDate || null,
@@ -260,7 +280,7 @@ router.post("/portfolio/force-refresh", auth, async (req, res) => {
     for (const ticker of tickers) {
       try {
         // Les tickers actualisés il y a moins de 15 min (par le cron ou un autre utilisateur) ne coûtent pas d'appel API
-        const { fromCache } = await priceStore.refreshTicker(ticker, { maxAgeMs: FRESH_PRICE_MS });
+        const { fromCache } = await priceStore.refreshTicker(ticker, { maxAgeMs: FRESH_PRICE_MS, ageField: "fullUpdateAt" });
         fromCache ? skipped++ : success++;
       } catch (error) {
         console.error(`❌ Failed to refresh ${ticker}:`, error.message);

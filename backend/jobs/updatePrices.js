@@ -219,7 +219,9 @@ class PriceUpdater {
           }
         }
 
-        const { doc, fromCache } = await priceStore.refreshTicker(ticker, { maxAgeMs });
+        // L'âge se mesure sur la dernière actualisation complète : les cours intraday
+        // (jobs/livePrices.js) ne dispensent pas de vérifier profil et dividendes le soir.
+        const { doc, fromCache } = await priceStore.refreshTicker(ticker, { maxAgeMs, ageField: "fullUpdateAt" });
         if (fromCache) {
           skippedCount++;
           continue;

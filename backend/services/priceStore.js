@@ -38,6 +38,7 @@ function buildDoc(ticker, quote, previous = {}) {
     name: pick(quote.name, previous.name),
     dividend: pick(quote.dividend, previous.dividend),
     dividendYield: pick(quote.dividendYield, previous.dividendYield),
+    dividendFrequency: pick(quote.dividendFrequency, previous.dividendFrequency),
     dividendRate: pick(quote.dividendRate ?? quote.dividend, previous.dividendRate),
     exDividendDate: pick(quote.exDividendDate, previous.exDividendDate),
     paymentDate: pick(quote.paymentDate, previous.paymentDate),
@@ -45,6 +46,8 @@ function buildDoc(ticker, quote, previous = {}) {
     profileUpdatedAt: quote.profileUpdatedAt || previous.profileUpdatedAt || null,
     dividendsUpdatedAt: quote.dividendsUpdatedAt || previous.dividendsUpdatedAt || null,
     source: quote.source || previous.source || null,
+    // Dernière actualisation complète (profil, dividendes) ; les actualisations intraday ne la changent pas
+    fullUpdateAt: quote.live ? previous.fullUpdateAt || previous.lastUpdate || null : now,
     fmpNotCoveredAt: quote.fmpNotCoveredAt !== undefined ? quote.fmpNotCoveredAt : previous.fmpNotCoveredAt ?? null,
     lastUpdate: now,
   };
@@ -71,12 +74,13 @@ async function saveQuote(ticker, quote, previous) {
  * sinon depuis l'API (en passant l'ancienne donnée au provider pour éviter
  * de re-télécharger profil et dividendes encore valides).
  */
-async function refreshTicker(ticker, { maxAgeMs = 0 } = {}) {
+async function refreshTicker(ticker, { maxAgeMs = 0, ageField = "lastUpdate", live = false, providers } = {}) {
   const cached = await getCached(ticker);
-  if (cached && maxAgeMs > 0 && Date.now() - new Date(cached.lastUpdate).getTime() < maxAgeMs) {
+  const refDate = cached?.[ageField] || (ageField !== "lastUpdate" ? null : cached?.lastUpdate);
+  if (cached && maxAgeMs > 0 && refDate && Date.now() - new Date(refDate).getTime() < maxAgeMs) {
     return { doc: cached, fromCache: true };
   }
-  const quote = await priceService.getQuote(ticker, { forceRefresh: true, previous: cached });
+  const quote = await priceService.getQuote(ticker, { forceRefresh: true, previous: cached, live, providers });
   const doc = await saveQuote(ticker, quote, cached);
   return { doc, fromCache: false };
 }

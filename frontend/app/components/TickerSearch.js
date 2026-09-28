@@ -3,6 +3,19 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { cx } from "./ui/cx";
+import TickerLogo from "./TickerLogo";
+
+// Suggestions affichées avant la saisie (titres les plus suivis)
+const logoOf = (symbol) => `https://images.financialmodelingprep.com/symbol/${symbol.replace("-", "")}.png`;
+const QUICK = [
+  { symbol: "AAPL", name: "Apple Inc.", type: "Stock", exchange: "NASDAQ" },
+  { symbol: "NVDA", name: "NVIDIA Corporation", type: "Stock", exchange: "NASDAQ" },
+  { symbol: "MSFT", name: "Microsoft Corporation", type: "Stock", exchange: "NASDAQ" },
+  { symbol: "MC.PA", name: "LVMH", type: "Stock", exchange: "Euronext Paris" },
+  { symbol: "AIR.PA", name: "Airbus SE", type: "Stock", exchange: "Euronext Paris" },
+  { symbol: "CW8.PA", name: "Amundi MSCI World UCITS ETF", type: "ETF", exchange: "Euronext Paris" },
+  { symbol: "BTC-USD", name: "Bitcoin", type: "Crypto", exchange: "Crypto" },
+].map((q) => ({ ...q, logo: logoOf(q.symbol) }));
 
 const TYPE_LABELS = { Stock: "Action", ETF: "ETF", Crypto: "Crypto" };
 const TYPE_STYLES = {
@@ -29,7 +42,8 @@ export default function TickerSearch({ value, onChange, onSelect, disabled, exis
   useEffect(() => {
     const q = value.trim();
     if (!q) {
-      setResults([]);
+      setResults(QUICK);
+      setLoading(false);
       return;
     }
     let alive = true;
@@ -62,7 +76,7 @@ export default function TickerSearch({ value, onChange, onSelect, disabled, exis
     onSelect(symbol);
   };
 
-  const showList = open && value.trim() && (results.length > 0 || !loading);
+  const showList = open && (results.length > 0 || (value.trim() && !loading));
 
   const onKeyDown = (e) => {
     if (e.key === "ArrowDown") {
@@ -76,6 +90,7 @@ export default function TickerSearch({ value, onChange, onSelect, disabled, exis
       setOpen(false);
     } else if (e.key === "Enter") {
       e.preventDefault();
+      if (!value.trim()) return;
       const pick = open && results[active];
       choose(pick ? pick.symbol : value.trim().toUpperCase());
     }
@@ -124,7 +139,13 @@ export default function TickerSearch({ value, onChange, onSelect, disabled, exis
               Aucun titre trouvé. Vérifiez l&apos;orthographe ou saisissez le ticker exact (ex. AIR.PA pour Paris).
             </li>
           ) : (
-            results.map((r, i) => {
+            <>
+            {!value.trim() && (
+              <li role="presentation" className="px-4 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
+                Suggestions — tapez un nom ou un ticker
+              </li>
+            )}
+            {results.map((r, i) => {
               const isOwned = owned.has(r.symbol);
               return (
                 <li
@@ -144,6 +165,7 @@ export default function TickerSearch({ value, onChange, onSelect, disabled, exis
                     isOwned && "cursor-default opacity-60"
                   )}
                 >
+                  <TickerLogo ticker={r.symbol} logo={r.logo} size={28} />
                   <span className="w-16 shrink-0 text-sm font-semibold text-ink sm:w-20 sm:text-base">{r.symbol}</span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm text-ink">{r.name}</span>
@@ -158,7 +180,8 @@ export default function TickerSearch({ value, onChange, onSelect, disabled, exis
                   )}
                 </li>
               );
-            })
+            })}
+            </>
           )}
         </ul>
       )}

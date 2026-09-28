@@ -229,8 +229,8 @@ describe("POST /api/user/portfolio/force-refresh et GET /portfolio/stats", () =>
 
     // Prix vieux d'une heure, et MC.PA n'existe plus chez FMP
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-    await h.db.collection("prices").updateOne({ symbol: "AAPL" }, { $set: { lastUpdate: oneHourAgo } });
-    await h.db.collection("prices").updateOne({ symbol: "MC.PA" }, { $set: { lastUpdate: oneHourAgo } });
+    await h.db.collection("prices").updateOne({ symbol: "AAPL" }, { $set: { lastUpdate: oneHourAgo, fullUpdateAt: oneHourAgo } });
+    await h.db.collection("prices").updateOne({ symbol: "MC.PA" }, { $set: { lastUpdate: oneHourAgo, fullUpdateAt: oneHourAgo } });
     h.fmp.quotes.AAPL.price = 210;
     delete h.fmp.quotes["MC.PA"];
     h.fmp.calls.length = 0;

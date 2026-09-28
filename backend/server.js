@@ -28,6 +28,7 @@ const marketRoutes = require("./routes/market");
 const priceService = require("./services/priceService");
 const priceUpdater = require("./jobs/updatePrices");
 const dailySnapshot = require("./jobs/dailySnapshot");
+const livePrices = require("./jobs/livePrices");
 
 const app = express();
 
@@ -108,6 +109,7 @@ app.get("/api/admin/stats", async (req, res) => {
       apiUsage: stats,
       cronJob: cronStats,
       dailyHistory: historyStats,
+      livePrices: livePrices.getStats(),
       timestamp: new Date(),
     });
   } catch (error) {
@@ -243,8 +245,9 @@ const startServer = async () => {
       console.log("⏸️ Cron job disabled");
     }
 
-    // 4 bis. Historique quotidien des portefeuilles
+    // 4 bis. Historique quotidien des portefeuilles + cours intraday
     dailySnapshot.start();
+    livePrices.start();
 
     // 5. Démarrer le serveur Express
     app.listen(PORT, () => {

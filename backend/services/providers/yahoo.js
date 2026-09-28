@@ -87,14 +87,17 @@ class YahooProvider {
     }
   }
 
-  async getQuote(ticker, { previous = null } = {}) {
+  /**
+   * live = true : actualisation intraday légère (1 appel, sans dividendes ni profil,
+   * la clôture de la veille vient de chartPreviousClose sur la période « 1d »).
+   */
+  async getQuote(ticker, { previous = null, live = false } = {}) {
     if (!this.config.enabled) throw new Error("Yahoo provider disabled");
 
-    const data = await this.request(`v8/finance/chart/${encodeURIComponent(ticker)}`, {
-      range: "1y",
-      interval: "1d",
-      events: "div",
-    });
+    const data = await this.request(
+      `v8/finance/chart/${encodeURIComponent(ticker)}`,
+      live ? { range: "1d", interval: "1d" } : { range: "1y", interval: "1d", events: "div" }
+    );
     const result = data?.chart?.result?.[0];
     const meta = result?.meta;
     const price = num(meta?.regularMarketPrice);
@@ -103,12 +106,22 @@ class YahooProvider {
       throw new Error(msg);
     }
 
-    // Clôture de la veille : avant-dernière clôture quotidienne (chartPreviousClose = début de la période)
-    const closes = (result.indicators?.quote?.[0]?.close || []).filter((c) => Number(c) > 0);
-    const lastBar = closes[closes.length - 1];
+    // Clôture de la veille : dernière barre quotidienne d'un jour ANTÉRIEUR à la séance du cours.
+    // (En séance, la dernière barre est celle du jour : la prendre donnerait une variation ≈ 0.)
+    const stamps = result.timestamp || [];
+    const rawCloses = result.indicators?.quote?.[0]?.close || [];
+    const offset = Number(meta.gmtoffset) || 0;
+    const dayOf = (t) => new Date((Number(t) + offset) * 1000).toISOString().slice(0, 10);
+    const sessionDay = dayOf(Number(meta.regularMarketTime) || stamps[stamps.length - 1] || Date.now() / 1000);
+    let closeBefore = null;
+    for (let i = stamps.length - 1; i >= 0; i--) {
+      if (Number(rawCloses[i]) > 0 && dayOf(stamps[i]) < sessionDay) {
+        closeBefore = Number(rawCloses[i]);
+        break;
+      }
+    }
     const previousClose =
-      num(meta.previousClose) ||
-      (closes.length >= 2 ? (Math.abs(lastBar - price) / price < 1e-6 ? closes[closes.length - 2] : lastBar) : null);
+      num(meta.previousClose) || (live ? num(meta.chartPreviousClose) : null) || closeBefore;
 
     const type = TYPES[meta.instrumentType] || (/-(USD|EUR)$/.test(ticker) ? "Crypto" : "Stock");
 
@@ -141,10 +154,11 @@ class YahooProvider {
       recordDate: null,
       lastUpdate: new Date(),
       source: "yahoo",
+      live,
     };
 
     // Profil (secteur, industrie, nom complet) : 1 appel de recherche tous les 30 jours
-    if (type !== "Crypto" && (isStale(previous?.profileUpdatedAt, PROFILE_TTL) || !previous?.sector || previous.sector === "Unknown")) {
+    if (!live && type !== "Crypto" && (isStale(previous?.profileUpdatedAt, PROFILE_TTL) || !previous?.sector || previous.sector === "Unknown")) {
       const profile = await this.getProfile(ticker);
       if (profile) {
         quote.name = profile.name || quote.name;
@@ -157,15 +171,16 @@ class YahooProvider {
     if (quote.type === "ETF" && !quote.sector) quote.sector = "ETF";
 
     // Dividendes des 12 derniers mois, fournis par le même appel (events=div)
-    if (quote.type === "Stock" || quote.type === "ETF") {
+    if (!live && (quote.type === "Stock" || quote.type === "ETF")) {
       const events = Object.values(result.events?.dividends || {})
         .map((d) => ({ date: new Date(Number(d.date) * 1000).toISOString().slice(0, 10), dividend: Number(d.amount) }))
         .filter((d) => d.dividend > 0);
-      const { annual, latest } = annualizeDividends(events);
+      const { annual, latest, frequency } = annualizeDividends(events);
       quote.dividend = annual;
       quote.dividendRate = annual;
       quote.dividendYield = annual && price > 0 ? (annual / price) * 100 : null;
       quote.exDividendDate = latest?.date || null;
+      quote.dividendFrequency = annual ? frequency : null;
       quote.dividendsUpdatedAt = new Date();
     }
 
