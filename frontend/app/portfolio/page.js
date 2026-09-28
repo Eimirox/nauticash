@@ -11,7 +11,8 @@ import AppHeader from "../components/AppHeader";
 import { ConfirmModal, useToast, Delta } from "../components/ui";
 import { quoteFreshness } from "@/lib/quoteTime";
 import { useFxRates, toCurrency, currencySymbol } from "@/lib/fx";
-import { useBaseCurrency } from "@/lib/profile";
+import { useBaseCurrency, useProfile } from "@/lib/profile";
+import GoalGauge from "../components/GoalGauge";
 
 // Enveloppes proposées (doivent correspondre à ACCOUNTS côté backend)
 const ACCOUNT_LABELS = { PEA: "PEA", CTO: "Compte-titres", AV: "Assurance-vie", PER: "PER", CRYPTO: "Crypto" };
@@ -264,6 +265,7 @@ export default function Portfolio() {
   // Synthèse dans la devise de référence du profil (taux BCE) : patrimoine, variation du jour, plus-value latente
   const { rates } = useFxRates();
   const base = useBaseCurrency();
+  const { profile } = useProfile();
   const baseSymbol = currencySymbol(base);
   const toBase = (amount, currency) => toCurrency(amount, currency, base, rates);
   const summary = (() => {
@@ -866,6 +868,11 @@ export default function Portfolio() {
               <Delta value={summary.gainPct} suffix=" depuis l'achat" className="text-sm" />
             </div>
           </div>
+        )}
+
+        {/* Objectif de patrimoine (profil) */}
+        {stocks.length > 0 && summary.ready && (
+          <GoalGauge current={summary.total} goalAmount={profile.goalAmount} goalDate={profile.goalDate} symbol={baseSymbol} />
         )}
 
         {/* KPI Cards */}
