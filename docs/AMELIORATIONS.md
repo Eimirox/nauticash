@@ -54,6 +54,9 @@ Quand ces tâches et l'harmonisation visuelle sont faites, la boucle peut s'arr�
 - [x] Analyse des frais (inspirée du « scanner de frais » de Finary) : frais annuels (TER) saisissables par ETF/fonds, coût annuel en euros et impact projeté sur 10 et 20 ans
 - [x] Comparaison à un indice (CAC 40, S&P 500, MSCI World) sur la courbe d'évolution (données FMP, mises en cache, quota respecté)
 - [x] Fonds de précaution : cash comparé à N mois de dépenses saisis dans le profil
+- [ ] Harmonisation visuelle 1/3 : page Portefeuille migrée vers les jetons du design system (bg-surface, text-ink, border-line… au lieu de slate-*/white), lisible en mode sombre
+- [ ] Harmonisation visuelle 2/3 : Vue d'ensemble, Dividendes, Géographie et Performance migrées vers les jetons (cartes, tableaux, titres, formats de nombres « fr-FR » homogènes)
+- [ ] Harmonisation visuelle 3/3 : composants récents (jauges, cartes Diversification/Frais/Indice/Fonds de précaution) passés sur Card/Stat du design system + vérification clair/sombre et mobile de toutes les pages
 
 ### Après le lancement
 
