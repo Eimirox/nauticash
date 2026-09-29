@@ -515,7 +515,7 @@ export default function Portfolio() {
                         <p className="truncate text-sm text-ink">{stock.name}</p>
                       )}
                       <p className="truncate text-xs text-ink-muted">
-                        {[stock.exchange, stock.currency, stock.zone, stock.exposure && `indice ${stock.exposure}`].filter(Boolean).join(" · ")}
+                        {[stock.exchange, stock.currency, stock.zone, stock.exposure && (stock.commodity ? stock.exposure : `indice ${stock.exposure}`)].filter(Boolean).join(" · ")}
                       </p>
                       <AccountSelect stock={stock} className="mt-1" />
                     </div>
@@ -680,7 +680,9 @@ export default function Portfolio() {
                     <span className="block font-medium text-ink">{stock.zone || exchangeToCountry[stock.country] || stock.country || "—"}</span>
                     <span className="block text-xs text-ink-muted" title={stock.exposure ? `Exposition déduite de l'indice suivi (${stock.exposure}), cotation : ${stock.listingCountry}` : undefined}>
                       {stock.exposure
-                        ? `${stock.country !== stock.zone ? stock.country + " · " : ""}indice ${stock.exposure}`
+                        ? stock.commodity
+                          ? stock.exposure
+                          : `${stock.country !== stock.zone ? stock.country + " · " : ""}indice ${stock.exposure}`
                         : stock.zone && stock.country !== stock.zone
                           ? stock.country
                           : ""}

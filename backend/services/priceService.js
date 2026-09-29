@@ -192,7 +192,9 @@ class PriceService {
     // ou Finnhub (cours seul) : on complète avec Yahoo, sans rien écraser du cours obtenu.
     const missingProfile = !quote.sector || quote.sector === "Unknown";
     const missingDividends = quote.type !== "Crypto" && !quote.dividendsUpdatedAt &&
-      !(previous?.dividendsUpdatedAt && Date.now() - new Date(previous.dividendsUpdatedAt).getTime() < 7 * 86400000);
+      (!(previous?.dividendsUpdatedAt && Date.now() - new Date(previous.dividendsUpdatedAt).getTime() < 7 * 86400000) ||
+        // dividende calculé par une ancienne version (sans fréquence) : on le recalcule
+        (previous?.dividend > 0 && !previous?.dividendFrequency));
     if (!live && (usedProvider === "fmp" || usedProvider === "finnhub") && this.providers.yahoo && quote.type !== "Crypto" && (missingProfile || missingDividends)) {
       try {
         const extra = await this.providers.yahoo.getQuote(ticker, { previous });

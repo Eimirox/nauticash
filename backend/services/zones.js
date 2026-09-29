@@ -63,7 +63,24 @@ const INDEX_RULES = [
  * Exposition d'un ETF d'après son nom : { country?, zone?, label } ou null si rien de reconnu.
  * Ne s'applique qu'aux ETF / fonds (une action « America Movil » ne doit pas devenir américaine).
  */
+// Matières premières physiques (ETC / ETF adossés à de l'or, de l'argent…) : ni pays ni actions
+const COMMODITY_RULES = [
+  { re: /\b(PHYSICAL GOLD|GOLD ETC|XETRA GOLD|GOLD BULLION|PHYSICAL SWISS GOLD|GOLD TRUST|GOLD SHARES|\bGOLD\b.*\b(ETC|ETF|TRUST)\b|OR PHYSIQUE)\b/, label: "Or" },
+  { re: /\b(PHYSICAL SILVER|SILVER ETC|SILVER TRUST|\bSILVER\b.*\b(ETC|ETF|TRUST)\b)\b/, label: "Argent" },
+  { re: /\b(PHYSICAL PLATINUM|PHYSICAL PALLADIUM|PRECIOUS METALS)\b/, label: "Métaux précieux" },
+  { re: /\b(BROAD COMMODIT|COMMODITY|COMMODITIES|MATIERES PREMIERES)\b/, label: "Matières premières" },
+];
+
+/** ETC / fonds de matières premières d'après le nom : { label } ou null */
+function commodityExposure(name) {
+  const n = norm(name);
+  for (const r of COMMODITY_RULES) if (r.re.test(n)) return { country: null, zone: "Matières premières", label: r.label, commodity: true };
+  return null;
+}
+
 function etfExposure(name, type) {
+  const commodity = commodityExposure(name);
+  if (commodity) return commodity;
   const isFund = /ETF|FUND|FONDS/i.test(String(type || "")) || /\b(ETF|UCITS|TRACKER|FUND|FONDS)\b/.test(norm(name));
   if (!isFund) return null;
   const n = norm(name);
@@ -74,4 +91,4 @@ function etfExposure(name, type) {
   return null;
 }
 
-module.exports = { zoneOf, etfExposure, ZONE_OF_COUNTRY };
+module.exports = { zoneOf, etfExposure, commodityExposure, ZONE_OF_COUNTRY };

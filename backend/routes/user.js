@@ -71,6 +71,7 @@ function countryFields(ticker, priceInfo = {}) {
       countryNumeric: byIndex ? byIndex.numeric : null,
       zone: etf.zone,
       exposure: etf.label,
+      commodity: Boolean(etf.commodity),
       listingCountry: c.name,
     };
   }
@@ -136,7 +137,8 @@ function enrich(position, priceInfo) {
     paymentDate: priceInfo.paymentDate || null,
     recordDate: priceInfo.recordDate || null,
     ...countryFields(position.ticker, priceInfo),
-    sector: priceInfo.sector || null,
+    // ETC d'or / matières premières : pas de secteur d'entreprise
+    sector: priceInfo.sector || (etfExposure(priceInfo.name, priceInfo.type)?.commodity ? "Matières premières" : null),
     industry: priceInfo.industry || null,
     type: priceInfo.type || "Stock",
     lastUpdate: priceInfo.lastUpdate,
