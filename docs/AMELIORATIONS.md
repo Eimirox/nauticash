@@ -77,6 +77,9 @@ Quand ces tâches et l'harmonisation visuelle sont faites, la boucle peut s'arr�
 - [x] Accessibilité 3b/3 : graphiques avec résumé texte (`role="img"` + `aria-label` décrivant la tendance / la répartition), navigation entre pages d'analytics avec `aria-current`, filtres restants avec `aria-pressed`
 - [x] États de chargement (squelettes) sur portefeuille et analytics
 - [x] Une seule librairie de graphiques au lieu de chart.js + recharts (echarts retiré, il n'était pas utilisé)
+- [ ] Cohérence des cours (demande d'Alex, 29/09) : certains titres (NVDA, GTT.PA, TTE.PA constatés) ont un cours sans date ni variation du jour, donc probablement jamais actualisé → afficher un badge « cours non daté » (comme « cours du … » quand il est ancien), faire que le cron et l'actualisation forcée traitent en priorité les cours sans `lastUpdate`/`marketTime`, et journaliser le provider qui échoue pour ces titres
+- [ ] Colonne ZONE dans le portefeuille (choix d'Alex) : Europe / Amérique du Nord / Asie / Océanie / Amérique latine / Afrique / Crypto / Monde, déduite du pays (réutiliser la table des continents de la page Géographie, à déplacer dans une lib partagée) ; pays et place boursière conservés
+- [ ] ETF : pays déduit de l'indice suivi quand le nom le mentionne (S&P 500, Nasdaq 100, Dow Jones, Russell → États-Unis ; CAC 40 → France ; DAX → Allemagne ; FTSE 100 → Royaume-Uni ; Nikkei/Topix → Japon ; Euro Stoxx, Stoxx 600, MSCI Europe → zone Europe ; MSCI World, ACWI, All-World → Monde) au lieu du pays de la place de cotation ; tests unitaires sur une liste de noms réels d'ETF
 - [ ] Tests : renommer le test « quota atteint pendant l'enrichissement » (il vérifie que rien n'est enregistré) et faire que FMP_DAILY_LIMIT=0 bloque les appels au lieu de supprimer la limite
 - [ ] ESLint (`npm run lint`) sans avertissement
 
