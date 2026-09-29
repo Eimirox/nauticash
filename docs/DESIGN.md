@@ -56,6 +56,7 @@ Composants de base dans `frontend/app/components/ui/` : `Card`, `Button`, `Stat`
 - **Badge** : type d'actif (Action, ETF, Crypto) avec couleurs douces et texte lisible.
 - **Modal** : confirmation d'action destructive ; focus piégé, fermeture par Échap.
 - **Toast** : succès / erreur / info, en bas à droite (bas centré sur mobile), disparition après 4 s, lu par les lecteurs d'écran (`role="status"`).
+- **Skeleton** (`ui/Skeleton.js`) : états de chargement des pages de données (portefeuille, analyses) — blocs `bg-surface-2` à la forme du contenu attendu (carte KPI, graphique, lignes de tableau, cartes mobiles), pulsation `motion-safe` uniquement, conteneur `SkeletonRegion` (`role="status"` + libellé masqué « Chargement de … »). La boussole reste réservée aux pages d'état (404, erreur).
 
 ## Mouvement
 

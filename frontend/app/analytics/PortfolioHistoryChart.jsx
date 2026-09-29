@@ -15,6 +15,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { trendSummary } from "@/lib/chartSummary";
+import Skeleton, { SkeletonRegion } from "../components/ui/Skeleton";
 
 // Mapping mois anglais -> numéro
 const MONTH_MAP = {
@@ -38,6 +39,7 @@ export default function PortfolioHistoryChart() {
   const [selectedYears, setSelectedYears] = useState([]);
   const [availableYears, setAvailableYears] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [fetched, setFetched] = useState(false); // premier chargement terminé
   const [lastSnapshot, setLastSnapshot] = useState(null);
   const [showManualEdit, setShowManualEdit] = useState(false);
   const [manualForm, setManualForm] = useState({ date: "", value: "" });
@@ -104,6 +106,8 @@ export default function PortfolioHistoryChart() {
       }
     } catch (err) {
       console.error("❌ Erreur:", err);
+    } finally {
+      setFetched(true);
     }
   };
 
@@ -285,7 +289,7 @@ export default function PortfolioHistoryChart() {
               {year}
             </button>
           ))}
-          {availableYears.length === 0 && (
+          {fetched && availableYears.length === 0 && (
             <span className="text-sm text-ink-muted italic">Aucune donnée</span>
           )}
         </div>
@@ -462,7 +466,11 @@ export default function PortfolioHistoryChart() {
       )}
 
       {/* Chart */}
-      {!hasData ? (
+      {!fetched ? (
+        <SkeletonRegion label="Chargement de l'historique…">
+          <Skeleton className="h-[400px] w-full rounded-lg" />
+        </SkeletonRegion>
+      ) : !hasData ? (
         <div className="flex flex-col items-center justify-center py-16 text-ink-muted">
           <svg
             className="w-16 h-16 mb-4 text-ink-muted/40"

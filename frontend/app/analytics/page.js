@@ -17,6 +17,7 @@ import PortfolioHistoryChart from "./PortfolioHistoryChart";
 import WealthHero from "../components/WealthHero";
 import { wealthSummary, allocationByType, allocationByCountry } from "@/lib/wealth";
 import { shareSummary } from "@/lib/chartSummary";
+import Skeleton, { SkeletonRegion, SkeletonStat } from "../components/ui/Skeleton";
 
 // Types d'actif : ordre des séries de DESIGN.md (accent, accent-2, teintes intermédiaires)
 const TYPE_COLORS = {
@@ -283,7 +284,16 @@ export default function Analytics() {
         {activeTab === "vue" && (
           <section>
             {/* Synthèse : valeur totale, cap du jour, depuis l'achat */}
-            {!loading && summaryReady && (stocks.length > 0 || cash.amount !== 0) && (
+            {loading ? (
+              <SkeletonRegion label="Chargement de votre patrimoine…" className="mb-8 rounded-2xl border border-line bg-surface p-6 shadow-card">
+                <Skeleton className="mb-3 h-3 w-32" />
+                <Skeleton className="mb-4 h-10 w-64 max-w-full" />
+                <div className="flex flex-wrap gap-6">
+                  <Skeleton className="h-4 w-28" />
+                  <Skeleton className="h-4 w-36" />
+                </div>
+              </SkeletonRegion>
+            ) : summaryReady && (stocks.length > 0 || cash.amount !== 0) && (
               <WealthHero summary={summary} symbol={baseSymbol} base={base} />
             )}
 
@@ -310,27 +320,12 @@ export default function Analytics() {
             {/* KPI Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
               {loading ? (
-                <div className="col-span-full flex justify-center py-10">
-                  <svg
-                    className="animate-spin h-8 w-8 text-accent"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
-                </div>
+                <>
+                  <span role="status" className="sr-only">Chargement des indicateurs…</span>
+                  <SkeletonStat />
+                  <SkeletonStat />
+                  <SkeletonStat className="hidden lg:block" />
+                </>
               ) : (
                 <>
                   {/* Par devise originale */}
