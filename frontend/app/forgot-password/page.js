@@ -44,7 +44,7 @@ export default function ForgotPassword() {
         <div className="bg-surface rounded-2xl shadow-xl border border-line p-8">
           {sent ? (
             <div className="space-y-5">
-              <div className="bg-accent/10 border border-accent/40 rounded-lg p-4 text-sm text-accent">
+              <div role="status" className="bg-accent/10 border border-accent/40 rounded-lg p-4 text-sm text-accent">
                 {sent} Pensez à vérifier vos spams. Le lien est valable 1 heure.
               </div>
               <Link href="/login"
@@ -57,12 +57,14 @@ export default function ForgotPassword() {
               <div>
                 <label htmlFor="email" className="block text-sm font-semibold text-ink mb-2">Email</label>
                 <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                  placeholder="email@exemple.com" required
+                  placeholder="email@exemple.com" required autoComplete="email"
+                  aria-invalid={error ? true : undefined}
+                  aria-describedby={error ? "forgot-error" : undefined}
                   className="w-full px-4 py-3 border border-line rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent transition-all" />
               </div>
 
               {error && (
-                <div className="bg-loss/10 border border-loss/30 rounded-lg p-3 text-sm text-loss">{error}</div>
+                <div id="forgot-error" role="alert" className="bg-loss/10 border border-loss/30 rounded-lg p-3 text-sm text-loss">{error}</div>
               )}
 
               <button type="submit" disabled={loading}

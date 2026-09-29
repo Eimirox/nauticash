@@ -48,7 +48,7 @@ function ResetPasswordForm() {
   if (!token) {
     return (
       <div className="space-y-5">
-        <div className="bg-loss/10 border border-loss/30 rounded-lg p-3 text-sm text-loss">
+        <div role="alert" className="bg-loss/10 border border-loss/30 rounded-lg p-3 text-sm text-loss">
           Lien invalide. Refaites une demande de réinitialisation.
         </div>
         <Link href="/forgot-password" className="block text-center text-sm font-semibold text-accent hover:text-accent">
@@ -60,7 +60,7 @@ function ResetPasswordForm() {
 
   if (done) {
     return (
-      <div className="bg-accent/10 border border-accent/40 rounded-lg p-4 text-sm text-accent">
+      <div role="status" className="bg-accent/10 border border-accent/40 rounded-lg p-4 text-sm text-accent">
         {done} Redirection vers la connexion...
       </div>
     );
@@ -75,16 +75,23 @@ function ResetPasswordForm() {
         <label htmlFor="password" className="block text-sm font-semibold text-ink mb-2">Nouveau mot de passe</label>
         <div className="relative">
           <input id="password" type={showPassword ? "text" : "password"} value={password}
-            onChange={(e) => setPassword(e.target.value)} required className={`${inputClass} pr-24`} />
+            onChange={(e) => setPassword(e.target.value)} required autoComplete="new-password"
+            aria-invalid={error && !allValid ? true : undefined}
+            aria-describedby={error && !allValid ? "reset-error password-rules" : "password-rules"}
+            className={`${inputClass} pr-24`} />
           <button type="button" onClick={() => setShowPassword(!showPassword)}
+            aria-pressed={showPassword} aria-controls="password confirm"
+            aria-label={showPassword ? "Masquer les mots de passe" : "Afficher les mots de passe"}
             className="absolute inset-y-0 right-0 pr-3 text-sm text-ink-muted hover:text-ink">
             {showPassword ? "Masquer" : "Afficher"}
           </button>
         </div>
-        <ul className="mt-2 grid grid-cols-2 gap-1 text-xs">
+        <ul id="password-rules" aria-label="Règles du mot de passe" className="mt-2 grid grid-cols-2 gap-1 text-xs">
           {RULES.map((r) => (
             <li key={r.label} className={r.test(password) ? "text-accent" : "text-ink-muted/70"}>
-              {r.test(password) ? "✓" : "•"} {r.label}
+              <span aria-hidden="true">{r.test(password) ? "✓" : "•"}</span>{" "}
+              <span className="sr-only">{r.test(password) ? "Respectée : " : "Manquante : "}</span>
+              {r.label}
             </li>
           ))}
         </ul>
@@ -93,10 +100,13 @@ function ResetPasswordForm() {
       <div>
         <label htmlFor="confirm" className="block text-sm font-semibold text-ink mb-2">Confirmer le mot de passe</label>
         <input id="confirm" type={showPassword ? "text" : "password"} value={confirm}
-          onChange={(e) => setConfirm(e.target.value)} required className={inputClass} />
+          onChange={(e) => setConfirm(e.target.value)} required autoComplete="new-password"
+          aria-invalid={error && allValid && password !== confirm ? true : undefined}
+          aria-describedby={error && allValid && password !== confirm ? "reset-error" : undefined}
+          className={inputClass} />
       </div>
 
-      {error && <div className="bg-loss/10 border border-loss/30 rounded-lg p-3 text-sm text-loss">{error}</div>}
+      {error && <div id="reset-error" role="alert" className="bg-loss/10 border border-loss/30 rounded-lg p-3 text-sm text-loss">{error}</div>}
 
       <button type="submit" disabled={loading}
         className="w-full py-3 px-4 bg-gradient-to-r from-emerald-700 to-blue-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100">
