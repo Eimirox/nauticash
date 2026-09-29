@@ -13,7 +13,8 @@ function limitsFor(provider) {
   const free = p.limits?.free || {};
   const envDaily = parseInt(process.env[`${provider.toUpperCase()}_DAILY_LIMIT`], 10);
   return {
-    perDay: Number.isFinite(envDaily) ? envDaily : free.requestsPerDay || null,
+    // FMP_DAILY_LIMIT=0 coupe le provider ; variable absente ou vide → quota de l'offre gratuite
+    perDay: Number.isFinite(envDaily) ? Math.max(0, envDaily) : free.requestsPerDay || null,
     perMinute: free.requestsPerMinute || null,
   };
 }
@@ -28,7 +29,8 @@ function recent(provider, windowMs) {
 function canCall(provider) {
   if (!config.rateLimiting?.enabled) return true;
   const { perDay, perMinute } = limitsFor(provider);
-  if (perDay && recent(provider, DAY) >= perDay) return false;
+  // perDay = 0 bloque tous les appels ; null = pas de plafond
+  if (perDay != null && recent(provider, DAY) >= perDay) return false;
   if (perMinute && recent(provider, MINUTE) >= perMinute) return false;
   return true;
 }

@@ -13,11 +13,9 @@ beforeEach(h.resetState);
 // un nom de provider distinct, ou un quota calculé à partir des appels déjà faits.
 const usedToday = (provider) => apiUsage.stats()[provider]?.last24h || 0;
 
-// Épuise le quota FMP : au moins un appel compté, puis limite = appels déjà faits.
-// (FMP_DAILY_LIMIT=0 n'est pas utilisé car il signifie « pas de limite ».)
+// Épuise le quota FMP : FMP_DAILY_LIMIT=0 bloque tous les appels.
 function exhaustFmpQuota() {
-  if (usedToday("fmp") === 0) apiUsage.record("fmp");
-  process.env.FMP_DAILY_LIMIT = String(usedToday("fmp"));
+  process.env.FMP_DAILY_LIMIT = "0";
 }
 
 describe("services/apiUsage", () => {
@@ -33,6 +31,18 @@ describe("services/apiUsage", () => {
       process.env.FMP_DAILY_LIMIT = "";
     }
     assert.equal(apiUsage.canCall("fmp"), true, "limite par défaut (250) de l'offre gratuite");
+  });
+
+  test("FMP_DAILY_LIMIT=0 bloque tous les appels (au lieu de supprimer la limite)", () => {
+    process.env.FMP_DAILY_LIMIT = "0";
+    try {
+      assert.equal(apiUsage.canCall("fmp"), false);
+      apiUsage.record("fmp"); // pour que fmp apparaisse dans les stats
+      assert.equal(apiUsage.stats().fmp.dailyLimit, 0);
+    } finally {
+      process.env.FMP_DAILY_LIMIT = "";
+    }
+    assert.equal(apiUsage.canCall("fmp"), true, "variable vide : retour au quota de l'offre gratuite");
   });
 
   test("respecte la limite par minute des offres gratuites (Alpha Vantage : 5/min)", () => {
@@ -101,7 +111,7 @@ describe("Quota atteint : effet sur les routes", () => {
     }
   });
 
-  test("quota atteint pendant l'enrichissement : le quote est gardé, profil/dividendes au prochain passage", async () => {
+  test("quota atteint pendant l'enrichissement : rien d'incomplet n'est enregistré (tout sera récupéré au prochain passage)", async () => {
     // Un seul appel restant : le quote passe, le profil lève QUOTA_EXCEEDED
     process.env.FMP_DAILY_LIMIT = String(usedToday("fmp") + 1);
     try {
