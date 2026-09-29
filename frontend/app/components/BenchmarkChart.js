@@ -5,6 +5,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { apiFetch } from "@/lib/api";
 import { compareToBenchmark } from "@/lib/benchmark";
 import { Delta } from "./ui";
+import { signedPct } from "@/lib/chartSummary";
 
 const OPTIONS = [
   { key: "CAC40", label: "CAC 40" },
@@ -69,7 +70,7 @@ export default function BenchmarkChart({ daily }) {
       ) : status === "error" ? (
         <p className="text-sm text-ink-muted">Les données de l&apos;indice sont momentanément indisponibles.</p>
       ) : status === "loading" || !cmp ? (
-        <div className="h-64 animate-pulse rounded-lg bg-surface-2" aria-label="Chargement" />
+        <div className="h-64 animate-pulse rounded-lg bg-surface-2" role="status" aria-label="Chargement de la comparaison" />
       ) : (
         <>
           <div className="mb-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
@@ -81,7 +82,13 @@ export default function BenchmarkChart({ daily }) {
             </span>
             <span className="text-ink-muted/70">depuis le {new Date(`${cmp.from}T12:00:00Z`).toLocaleDateString("fr-FR")}</span>
           </div>
-          <div className="h-64">
+          <div
+            className="h-64"
+            role="img"
+            aria-label={`Courbes base 100 depuis le ${new Date(`${cmp.from}T12:00:00Z`).toLocaleDateString("fr-FR")} : portefeuille ${signedPct(cmp.portfolioPct)}, ${label} ${signedPct(cmp.indexPct)}. ${
+              cmp.portfolioPct > cmp.indexPct ? "Le portefeuille fait mieux que l'indice." : cmp.portfolioPct < cmp.indexPct ? "L'indice fait mieux que le portefeuille." : "Performances égales."
+            }`}
+          >
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={cmp.series} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#94A3B8" strokeOpacity={0.25} />

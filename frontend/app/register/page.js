@@ -73,7 +73,7 @@ export default function Register() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50 dark:from-bg dark:via-bg dark:to-surface flex items-center justify-center p-4 py-12">
+    <main id="contenu" tabIndex={-1} className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50 dark:from-bg dark:via-bg dark:to-surface flex items-center justify-center p-4 py-12">
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-[0.03]">
         <div
@@ -119,7 +119,7 @@ export default function Register() {
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg className="h-5 w-5 text-ink-muted/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg aria-hidden="true" className="h-5 w-5 text-ink-muted/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -136,6 +136,9 @@ export default function Register() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value.trim())}
                   required
+                  autoComplete="email"
+                  aria-invalid={error ? true : undefined}
+                  aria-describedby={error ? "register-error" : undefined}
                 />
               </div>
             </div>
@@ -147,7 +150,7 @@ export default function Register() {
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg className="h-5 w-5 text-ink-muted/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg aria-hidden="true" className="h-5 w-5 text-ink-muted/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -166,14 +169,18 @@ export default function Register() {
                   required
                   minLength={10}
                   autoComplete="new-password"
+                  aria-describedby="password-rules"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPw(!showPw)}
+                  aria-label={showPw ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                  aria-pressed={showPw}
+                  aria-controls="password"
                   className="absolute inset-y-0 right-0 pr-3 flex items-center text-ink-muted/70 hover:text-ink-muted transition"
                 >
                   {showPw ? (
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -182,7 +189,7 @@ export default function Register() {
                       />
                     </svg>
                   ) : (
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                       <path
                         strokeLinecap="round"
@@ -197,7 +204,7 @@ export default function Register() {
 
               {/* Strength Bar */}
               {password && (
-                <div className="mt-3">
+                <div className="mt-3" aria-hidden="true">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-medium text-ink-muted">Force du mot de passe</span>
                     <span className={`text-xs font-semibold ${
@@ -215,15 +222,18 @@ export default function Register() {
                 </div>
               )}
 
-              {/* Rules */}
+              {/* Rules (toujours rendues pour aria-describedby ; visibles dès la saisie) */}
+              <p id="password-rules" className="sr-only">
+                Le mot de passe doit contenir au moins 10 caractères, une majuscule, une minuscule, un chiffre et un caractère spécial.
+              </p>
               {password && (
-                <ul className="mt-3 space-y-1.5">
+                <ul className="mt-3 space-y-1.5" aria-label="Règles du mot de passe">
                   {passwordRules.map((r) => {
                     const ok = r.test(password);
                     return (
                       <li key={r.id} className="flex items-center gap-2 text-xs">
                         {ok ? (
-                          <svg className="w-4 h-4 text-accent flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <svg aria-hidden="true" className="w-4 h-4 text-accent flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                             <path
                               fillRule="evenodd"
                               d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
@@ -231,7 +241,7 @@ export default function Register() {
                             />
                           </svg>
                         ) : (
-                          <svg className="w-4 h-4 text-ink-muted/40 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <svg aria-hidden="true" className="w-4 h-4 text-ink-muted/40 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                             <path
                               fillRule="evenodd"
                               d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z"
@@ -239,7 +249,10 @@ export default function Register() {
                             />
                           </svg>
                         )}
-                        <span className={ok ? "text-ink" : "text-ink-muted"}>{r.label}</span>
+                        <span className={ok ? "text-ink" : "text-ink-muted"}>
+                          <span className="sr-only">{ok ? "Respectée : " : "Manquante : "}</span>
+                          {r.label}
+                        </span>
                       </li>
                     );
                   })}
@@ -254,7 +267,7 @@ export default function Register() {
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg className="h-5 w-5 text-ink-muted/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg aria-hidden="true" className="h-5 w-5 text-ink-muted/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -272,14 +285,19 @@ export default function Register() {
                   onChange={(e) => setConfirm(e.target.value)}
                   required
                   autoComplete="new-password"
+                  aria-invalid={confirm && confirm !== password ? true : undefined}
+                  aria-describedby="confirm-status"
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirm(!showConfirm)}
+                  aria-label={showConfirm ? "Masquer la confirmation" : "Afficher la confirmation"}
+                  aria-pressed={showConfirm}
+                  aria-controls="confirm"
                   className="absolute inset-y-0 right-0 pr-3 flex items-center text-ink-muted/70 hover:text-ink-muted transition"
                 >
                   {showConfirm ? (
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -288,7 +306,7 @@ export default function Register() {
                       />
                     </svg>
                   ) : (
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                       <path
                         strokeLinecap="round"
@@ -300,9 +318,10 @@ export default function Register() {
                   )}
                 </button>
               </div>
+              <div id="confirm-status" aria-live="polite">
               {confirm && confirm !== password && (
                 <p className="text-xs text-loss mt-2 flex items-center gap-1">
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <svg aria-hidden="true" className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                     <path
                       fillRule="evenodd"
                       d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
@@ -314,7 +333,7 @@ export default function Register() {
               )}
               {confirm && confirm === password && password.length >= 10 && (
                 <p className="text-xs text-accent mt-2 flex items-center gap-1">
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <svg aria-hidden="true" className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                     <path
                       fillRule="evenodd"
                       d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
@@ -324,6 +343,7 @@ export default function Register() {
                   Les mots de passe correspondent
                 </p>
               )}
+              </div>
             </div>
 
             {/* Terms acceptance */}
@@ -333,24 +353,26 @@ export default function Register() {
                 type="checkbox"
                 checked={accepted}
                 onChange={(e) => setAccepted(e.target.checked)}
+                required
+                aria-required="true"
                 className="mt-0.5 w-4 h-4 text-accent border-line rounded focus:ring-accent"
               />
               <label htmlFor="accept" className="text-sm text-ink">
                 J'accepte les{" "}
-                <a href="/cgu" target="_blank" className="text-accent hover:text-accent font-medium">
-                  conditions d'utilisation
+                <a href="/cgu" target="_blank" rel="noopener noreferrer" className="text-accent hover:text-accent font-medium">
+                  conditions d'utilisation<span className="sr-only"> (nouvel onglet)</span>
                 </a>{" "}
                 et la{" "}
-                <a href="/confidentialite" target="_blank" className="text-accent hover:text-accent font-medium">
-                  politique de confidentialité
+                <a href="/confidentialite" target="_blank" rel="noopener noreferrer" className="text-accent hover:text-accent font-medium">
+                  politique de confidentialité<span className="sr-only"> (nouvel onglet)</span>
                 </a>
               </label>
             </div>
 
             {/* Error Message */}
             {error && (
-              <div className="bg-loss/10 border border-loss/30 rounded-lg p-3 flex items-start gap-2">
-                <svg className="w-5 h-5 text-loss mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <div id="register-error" role="alert" className="bg-loss/10 border border-loss/30 rounded-lg p-3 flex items-start gap-2">
+                <svg aria-hidden="true" className="w-5 h-5 text-loss mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                   <path
                     fillRule="evenodd"
                     d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
@@ -367,13 +389,13 @@ export default function Register() {
               disabled={!canSubmit}
               className={`w-full py-3 px-4 text-white font-semibold rounded-lg shadow-lg transition-all ${
                 canSubmit
-                  ? "bg-gradient-to-r from-emerald-600 to-blue-600 hover:shadow-xl hover:scale-[1.02]"
+                  ? "bg-gradient-to-r from-emerald-700 to-blue-600 hover:shadow-xl hover:scale-[1.02]"
                   : "bg-line text-ink-muted cursor-not-allowed"
               }`}
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                  <svg aria-hidden="true" className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path
                       className="opacity-75"
@@ -411,7 +433,7 @@ export default function Register() {
         {/* Back to home */}
         <div className="mt-6 text-center">
           <Link href="/" className="inline-flex items-center gap-2 text-sm text-ink-muted hover:text-ink transition">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg aria-hidden="true" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
             Retour à l'accueil

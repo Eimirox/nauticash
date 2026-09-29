@@ -101,6 +101,27 @@ module.exports = {
     },
   },
 
+  // Finnhub (optionnel) : secours pour les actions US hors offre FMP, essayé avant Yahoo.
+  // Désactivé tant que FINNHUB_API_KEY est vide (FINNHUB_ENABLED=false pour le couper).
+  finnhub: {
+    enabled: Boolean(process.env.FINNHUB_API_KEY) && process.env.FINNHUB_ENABLED !== "false",
+    apiKey: process.env.FINNHUB_API_KEY || "",
+    baseUrl: "https://finnhub.io/api/v1",
+    limits: {
+      free: {
+        requestsPerDay: null,
+        requestsPerMinute: 55, // offre gratuite : ~60/min, petite marge
+      },
+    },
+    supports: {
+      usStocks: true,
+      euStocks: false,
+      crypto: false,
+      etf: true,
+      dividends: false,
+    },
+  },
+
   // Configuration Alpha Vantage (backup gratuit)
   alphavantage: {
     enabled: process.env.ALPHA_VANTAGE_ENABLED === "true",

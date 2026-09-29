@@ -9,6 +9,7 @@ import { Delta } from "../../components/ui";
 import { periodPerformance } from "@/lib/periodPerf";
 import BenchmarkChart from "../../components/BenchmarkChart";
 import { fetchFxRates, toEUR } from "@/lib/fx";
+import { SkeletonRegion, SkeletonStat, SkeletonChart } from "../../components/ui/Skeleton";
 
 export default function PerformancePage() {
   const router = useRouter();
@@ -253,12 +254,10 @@ export default function PerformancePage() {
 
 
         {loading ? (
-          <div className="flex justify-center py-20">
-            <svg className="animate-spin h-10 w-10 text-accent" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
-          </div>
+          <SkeletonRegion label="Chargement de la performance…" className="space-y-6">
+            <SkeletonChart height="h-24" />
+            <SkeletonChart height="h-72" />
+          </SkeletonRegion>
         ) : (
           <>
           <section aria-labelledby="periods-title" className="mb-6 bg-surface border border-line rounded-xl shadow-lg p-6">
@@ -398,13 +397,14 @@ export default function PerformancePage() {
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
+                  <caption className="sr-only">Performance mensuelle : valeur de début, valeur de fin, performance en pourcentage et montant.</caption>
                   <thead>
                     <tr className="border-b border-line">
-                      <th className="text-left py-3 px-4 text-sm font-semibold text-ink-muted">Période</th>
-                      <th className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Valeur Début</th>
-                      <th className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Valeur Fin</th>
-                      <th className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Performance</th>
-                      <th className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Montant</th>
+                      <th scope="col" className="text-left py-3 px-4 text-sm font-semibold text-ink-muted">Période</th>
+                      <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Valeur Début</th>
+                      <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Valeur Fin</th>
+                      <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Performance</th>
+                      <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Montant</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -442,14 +442,15 @@ export default function PerformancePage() {
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
+                  <caption className="sr-only">Performance annuelle : valeur de début, valeur de fin, performance en pourcentage et montant.</caption>
                   <thead>
                     <tr className="border-b border-line">
-                      <th className="text-left py-3 px-4 text-sm font-semibold text-ink-muted">Année</th>
-                      <th className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Valeur Début</th>
-                      <th className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Valeur Fin</th>
-                      <th className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Performance</th>
-                      <th className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Montant</th>
-                      <th className="text-center py-3 px-4 text-sm font-semibold text-ink-muted">Mois</th>
+                      <th scope="col" className="text-left py-3 px-4 text-sm font-semibold text-ink-muted">Année</th>
+                      <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Valeur Début</th>
+                      <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Valeur Fin</th>
+                      <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Performance</th>
+                      <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Montant</th>
+                      <th scope="col" className="text-center py-3 px-4 text-sm font-semibold text-ink-muted">Mois</th>
                     </tr>
                   </thead>
                   <tbody>

@@ -23,6 +23,7 @@ function Choice({ name, value, current, onChange, children }) {
     <label
       className={cx(
         "flex cursor-pointer items-center justify-center rounded-xl border px-3 py-2.5 text-sm font-medium transition",
+        "has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent",
         active ? "border-accent bg-accent/10 text-accent" : "border-line bg-surface text-ink-muted hover:text-ink"
       )}
     >
@@ -97,7 +98,7 @@ export default function ProfileForm({ onLoaded }) {
   };
 
   return (
-    <form onSubmit={submit} className="space-y-6">
+    <form onSubmit={submit} className="space-y-6" aria-label="Profil" aria-describedby={error ? "profile-error" : undefined}>
       {/* Identité */}
       <Card as="section" aria-labelledby="identity-title">
         <h2 id="identity-title" className="mb-5 text-lg font-semibold">Identité</h2>
@@ -115,10 +116,13 @@ export default function ProfileForm({ onLoaded }) {
               id="displayName"
               className={inputClass}
               maxLength={40}
+              autoComplete="nickname"
+              aria-describedby="displayName-hint"
               value={form.displayName}
               onChange={(e) => set("displayName")(e.target.value)}
-              placeholder="Affiché dans l'en-tête"
+              placeholder="Ex. Camille"
             />
+            <p id="displayName-hint" className="mt-1 text-xs text-ink-muted">Affiché dans l&apos;en-tête, 40 caractères maximum.</p>
           </div>
           <fieldset>
             <legend className={labelClass}>Couleur de l'avatar</legend>
@@ -134,6 +138,7 @@ export default function ProfileForm({ onLoaded }) {
                     className="peer sr-only"
                   />
                   <span
+                    aria-hidden="true"
                     className={cx(
                       "block h-9 w-9 rounded-full ring-offset-2 ring-offset-surface transition peer-focus-visible:ring-2 peer-focus-visible:ring-accent",
                       cls,
@@ -168,13 +173,15 @@ export default function ProfileForm({ onLoaded }) {
               <Choice name="theme" value="dark" current={form.theme} onChange={set("theme")}>Sombre</Choice>
             </div>
           </fieldset>
-          <label className="flex items-start justify-between gap-4 rounded-xl border border-line p-4">
+          <label htmlFor="discreetMode" className="flex items-start justify-between gap-4 rounded-xl border border-line p-4">
             <span>
               <span className="block text-sm font-semibold">Mode discret</span>
-              <span className="block text-sm text-ink-muted">Masque les montants (les pourcentages restent visibles), pratique en public.</span>
+              <span id="discreetMode-hint" className="block text-sm text-ink-muted">Masque les montants (les pourcentages restent visibles), pratique en public.</span>
             </span>
             <input
+              id="discreetMode"
               type="checkbox"
+              aria-describedby="discreetMode-hint"
               checked={form.discreetMode}
               onChange={(e) => set("discreetMode")(e.target.checked)}
               className="mt-1 h-5 w-5 shrink-0 accent-emerald-600"
@@ -196,7 +203,7 @@ export default function ProfileForm({ onLoaded }) {
         <div className="grid gap-5 sm:grid-cols-2">
           <div>
             <label htmlFor="goalAmount" className={labelClass}>Objectif de patrimoine ({form.baseCurrency})</label>
-            <input id="goalAmount" type="number" min="0" step="100" inputMode="decimal" className={inputClass}
+            <input id="goalAmount" type="number" min="0" step="100" inputMode="decimal" className={inputClass} autoComplete="off"
               value={form.goalAmount} onChange={(e) => set("goalAmount")(e.target.value)} placeholder="Ex. 100000" />
           </div>
           <div>
@@ -226,12 +233,14 @@ export default function ProfileForm({ onLoaded }) {
             <label htmlFor="monthlyExpenses" className={labelClass}>Dépenses mensuelles ({form.baseCurrency})</label>
             <input id="monthlyExpenses" type="number" min="0" step="50" inputMode="decimal" className={inputClass}
               value={form.monthlyExpenses} onChange={(e) => set("monthlyExpenses")(e.target.value)}
-              placeholder="Pour calculer votre fonds de précaution" />
+              autoComplete="off" aria-describedby="monthlyExpenses-hint"
+              placeholder="Ex. 2000" />
+            <p id="monthlyExpenses-hint" className="mt-1 text-xs text-ink-muted">Sert à calculer votre fonds de précaution.</p>
           </div>
         </div>
       </Card>
 
-      {error && <p role="alert" className="rounded-lg border border-loss/30 bg-loss/10 px-3 py-2 text-sm text-loss">{error}</p>}
+      {error && <p id="profile-error" role="alert" className="rounded-lg border border-loss/30 bg-loss/10 px-3 py-2 text-sm text-loss">{error}</p>}
 
       <div className="sticky bottom-4 z-10 flex justify-end">
         <Button type="submit" loading={saving} disabled={!dirty} className="shadow-lg">

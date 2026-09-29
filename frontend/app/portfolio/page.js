@@ -9,6 +9,7 @@ import { getPerformanceClass } from "./utils/styles";
 import { apiFetch, logout as apiLogout } from "@/lib/api";
 import AppHeader from "../components/AppHeader";
 import { ConfirmModal, useToast, Delta } from "../components/ui";
+import { SkeletonRegion, SkeletonRows, SkeletonList } from "../components/ui/Skeleton";
 import { quoteFreshness } from "@/lib/quoteTime";
 import { useFxRates, toCurrency, currencySymbol } from "@/lib/fx";
 import { useBaseCurrency, useProfile } from "@/lib/profile";
@@ -362,7 +363,7 @@ export default function Portfolio() {
     if (sort.key !== k) return "";
     if (sort.dir === "asc")
       return (
-        <svg className="inline w-4 h-4 ml-1" fill="currentColor" viewBox="0 0 20 20">
+        <svg aria-hidden="true" className="inline w-4 h-4 ml-1" fill="currentColor" viewBox="0 0 20 20">
           <path
             fillRule="evenodd"
             d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z"
@@ -372,7 +373,7 @@ export default function Portfolio() {
       );
     if (sort.dir === "desc")
       return (
-        <svg className="inline w-4 h-4 ml-1" fill="currentColor" viewBox="0 0 20 20">
+        <svg aria-hidden="true" className="inline w-4 h-4 ml-1" fill="currentColor" viewBox="0 0 20 20">
           <path
             fillRule="evenodd"
             d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
@@ -471,7 +472,9 @@ export default function Portfolio() {
       </div>
 
       {loading ? (
-        <p className="px-4 py-16 text-center text-sm text-ink-muted">Chargement de votre portefeuille...</p>
+        <SkeletonRegion label="Chargement de votre portefeuille…" className="p-4">
+          <SkeletonList items={3} />
+        </SkeletonRegion>
       ) : !stocks.length ? (
         <div className="px-4 py-16 text-center">
           <p className="mb-1 text-base font-medium text-ink">Aucune position</p>
@@ -540,7 +543,9 @@ export default function Portfolio() {
                     {stock.myDividendYield != null && ` · ${nf2.format(stock.myDividendYield)} %`}
                   </span>
                   <button
+                    type="button"
                     onClick={() => removeStock(stock.ticker)}
+                    aria-label={`Supprimer ${stock.ticker}`}
                     className="rounded-lg border border-loss/30 bg-loss/10 px-3 py-2 text-xs font-medium text-loss transition hover:bg-loss hover:text-white"
                   >
                     Supprimer
@@ -554,103 +559,77 @@ export default function Portfolio() {
     </div>
   );
 
+  // En-tête triable : bouton focusable au clavier + état annoncé via aria-sort
+  const sortableTh = (k, label) => {
+    const active = sort.key === k && sort.dir !== SORT_DIR.NONE;
+    const ariaSort = active ? (sort.dir === SORT_DIR.ASC ? "ascending" : "descending") : "none";
+    return (
+      <th
+        scope="col"
+        aria-sort={ariaSort}
+        className="px-6 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider"
+      >
+        <button
+          type="button"
+          onClick={() => toggleSort(k)}
+          className="uppercase tracking-wider font-semibold hover:text-accent transition select-none"
+        >
+          {label} {caret(k)}
+          <span className="sr-only">
+            {active ? (sort.dir === SORT_DIR.ASC ? " (tri croissant)" : " (tri décroissant)") : " (trier)"}
+          </span>
+        </button>
+      </th>
+    );
+  };
+
   // Composant Tableau (écrans ≥ 768 px) + cartes sur mobile
   const TableContent = () => (
     <>
     <MobileCards />
     <div className="hidden md:block overflow-x-auto">
       <table className="w-full">
+        <caption className="sr-only">
+          Positions du portefeuille : prix, variation du jour, quantité, PRU, performance, dividende, rendement et total. Les colonnes avec un bouton peuvent être triées.
+        </caption>
         <thead className="bg-surface-2 border-b-2 border-line">
           <tr>
-            <th className="px-6 py-4 text-left text-xs font-semibold text-ink uppercase tracking-wider">
+            <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-ink uppercase tracking-wider">
               Titre
             </th>
-            <th className="px-6 py-4 text-left text-xs font-semibold text-ink uppercase tracking-wider">
+            <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-ink uppercase tracking-wider">
               Pays
             </th>
-            <th className="px-6 py-4 text-left text-xs font-semibold text-ink uppercase tracking-wider">
+            <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-ink uppercase tracking-wider">
               Type
             </th>
-            <th
-              className="px-6 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider cursor-pointer hover:text-accent transition select-none"
-              onClick={() => toggleSort("price")}
-            >
-              Prix {caret("price")}
-            </th>
-            <th
-              className="px-6 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider cursor-pointer hover:text-accent transition select-none"
-              onClick={() => toggleSort("day")}
-            >
-              Jour {caret("day")}
-            </th>
-            <th className="px-6 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider">
+            {sortableTh("price", "Prix")}
+            {sortableTh("day", "Jour")}
+            <th scope="col" className="px-6 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider">
               Quantité
             </th>
-            <th className="px-6 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider">
+            <th scope="col" className="px-6 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider">
               PRU
             </th>
-            <th
-              className="px-6 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider cursor-pointer hover:text-accent transition select-none"
-              onClick={() => toggleSort("performance")}
-            >
-              Performance {caret("performance")}
-            </th>
-            <th
-              className="px-6 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider cursor-pointer hover:text-accent transition select-none"
-              onClick={() => toggleSort("dividend")}
-            >
-              Dividende {caret("dividend")}
-            </th>
-            <th
-              className="px-6 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider cursor-pointer hover:text-accent transition select-none"
-              onClick={() => toggleSort("yield")}
-            >
-              Rendement {caret("yield")}
-            </th>
-            <th
-              className="px-6 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider cursor-pointer hover:text-accent transition select-none"
-              onClick={() => toggleSort("total")}
-            >
-              Total {caret("total")}
-            </th>
-            <th className="px-6 py-4 text-xs font-semibold text-ink uppercase tracking-wider">
+            {sortableTh("performance", "Performance")}
+            {sortableTh("dividend", "Dividende")}
+            {sortableTh("yield", "Rendement")}
+            {sortableTh("total", "Total")}
+            <th scope="col" className="px-6 py-4 text-xs font-semibold text-ink uppercase tracking-wider">
               Actions
             </th>
           </tr>
         </thead>
         <tbody>
           {loading ? (
-            <tr>
-              <td
-                colSpan="12"
-                className="px-6 py-20 text-center text-ink-muted"
-              >
-                <div className="flex flex-col items-center gap-3">
-                  <svg
-                    className="animate-spin h-8 w-8 text-accent"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
-                  <span className="text-sm font-medium">
-                    Chargement de votre portefeuille...
-                  </span>
-                </div>
-              </td>
-            </tr>
+            <>
+              <tr>
+                <td colSpan="12" className="p-0">
+                  <SkeletonRegion label="Chargement de votre portefeuille…" as="span" />
+                </td>
+              </tr>
+              <SkeletonRows rows={5} cols={12} />
+            </>
           ) : stocks.length ? (
             visibleStocks.map((stock) => {
               const perf =
@@ -701,6 +680,10 @@ export default function Portfolio() {
                   <td className="px-6 py-4 text-right">
                     <input
                       type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="any"
+                      aria-label={`Quantité ${stock.ticker}`}
                       key={`qty-${stock.ticker}-${stock.quantity}`}
                       defaultValue={stock.quantity}
                       onBlur={(e) => {
@@ -722,6 +705,10 @@ export default function Portfolio() {
                   <td className="px-6 py-4 text-right">
                     <input
                       type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="any"
+                      aria-label={`Prix de revient unitaire ${stock.ticker}`}
                       key={`pru-${stock.ticker}-${stock.pru}`}
                       defaultValue={stock.pru}
                       onBlur={(e) => {
@@ -770,7 +757,9 @@ export default function Portfolio() {
                   </td>
                   <td className="px-6 py-4">
                     <button
+                      type="button"
                       onClick={() => removeStock(stock.ticker)}
+                      aria-label={`Supprimer ${stock.ticker}`}
                       className="px-3 py-2 bg-loss/10 text-loss border border-loss/30 rounded-lg hover:bg-loss hover:text-white transition-all text-sm font-medium"
                     >
                       Supprimer
@@ -829,10 +818,11 @@ export default function Portfolio() {
             Mes Positions - Mode Plein Écran
           </h2>
           <button
+            type="button"
             onClick={() => setFullscreenTable(false)}
             className="px-4 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-all flex items-center gap-2"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg aria-hidden="true" className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
             Fermer
@@ -866,8 +856,9 @@ export default function Portfolio() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {error && (
-          <div className="mb-6 p-4 bg-loss/10 border border-loss/30 rounded-lg flex items-start gap-3">
+          <div role="alert" className="mb-6 p-4 bg-loss/10 border border-loss/30 rounded-lg flex items-start gap-3">
             <svg
+              aria-hidden="true"
               className="w-5 h-5 text-loss mt-0.5 flex-shrink-0"
               fill="currentColor"
               viewBox="0 0 20 20"
@@ -942,7 +933,10 @@ export default function Portfolio() {
           ))}
 
           <button
+            type="button"
             onClick={() => setShowCashSection(!showCashSection)}
+            aria-expanded={showCashSection}
+            aria-controls="cash-section"
             className="relative p-5 bg-gradient-to-br from-emerald-50 to-blue-50 dark:from-accent/10 dark:to-accent-2/10 border-2 border-dashed border-accent/40 rounded-xl hover:border-accent/50 transition-all group"
           >
             <div className="flex items-center justify-between">
@@ -955,6 +949,7 @@ export default function Portfolio() {
                 </p>
               </div>
               <svg
+                aria-hidden="true"
                 className={`w-5 h-5 text-accent transition-transform ${
                   showCashSection ? "rotate-180" : ""
                 }`}
@@ -974,9 +969,10 @@ export default function Portfolio() {
         </div>
 
         {showCashSection && (
-          <div className="mb-6 p-5 bg-gradient-to-br from-emerald-50 to-blue-50 dark:from-accent/10 dark:to-accent-2/10 border border-accent/40 rounded-xl animate-fade-in-up">
+          <section id="cash-section" aria-labelledby="cash-title" aria-describedby="cash-hint" className="mb-6 p-5 bg-gradient-to-br from-emerald-50 to-blue-50 dark:from-accent/10 dark:to-accent-2/10 border border-accent/40 rounded-xl animate-fade-in-up">
             <div className="flex items-center gap-2 mb-4">
               <svg
+                aria-hidden="true"
                 className="w-5 h-5 text-accent"
                 fill="currentColor"
                 viewBox="0 0 20 20"
@@ -988,20 +984,24 @@ export default function Portfolio() {
                   clipRule="evenodd"
                 />
               </svg>
-              <h3 className="text-sm font-bold text-ink">
+              <h3 id="cash-title" className="text-sm font-bold text-ink">
                 Gérer le cash disponible
               </h3>
-              <span className="text-xs text-ink-muted">
+              <span id="cash-hint" className="text-xs text-ink-muted">
                 (Optionnel - Non inclus dans les totaux de positions)
               </span>
             </div>
             <div className="flex flex-wrap gap-4">
               <div>
-                <label className="block text-xs font-medium text-ink mb-1.5">
+                <label htmlFor="cash-amount" className="block text-xs font-medium text-ink mb-1.5">
                   Montant
                 </label>
                 <input
+                  id="cash-amount"
                   type="number"
+                  inputMode="decimal"
+                  step="any"
+                  aria-describedby="cash-kind"
                   value={cash.amount}
                   onChange={(e) => {
                     const newVal = parseFloat(e.target.value) || 0;
@@ -1013,10 +1013,11 @@ export default function Portfolio() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-ink mb-1.5">
+                <label htmlFor="cash-currency" className="block text-xs font-medium text-ink mb-1.5">
                   Devise
                 </label>
                 <select
+                  id="cash-currency"
                   value={cash.currency}
                   onChange={(e) => {
                     const newCurrency = e.target.value;
@@ -1032,19 +1033,19 @@ export default function Portfolio() {
                 </select>
               </div>
               <div className="flex items-end">
-                <div className="flex items-center gap-2 px-3 py-2 bg-surface/60 rounded-lg text-xs text-ink-muted">
-                  <span className="text-base">
+                <div id="cash-kind" className="flex items-center gap-2 px-3 py-2 bg-surface/60 rounded-lg text-xs text-ink-muted">
+                  <span aria-hidden="true" className="text-base">
                     {cash.amount < 0 ? "💸" : "💰"}
                   </span>
                   {cash.amount < 0 ? "Dette" : "Épargne"}
                 </div>
               </div>
             </div>
-          </div>
+          </section>
         )}
 
         {/* Add Stock */}
-        <div className="mb-6 flex flex-wrap items-center gap-3 p-4 bg-surface border border-line rounded-xl shadow">
+        <div role="group" aria-label="Ajouter une position" className="mb-6 flex flex-wrap items-center gap-3 p-4 bg-surface border border-line rounded-xl shadow">
           <TickerSearch
             value={ticker}
             onChange={setTicker}
@@ -1053,12 +1054,15 @@ export default function Portfolio() {
             existing={stocks.map((s) => s.ticker)}
           />
           <button
+            type="button"
             onClick={() => addStock()}
             disabled={adding}
-            className="disabled:opacity-50 disabled:cursor-wait px-5 py-2 bg-gradient-to-r from-emerald-600 to-blue-600 text-white text-sm font-semibold rounded-lg hover:shadow-lg hover:scale-105 transition-all"
+            aria-busy={adding}
+            className="disabled:opacity-50 disabled:cursor-wait px-5 py-2 bg-gradient-to-r from-emerald-700 to-blue-600 text-white text-sm font-semibold rounded-lg hover:shadow-lg hover:scale-105 transition-all"
           >
             <span className="flex items-center gap-2">
               <svg
+                aria-hidden="true"
                 className="w-4 h-4"
                 fill="none"
                 stroke="currentColor"
@@ -1122,11 +1126,13 @@ export default function Portfolio() {
                 {stocks.length} {stocks.length > 1 ? "positions" : "position"}
               </span>
               <button
+                type="button"
                 onClick={() => setFullscreenTable(true)}
                 className="hidden md:flex px-3 py-1.5 bg-white/10 text-white text-xs font-medium rounded-lg hover:bg-white/20 transition-all items-center gap-1.5"
                 title="Mode plein écran"
+                aria-label="Afficher le tableau en plein écran"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg aria-hidden="true" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
                 </svg>
                 <span className="hidden sm:inline">Plein écran</span>

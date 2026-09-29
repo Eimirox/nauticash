@@ -4,7 +4,7 @@ import { useState } from "react";
 import AppHeader from "../components/AppHeader";
 import ProfileForm from "../components/ProfileForm";
 import { Card, Button, ConfirmModal, useToast } from "../components/ui";
-import { apiFetch, logout } from "@/lib/api";
+import { apiFetch, apiDownload, logout } from "@/lib/api";
 
 // Mêmes règles que le backend (routes/auth.js)
 const RULES = [
@@ -38,6 +38,27 @@ export default function MonProfil() {
   const [show, setShow] = useState(false);
   const [saving, setSaving] = useState(false);
   const [pwError, setPwError] = useState(null);
+
+  // Export des données (RGPD)
+  const [exporting, setExporting] = useState(null);
+
+  const exportData = async (kind) => {
+    const day = new Date().toISOString().slice(0, 10);
+    const files = {
+      json: ["/api/user/export?format=json", `nauticash-export-${day}.json`],
+      positions: ["/api/user/export?format=csv&dataset=positions", `nauticash-positions-${day}.csv`],
+      history: ["/api/user/export?format=csv&dataset=history", `nauticash-historique-${day}.csv`],
+    };
+    setExporting(kind);
+    try {
+      await apiDownload(...files[kind]);
+      toast.success("Export téléchargé.");
+    } catch (err) {
+      if (err.status !== 401) toast.error(err.message);
+    } finally {
+      setExporting(null);
+    }
+  };
 
   // Suppression du compte
   const [deletePassword, setDeletePassword] = useState("");
@@ -111,6 +132,8 @@ export default function MonProfil() {
               autoComplete="current-password"
               value={current}
               onChange={(e) => setCurrent(e.target.value)}
+              aria-invalid={pwError ? true : undefined}
+              aria-describedby={pwError ? "pw-error" : undefined}
               required
             />
             <div>
@@ -121,14 +144,24 @@ export default function MonProfil() {
                 autoComplete="new-password"
                 value={next}
                 onChange={(e) => setNext(e.target.value)}
+                aria-invalid={pwError ? true : undefined}
+                aria-describedby={pwError ? "new-rules pw-error" : "new-rules"}
                 required
               />
-              <ul className="mt-2 grid grid-cols-2 gap-1 text-xs">
-                {RULES.map((r) => (
-                  <li key={r.label} className={r.test(next) ? "text-gain" : "text-ink-muted"}>
-                    {r.test(next) ? "✓" : "•"} {r.label}
-                  </li>
-                ))}
+              <p id="new-rules" className="sr-only">
+                Le mot de passe doit contenir au moins 10 caractères, une majuscule, une minuscule, un chiffre et un caractère spécial.
+              </p>
+              <ul className="mt-2 grid grid-cols-2 gap-1 text-xs" aria-label="Règles du nouveau mot de passe">
+                {RULES.map((r) => {
+                  const ok = r.test(next);
+                  return (
+                    <li key={r.label} className={ok ? "text-gain" : "text-ink-muted"}>
+                      <span aria-hidden="true">{ok ? "✓" : "•"}</span>{" "}
+                      <span className="sr-only">{ok ? "Respectée : " : "Manquante : "}</span>
+                      {r.label}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
             <Field
@@ -138,24 +171,45 @@ export default function MonProfil() {
               autoComplete="new-password"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
+              aria-invalid={pwError || (confirm && confirm !== next) ? true : undefined}
+              aria-describedby={pwError ? "pw-error" : undefined}
               required
             />
             <label className="flex items-center gap-2 text-sm text-ink-muted">
-              <input type="checkbox" checked={show} onChange={(e) => setShow(e.target.checked)} className="h-4 w-4 accent-emerald-600" />
+              <input type="checkbox" checked={show} onChange={(e) => setShow(e.target.checked)} aria-controls="current new confirm" className="h-4 w-4 accent-emerald-600" />
               Afficher les mots de passe
             </label>
 
             {pwError && (
-              <p role="alert" className="rounded-lg border border-loss/30 bg-loss/10 px-3 py-2 text-sm text-loss">{pwError}</p>
+              <p id="pw-error" role="alert" className="rounded-lg border border-loss/30 bg-loss/10 px-3 py-2 text-sm text-loss">{pwError}</p>
             )}
 
             <Button type="submit" loading={saving} className="w-full sm:w-auto">Enregistrer le mot de passe</Button>
           </form>
         </Card>
 
+        <Card as="section" aria-labelledby="export-title">
+          <h2 id="export-title" className="mb-1 text-lg font-semibold">Exporter mes données</h2>
+          <p className="mb-5 text-sm text-ink-muted">
+            Téléchargez une copie de vos données : profil, positions, cash, historique de valeur et transactions.
+            Le fichier JSON contient tout ; les CSV s&apos;ouvrent directement dans un tableur.
+          </p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap" aria-busy={Boolean(exporting)}>
+            <Button variant="secondary" loading={exporting === "json"} disabled={Boolean(exporting)} onClick={() => exportData("json")}>
+              Tout exporter (JSON)
+            </Button>
+            <Button variant="secondary" loading={exporting === "positions"} disabled={Boolean(exporting)} onClick={() => exportData("positions")}>
+              Positions et cash (CSV)
+            </Button>
+            <Button variant="secondary" loading={exporting === "history"} disabled={Boolean(exporting)} onClick={() => exportData("history")}>
+              Historique quotidien (CSV)
+            </Button>
+          </div>
+        </Card>
+
         <Card as="section" aria-labelledby="delete-title" className="border-loss/30">
           <h2 id="delete-title" className="mb-1 text-lg font-semibold text-loss">Supprimer mon compte</h2>
-          <p className="mb-5 text-sm text-ink-muted">
+          <p id="delete-warning" className="mb-5 text-sm text-ink-muted">
             Votre compte, votre portefeuille, votre cash et votre historique seront effacés définitivement. Cette action est irréversible.
           </p>
           <form
@@ -164,6 +218,7 @@ export default function MonProfil() {
               if (deletePassword) setConfirmOpen(true);
             }}
             className="space-y-4"
+            aria-describedby="delete-warning"
           >
             <Field
               id="delete-password"

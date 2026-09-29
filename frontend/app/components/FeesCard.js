@@ -67,12 +67,13 @@ export default function FeesCard({ positions, symbol = "€", onFeesChange }) {
 
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
+          <caption className="sr-only">Frais annuels par ligne : valeur, pourcentage de frais et coût par an.</caption>
           <thead>
             <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-ink-muted">
-              <th className="py-2 pr-4 font-semibold">Ligne</th>
-              <th className="py-2 pr-4 text-right font-semibold">Valeur</th>
-              <th className="py-2 pr-4 text-right font-semibold">Frais annuels (%)</th>
-              <th className="py-2 text-right font-semibold">Coût par an</th>
+              <th scope="col" className="py-2 pr-4 font-semibold">Ligne</th>
+              <th scope="col" className="py-2 pr-4 text-right font-semibold">Valeur</th>
+              <th scope="col" className="py-2 pr-4 text-right font-semibold">Frais annuels (%)</th>
+              <th scope="col" className="py-2 text-right font-semibold">Coût par an</th>
             </tr>
           </thead>
           <tbody>

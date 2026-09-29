@@ -98,7 +98,7 @@ export default function TickerSearch({ value, onChange, onSelect, disabled, exis
 
   return (
     <div ref={boxRef} className="relative flex-1 min-w-[200px]">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 rounded-lg focus-within:ring-2 focus-within:ring-accent focus-within:ring-offset-2 focus-within:ring-offset-surface">
         <svg className="h-5 w-5 shrink-0 text-ink-muted/70" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
         </svg>

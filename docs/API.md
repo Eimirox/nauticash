@@ -10,7 +10,7 @@ Comparatif des sources gratuites utilisables par Nauticash et stratégie retenue
 |---|---|---|---|---|
 | **Financial Modeling Prep (FMP)** | ~250 appels/jour | Cours, profil (secteur, pays, ETF), dividendes ; API `/stable` | Couverture gratuite surtout US, données de fin de journée pour une partie des marchés | **Provider principal** (`services/providers/fmp.js`) |
 | **Alpha Vantage** | ~25 appels/jour, ~5/min | Actions européennes, historique mensuel ajusté (dividendes) | Quota très faible | Secours et enrichissement des dividendes (`services/providers/alphavantage.js`) |
-| **Finnhub** | ~60 appels/min | Cours US temps réel, profil, dividendes, actualités | International surtout payant | Candidat : fallback US optionnel (clé `FINNHUB_API_KEY`) |
+| **Finnhub** | ~60 appels/min | Cours US temps réel, profil, dividendes, actualités | International surtout payant | **Branché (optionnel)** : secours US entre FMP et Yahoo, actif seulement avec `FINNHUB_API_KEY` (`services/providers/finnhub.js`) |
 | **Twelve Data** | ~800 appels/jour, ~8/min | Bonne API, crypto, forex | Europe et ETF plutôt payants | Configuré mais non branché (`config/providers.js`) |
 | **Frankfurter** | Gratuit, sans clé | Taux de change de référence BCE, simple et fiable | Taux quotidiens uniquement | **Utilisé** : `GET /api/fx` (`services/fx.js`), cache 6 h, base EUR |
 | **Yahoo Finance (non officiel)** | Pas d'offre officielle | Couverture mondiale très large | Non documenté, peut casser ou bloquer sans préavis | Dernier recours uniquement, à éviter en production |
@@ -21,7 +21,15 @@ Comparatif des sources gratuites utilisables par Nauticash et stratégie retenue
 2. **Cron** toutes les 6 h (`jobs/updatePrices.js`) : réutilise les prix encore frais, ne rafraîchit pas les actions le week-end, s'arrête proprement quand le quota est atteint.
 3. **Coût par action** : 1 appel FMP (cours) dans la plupart des cas ; profil re-téléchargé tous les 30 jours, dividendes tous les 7 jours.
 4. **Quotas** comptés par appel HTTP réel (`services/apiUsage.js`), surchargeables par `FMP_DAILY_LIMIT` / `ALPHAVANTAGE_DAILY_LIMIT`.
-5. **Fallback** : ordre de `ACTIVE_PROVIDERS`, avec enrichissement des dividendes par Alpha Vantage si FMP n'a rien trouvé.
+5. **Fallback** : ordre de `ACTIVE_PROVIDERS`, puis Finnhub (si `FINNHUB_API_KEY`), puis Yahoo ; enrichissement des dividendes par Alpha Vantage si FMP n'a rien trouvé.
+
+## Finnhub (optionnel, depuis le 28/09/2026)
+
+- Activé uniquement si `FINNHUB_API_KEY` est renseignée (`FINNHUB_ENABLED=false` pour le couper). Sans clé : aucun changement, aucun appel.
+- Ordre des providers : `ACTIVE_PROVIDERS` (FMP) → **Finnhub** → Yahoo. Ne reçoit que les tickers américains (1 à 5 lettres, classe `BRK.B` acceptée) : jamais les places étrangères (`.PA`, `.L`…), les cryptos ni les indices.
+- Endpoint `/api/v1/quote` : cours, veille, plus haut/bas, heure de cotation, en USD. Pas de profil ni de dividendes : ils sont conservés depuis la base ou complétés par Yahoo (même logique que pour FMP).
+- Symbole inconnu (réponse à zéro), 429 ou 403 → passage à Yahoo. Quota : 55 appels/min (marge sur les ~60 de l'offre gratuite), aucun plafond journalier (`FINNHUB_DAILY_LIMIT` pour en fixer un).
+- Inclus dans `GET /api/admin/coverage` (`providers=finnhub`), statut `unsupported` hors US.
 
 ## Cohérence des données (vérifiée le 27/09/2026)
 
@@ -49,6 +57,25 @@ Yahoo est ajouté automatiquement en dernier recours (`YAHOO_ENABLED=false` pour
 
 **Autocomplétion** : `GET /api/market/search?q=` fusionne une liste locale de titres courants (`services/popularTickers.js`, instantanée, sans appel) et la recherche Yahoo mise en cache 7 jours par requête ; indices exclus ; 60 recherches/min/IP.
 
+## Mesure de la couverture (route admin, depuis le 28/09/2026)
+
+`GET /api/admin/coverage` (compte listé dans `ADMIN_EMAILS`) teste, pour chaque ticker réellement détenu (les plus détenus d'abord), si chaque provider actif renvoie un cours. Lecture seule : rien n'est enregistré.
+
+- Paramètres : `limit` (1 à 200 tickers, 50 par défaut) et `providers` (ex. `fmp,yahoo` ; par défaut tous les providers actifs).
+- Coût : **1 appel par provider et par ticker** (FMP `quote`, Alpha Vantage `GLOBAL_QUOTE`, Yahoo `chart` léger), compté dans les quotas ; un provider dont le quota est atteint n'est plus appelé (statut `quota`). Avec 50 tickers, compter 50 appels FMP sur 250/jour : à lancer hors du créneau de 21:15 UTC, ou avec `providers=yahoo`.
+- Statuts par ticker : `ok` (cours reçu), `not_covered` (402 FMP, 404 ou aucune donnée), `unsupported` (type non géré, ex. crypto chez Alpha Vantage), `quota`, `error`.
+- Réponse : `summary.<provider>` (compteurs + `coverage` en % = ok / (ok + not_covered)), `uncovered` (tickers qu'aucun provider ne cote), `tickers[]` (détenteurs, source actuelle en base, résultat par provider).
+
+### Résultats en production
+
+À remplir après un appel en production (l'environnement de test n'a ni la base réelle ni les clés API) :
+
+| Date | Tickers testés | FMP | Yahoo | Finnhub | Alpha Vantage | Non couverts |
+|---|---|---|---|---|---|---|
+| _à mesurer_ | | | | | | |
+
+**Cours figé (diagnostic)** : `GET /api/admin/stats` → `livePrices.errors` liste, par ticker, la dernière erreur de l'actualisation intraday Yahoo (message, heure, nombre d'échecs consécutifs), effacée au premier succès.
+
 ## Rythme d'actualisation (28/09/2026)
 
 | Quand | Job | Source | Coût |
@@ -62,8 +89,12 @@ Yahoo est ajouté automatiquement en dernier recours (`YAHOO_ENABLED=false` pour
 
 **Place de cotation et logo** : `exchange` (libellé lisible : NASDAQ, NYSE, Euronext Paris, XETRA…) et `logo` (images publiques FMP, initiales en secours) sont renvoyés pour chaque position et chaque suggestion de recherche.
 
+## Export des données du compte (RGPD, depuis le 28/09/2026)
+
+`GET /api/user/export` (connecté) : `format=json` (par défaut) renvoie tout ce qui est rattaché au compte — e-mail, dates, profil, positions, cash, historique mensuel et quotidien, transactions — sans mot de passe hashé ni jeton de réinitialisation ; `format=csv&dataset=positions|history` renvoie les positions (+ ligne CASH) ou l'historique quotidien en CSV compatible Excel français (séparateur `;`, virgule décimale, BOM UTF-8, formules neutralisées). Réponse en pièce jointe, `Cache-Control: no-store`. Aucun appel aux API de cotation. Boutons sur la page « Mon profil ».
+
 ## Pistes (voir `docs/AMELIORATIONS.md`)
 
-- Route admin qui mesure, pour les tickers réellement détenus, quel provider les couvre (résultats à reporter ici).
+- Reporter ci-dessus les résultats de `GET /api/admin/coverage` en production.
 - Finnhub en fallback US, désactivé sans clé.
 - Fallback par région : suffixes `.PA`, `.AS`, `.DE`, `.L` → provider adapté à l'Europe.

@@ -12,6 +12,8 @@ import {
   Geography,
   ZoomableGroup,
 } from "react-simple-maps";
+import { shareSummary } from "@/lib/chartSummary";
+import { SkeletonRegion, SkeletonStat, SkeletonChart } from "../../components/ui/Skeleton";
 
 // URL de la carte du monde (TopoJSON)
 // Fond de carte servi par le site (world-atlas 2.0.2, Natural Earth) : pas de dépendance à un CDN externe
@@ -172,21 +174,23 @@ export default function GeographiePage() {
     return ((value / total) * 100).toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " %";
   };
 
-  // Obtenir la couleur selon la valeur (gradient vert)
+  // Couleurs de la carte (jetons DESIGN.md, lisibles en clair comme en sombre) :
+  // mer = surface-2, pays non détenus = gris neutre nettement distinct, pays détenus = accent
+  // dont l'opacité croît avec l'exposition (jamais sous 45 % pour rester bien visible).
+  const LAND = "rgb(var(--text-muted) / 0.35)";
+  const exposureFill = (level) => `rgb(var(--accent) / ${level})`;
+  const LEVELS = [0.45, 0.65, 0.85, 1];
+
   const getColor = (isoCode) => {
-    if (!isoCode) return "rgb(var(--surface-2))";
-    
+    if (!isoCode) return LAND;
     const countryData = geoData.countryList.find(c => c.isoCode === isoCode);
-    if (!countryData) return "rgb(var(--surface-2))";
+    if (!countryData || !(geoData.maxValue > 0)) return LAND;
 
     const intensity = countryData.valueBase / geoData.maxValue;
-    
-    // Gradient de vert emerald
-    if (intensity > 0.7) return "#059669"; // Très foncé
-    if (intensity > 0.4) return "#10B981"; // Foncé
-    if (intensity > 0.2) return "#34D399"; // Moyen
-    if (intensity > 0.1) return "#6EE7B7"; // Clair
-    return "#A7F3D0"; // Très clair
+    if (intensity > 0.7) return exposureFill(LEVELS[3]);
+    if (intensity > 0.4) return exposureFill(LEVELS[2]);
+    if (intensity > 0.15) return exposureFill(LEVELS[1]);
+    return exposureFill(LEVELS[0]);
   };
 
   return (
@@ -212,12 +216,14 @@ export default function GeographiePage() {
 
 
         {loading ? (
-          <div className="flex justify-center py-20">
-            <svg className="animate-spin h-10 w-10 text-accent" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
-          </div>
+          <SkeletonRegion label="Chargement de la répartition géographique…" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <SkeletonStat />
+              <SkeletonStat className="hidden md:block" />
+              <SkeletonStat className="hidden md:block" />
+            </div>
+            <SkeletonChart height="h-80" />
+          </SkeletonRegion>
         ) : (
           <div className="space-y-6">
             {/* KPI Cards */}
@@ -280,20 +286,31 @@ export default function GeographiePage() {
               <div className="mb-4 flex items-center gap-4 text-xs text-ink-muted">
                 <span>Exposition :</span>
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded" style={{ backgroundColor: "#A7F3D0" }}></div>
+                  <div className="w-4 h-4 rounded" style={{ backgroundColor: LAND }}></div>
+                  <span>Aucune</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded" style={{ backgroundColor: exposureFill(LEVELS[0]) }}></div>
                   <span>Faible</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded" style={{ backgroundColor: "#10B981" }}></div>
+                  <div className="w-4 h-4 rounded" style={{ backgroundColor: exposureFill(LEVELS[2]) }}></div>
                   <span>Moyenne</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded" style={{ backgroundColor: "#059669" }}></div>
+                  <div className="w-4 h-4 rounded" style={{ backgroundColor: exposureFill(LEVELS[3]) }}></div>
                   <span>Élevée</span>
                 </div>
               </div>
 
               <div className="relative bg-surface-2 rounded-lg overflow-hidden" style={{ height: "500px" }}>
+                <div
+                  role="img"
+                  aria-label={`Carte du monde de l'exposition par pays : ${shareSummary(
+                    geoData.countryList.map((c) => ({ label: c.country, value: c.valueBase }))
+                  )}. Le détail est dans le tableau par pays.`}
+                  className="h-full"
+                >
                 <ComposableMap
                   projection="geoMercator"
                   projectionConfig={{
@@ -311,12 +328,12 @@ export default function GeographiePage() {
                             <Geography
                               key={geo.rsmKey}
                               geography={geo}
-                              strokeWidth={0.5}
+                              strokeWidth={0.6}
                               style={{
                                 // Couleurs en style (et non en attribut) pour suivre les jetons clair/sombre
-                                default: { fill: getColor(isoCode), stroke: "rgb(var(--surface))", outline: "none" },
-                                hover: { fill: "#F59E0B", outline: "none", cursor: "pointer" },
-                                pressed: { fill: getColor(isoCode), outline: "none" }
+                                default: { fill: getColor(isoCode), stroke: "rgb(var(--surface-2))", outline: "none" },
+                                hover: { fill: countryData ? "rgb(var(--warn))" : getColor(isoCode), stroke: "rgb(var(--surface-2))", outline: "none", cursor: countryData ? "pointer" : "default" },
+                                pressed: { fill: getColor(isoCode), stroke: "rgb(var(--surface-2))", outline: "none" }
                               }}
                               onMouseEnter={() => {
                                 if (countryData) {
@@ -337,6 +354,7 @@ export default function GeographiePage() {
                     </Geographies>
                   </ZoomableGroup>
                 </ComposableMap>
+                </div>
 
                 {/* Tooltip */}
                 {tooltipContent && (
@@ -357,12 +375,13 @@ export default function GeographiePage() {
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
+                  <caption className="sr-only">Répartition par pays : valeur, part du portefeuille et nombre d’actions.</caption>
                   <thead>
                     <tr className="border-b border-line">
-                      <th className="text-left py-3 px-4 text-sm font-semibold text-ink-muted">Pays</th>
-                      <th className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Valeur</th>
-                      <th className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">% Portfolio</th>
-                      <th className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Actions</th>
+                      <th scope="col" className="text-left py-3 px-4 text-sm font-semibold text-ink-muted">Pays</th>
+                      <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Valeur</th>
+                      <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">% Portfolio</th>
+                      <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Actions</th>
                     </tr>
                   </thead>
                   <tbody>

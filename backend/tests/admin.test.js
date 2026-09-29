@@ -3,6 +3,7 @@ const { test, describe, before, after, beforeEach } = require("node:test");
 const assert = require("node:assert/strict");
 const h = require("./helpers/setup");
 const priceUpdater = require("../jobs/updatePrices");
+const apiUsage = require("../services/apiUsage");
 
 before(h.start);
 after(h.stop);
@@ -13,6 +14,7 @@ const ROUTES = [
   ["GET", "/api/admin/stats"],
   ["GET", "/api/admin/health"],
   ["POST", "/api/admin/update-prices"],
+  ["GET", "/api/admin/coverage"],
 ];
 
 describe("Accès aux routes /api/admin", () => {
@@ -93,6 +95,101 @@ describe("Routes admin (connecté en administrateur)", () => {
     } finally {
       priceUpdater.runManual = original;
     }
+  });
+});
+
+describe("GET /api/admin/coverage (couverture des tickers par provider)", () => {
+  const now = Math.floor(Date.now() / 1000);
+  const chart = (symbol, price) => ({
+    meta: { currency: "USD", symbol, instrumentType: "EQUITY", regularMarketPrice: price, regularMarketTime: now, previousClose: price - 1 },
+    timestamp: [now],
+    indicators: { quote: [{ close: [price] }] },
+  });
+
+  // Portefeuilles écrits directement en base : aucun appel API avant la mesure
+  async function holdings(portfolios) {
+    for (const tickers of portfolios) {
+      const u = await h.registerUser();
+      await h.db.collection("users").updateOne(
+        { email: u.email },
+        { $set: { portfolio: tickers.map((ticker) => ({ ticker, quantity: 1, pru: 0 })) } }
+      );
+    }
+  }
+
+  test("teste chaque ticker détenu auprès de chaque provider, sans rien enregistrer", async () => {
+    const admin = await h.registerUser(ADMIN_EMAIL);
+    await holdings([["AAPL", "NVDA"], ["AAPL", "ZZZZ"]]);
+    h.fmp.notCovered.NVDA = true;
+    h.yahoo.charts.AAPL = chart("AAPL", 200);
+    h.yahoo.charts.NVDA = chart("NVDA", 180);
+
+    const res = await h.request("GET", "/api/admin/coverage", { token: admin.token });
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.providers, ["fmp", "yahoo"]);
+    assert.equal(res.body.totalHeld, 3);
+    assert.equal(res.body.truncated, false);
+    assert.equal(res.body.tickers[0].ticker, "AAPL", "les plus détenus d'abord");
+    assert.equal(res.body.tickers[0].holders, 2);
+
+    const byTicker = Object.fromEntries(res.body.tickers.map((t) => [t.ticker, t.results]));
+    assert.equal(byTicker.AAPL.fmp.status, "ok");
+    assert.equal(byTicker.AAPL.fmp.price, 200);
+    assert.equal(byTicker.NVDA.fmp.status, "not_covered", "402 FMP = hors offre");
+    assert.equal(byTicker.NVDA.yahoo.status, "ok");
+    assert.equal(byTicker.ZZZZ.yahoo.status, "not_covered");
+
+    assert.deepEqual(res.body.summary.fmp, { ok: 1, not_covered: 2, unsupported: 0, quota: 0, error: 0, tested: 3, coverage: 33.3 });
+    assert.equal(res.body.summary.yahoo.ok, 2);
+    assert.deepEqual(res.body.uncovered, ["ZZZZ"]);
+
+    // Un seul appel « quote » par ticker côté FMP (ni profil ni dividendes), rien d'écrit dans les prix
+    assert.deepEqual(h.fmp.calls.map((c) => c.endpoint), ["quote", "quote", "quote"]);
+    assert.equal((await h.db.collection("prices").find({}).toArray()).length, 0);
+  });
+
+  test("paramètres limit et providers, valeurs invalides refusées", async () => {
+    const admin = await h.registerUser(ADMIN_EMAIL);
+    await holdings([["AAPL", "MC.PA"]]);
+
+    const one = await h.request("GET", "/api/admin/coverage?limit=1&providers=fmp", { token: admin.token });
+    assert.equal(one.status, 200);
+    assert.deepEqual(one.body.providers, ["fmp"]);
+    assert.equal(one.body.tested, 1);
+    assert.equal(one.body.truncated, true);
+    assert.equal(h.yahoo.calls.length, 0, "Yahoo non interrogé");
+
+    for (const q of ["limit=0", "limit=201", "limit=abc", "providers=inconnu"]) {
+      const bad = await h.request("GET", `/api/admin/coverage?${q}`, { token: admin.token });
+      assert.equal(bad.status, 400, q);
+      assert.ok(bad.body.error, q);
+    }
+  });
+
+  test("quota atteint : le provider n'est plus appelé (statut quota)", async () => {
+    const admin = await h.registerUser(ADMIN_EMAIL);
+    await holdings([["AAPL", "MC.PA"]]);
+    const previous = process.env.FMP_DAILY_LIMIT;
+    process.env.FMP_DAILY_LIMIT = String((apiUsage.stats().fmp?.last24h || 0) + 1);
+    try {
+      const res = await h.request("GET", "/api/admin/coverage?providers=fmp", { token: admin.token });
+      assert.equal(res.status, 200);
+      assert.equal(res.body.summary.fmp.ok, 1);
+      assert.equal(res.body.summary.fmp.quota, 1);
+      assert.equal(res.body.summary.fmp.coverage, 100, "le quota n'entre pas dans le taux");
+      assert.equal(h.fmp.calls.length, 1);
+    } finally {
+      process.env.FMP_DAILY_LIMIT = previous;
+    }
+  });
+
+  test("aucun portefeuille : résultat vide", async () => {
+    const admin = await h.registerUser(ADMIN_EMAIL);
+    const res = await h.request("GET", "/api/admin/coverage", { token: admin.token });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.tested, 0);
+    assert.equal(res.body.summary.fmp.coverage, null);
+    assert.deepEqual(res.body.uncovered, []);
   });
 });
 

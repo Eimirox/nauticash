@@ -2,11 +2,11 @@ import { cx } from "./cx";
 
 const VARIANTS = {
   primary:
-    "bg-gradient-to-r from-emerald-600 to-blue-600 text-white shadow-sm hover:shadow-md hover:brightness-110 dark:from-emerald-500 dark:to-blue-500",
+    "bg-gradient-to-r from-emerald-700 to-blue-600 text-white shadow-sm hover:shadow-md hover:brightness-110",
   accent: "bg-accent text-on-accent hover:brightness-110",
   secondary: "bg-surface text-ink border border-line hover:bg-surface-2",
   ghost: "text-ink-muted hover:text-ink hover:bg-surface-2",
-  danger: "bg-loss/10 text-loss border border-loss/30 hover:bg-loss hover:text-white",
+  danger: "bg-loss/10 text-loss border border-loss/30 hover:bg-loss hover:text-on-accent",
 };
 
 const SIZES = {

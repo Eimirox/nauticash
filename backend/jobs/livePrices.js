@@ -20,6 +20,9 @@ class LivePrices {
     this.task = null;
     this.isRunning = false;
     this.stats = { runs: 0, refreshed: 0, failed: 0, skippedClosed: 0, lastRun: null, lastRefreshed: 0 };
+    // Diagnostic : dernière erreur par ticker (effacée au prochain succès), visible dans /api/admin/stats.
+    // Permet de voir pourquoi un cours reste figé (ex. symbole refusé par Yahoo).
+    this.errors = new Map(); // ticker -> { message, at, count }
   }
 
   start() {
@@ -80,8 +83,11 @@ class LivePrices {
         try {
           await priceStore.refreshTicker(ticker, { live: true, providers: ["yahoo"] });
           refreshed++;
+          this.errors.delete(ticker);
         } catch (err) {
           failed++;
+          const prev = this.errors.get(ticker);
+          this.errors.set(ticker, { message: err.message, at: new Date(), count: (prev?.count || 0) + 1 });
           // Limite Yahoo atteinte : on s'arrête pour cette minute
           if (/quota|429|rate/i.test(err.message)) break;
         }
@@ -102,7 +108,12 @@ class LivePrices {
   }
 
   getStats() {
-    return { ...this.stats, schedule: config.cron.livePrices.schedule, enabled: config.cron.livePrices.enabled };
+    return {
+      ...this.stats,
+      schedule: config.cron.livePrices.schedule,
+      enabled: config.cron.livePrices.enabled,
+      errors: Object.fromEntries(this.errors),
+    };
   }
 }
 

@@ -80,3 +80,42 @@ export async function apiFetch(path, { method = "GET", body, auth = true } = {})
 
   return data;
 }
+
+/**
+ * Télécharge un fichier servi par le backend (export CSV / JSON) avec le token.
+ * apiDownload("/api/user/export?format=csv", "nauticash-positions.csv")
+ */
+export async function apiDownload(path, filename) {
+  const token = getToken();
+  if (!token) {
+    logout();
+    throw new ApiError("Session expirée", 401);
+  }
+
+  let res;
+  try {
+    res = await fetch(`${API_BASE}${path}`, { headers: { Authorization: `Bearer ${token}` } });
+  } catch {
+    throw new ApiError("Impossible de joindre le serveur. Vérifiez votre connexion et réessayez.", 0);
+  }
+  if (res.status === 401) {
+    logout();
+    throw new ApiError("Session expirée", 401);
+  }
+  if (!res.ok) {
+    let message = `Erreur ${res.status}`;
+    try {
+      message = (await res.json()).error || message;
+    } catch {}
+    throw new ApiError(message, res.status);
+  }
+
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}

@@ -21,7 +21,7 @@ Les couleurs sont exposées en variables CSS (`app/globals.css`) puis mappées d
 | `--border` | Bordures, séparateurs | `#DDE3E1` | `#1F3B57` |
 | `--text` | Texte principal | `#0B1B2B` | `#E8EEF2` |
 | `--text-muted` | Texte secondaire | `#51606E` | `#9FB0BF` |
-| `--accent` | « Lagon » : action principale, liens, focus | emerald-600 `#059669` | emerald-400 `#34D399` |
+| `--accent` | « Lagon » : action principale, liens, focus | emerald-700 `#047857` (emerald-600 échouait au contraste AA : 3,5:1) | emerald-400 `#34D399` |
 | `--accent-2` | Bleu secondaire : graphiques, informations | blue-600 `#2563EB` | blue-400 `#60A5FA` |
 | `--gain` | Variation positive | `#15803D` | `#4ADE80` |
 | `--loss` | Variation négative | `#B91C1C` | `#F87171` |
@@ -29,8 +29,10 @@ Les couleurs sont exposées en variables CSS (`app/globals.css`) puis mappées d
 
 Règles :
 - Les couleurs gain/perte ne sont **jamais le seul indicateur** : toujours un signe (+ / −) ou une flèche ▲▼.
-- Le dégradé emerald → blue existant est réservé au logo et au bouton principal, un seul par écran.
+- Le dégradé emerald → blue (`from-emerald-700 to-blue-600`, texte blanc ≥ 5:1, identique en mode sombre) est réservé au logo et au bouton principal, un seul par écran.
+- Graphiques : une seule librairie, **recharts** (camemberts via `components/AllocationPie.js`) ; ne pas réintroduire Chart.js.
 - Graphiques : séries dans l'ordre accent, accent-2, puis teintes intermédiaires (teal, cyan, indigo, slate). Éviter le rouge/vert pour des catégories.
+- Tout graphique porte un résumé texte pour les lecteurs d'écran : conteneur `role="img"` + `aria-label` construit avec `frontend/lib/chartSummary.js` (répartition, tendance ou points haut/bas).
 
 ## Typographie
 
@@ -55,6 +57,7 @@ Composants de base dans `frontend/app/components/ui/` : `Card`, `Button`, `Stat`
 - **Badge** : type d'actif (Action, ETF, Crypto) avec couleurs douces et texte lisible.
 - **Modal** : confirmation d'action destructive ; focus piégé, fermeture par Échap.
 - **Toast** : succès / erreur / info, en bas à droite (bas centré sur mobile), disparition après 4 s, lu par les lecteurs d'écran (`role="status"`).
+- **Skeleton** (`ui/Skeleton.js`) : états de chargement des pages de données (portefeuille, analyses) — blocs `bg-surface-2` à la forme du contenu attendu (carte KPI, graphique, lignes de tableau, cartes mobiles), pulsation `motion-safe` uniquement, conteneur `SkeletonRegion` (`role="status"` + libellé masqué « Chargement de … »). La boussole reste réservée aux pages d'état (404, erreur).
 
 ## Mouvement
 
@@ -70,7 +73,9 @@ framer-motion est disponible. Animations **sobres** : apparition en fondu + 8 px
 ## Accessibilité (niveau AA)
 
 - Contraste texte ≥ 4,5:1 (≥ 3:1 pour les grands textes et les éléments d'interface).
-- Focus toujours visible : anneau `ring-2` couleur `--accent`, décalé de 2 px.
+- Focus toujours visible : anneau `ring-2` couleur `--accent`, décalé de 2 px. Règle globale dans `globals.css` (`outline` 2 px `--accent`) ; ne jamais mettre `focus:outline-none` sans anneau de remplacement (`focus-visible:ring-*` ou `focus-within:ring-*` sur le conteneur).
+- Lien d'évitement « Aller au contenu » (premier Tab, `app/layout.js`) vers `#contenu`, placé juste après l'en-tête (`AppHeader`) ou sur le `<main>` des pages sans en-tête.
+- Les couleurs de graphiques (séries, barres) doivent atteindre 3:1 ; le texte des montants utilise les jetons, jamais une couleur de série.
 - Boutons icônes avec `aria-label` ; champs avec `<label>` associé.
 - Textes en français, `lang="fr"`.
 
