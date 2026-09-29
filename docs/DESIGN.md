@@ -30,6 +30,7 @@ Les couleurs sont exposées en variables CSS (`app/globals.css`) puis mappées d
 Règles :
 - Les couleurs gain/perte ne sont **jamais le seul indicateur** : toujours un signe (+ / −) ou une flèche ▲▼.
 - Le dégradé emerald → blue (`from-emerald-700 to-blue-600`, texte blanc ≥ 5:1, identique en mode sombre) est réservé au logo et au bouton principal, un seul par écran.
+- Graphiques : une seule librairie, **recharts** (camemberts via `components/AllocationPie.js`) ; ne pas réintroduire Chart.js.
 - Graphiques : séries dans l'ordre accent, accent-2, puis teintes intermédiaires (teal, cyan, indigo, slate). Éviter le rouge/vert pour des catégories.
 - Tout graphique porte un résumé texte pour les lecteurs d'écran : conteneur `role="img"` + `aria-label` construit avec `frontend/lib/chartSummary.js` (répartition, tendance ou points haut/bas).
 

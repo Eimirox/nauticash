@@ -10,8 +10,7 @@ import DividendIncomeCard from "../components/DividendIncomeCard";
 import { estimateDividends } from "@/lib/dividendCalendar";
 import AppHeader from "../components/AppHeader";
 import Link from "next/link";
-import { Pie } from "react-chartjs-2";
-import Chart from "chart.js/auto";
+import AllocationPie from "../components/AllocationPie";
 import { formatCurrencySymbol } from "../portfolio/utils/formats";
 import PortfolioHistoryChart from "./PortfolioHistoryChart";
 import WealthHero from "../components/WealthHero";
@@ -165,17 +164,11 @@ export default function Analytics() {
   const typeLabels = Object.keys(totalsPerType);
   const countryRows = allocationByCountry(stocks, toBaseOrNull, 5);
   const dividendEstimate = summaryReady ? estimateDividends(stocks, inBase) : null;
-  const pieType = {
-    labels: typeLabels,
-    datasets: [
-      {
-        data: typeLabels.map((t) => totalsPerType[t]),
-        backgroundColor: typeLabels.map((t) => TYPE_COLORS[t] || TYPE_COLORS.Autres),
-        borderWidth: 2,
-        borderColor: "#fff",
-      },
-    ],
-  };
+  const pieType = typeLabels.map((t) => ({
+    label: t,
+    value: totalsPerType[t],
+    color: TYPE_COLORS[t] || TYPE_COLORS.Autres,
+  }));
 
   // Fonction pour obtenir la couleur d'un secteur
   const getSectorColor = (sector) => {
@@ -192,72 +185,22 @@ export default function Analytics() {
   const curLabels = Object.keys(portfolioTotalsByCurrency);
   // Parts comparées dans une même devise (sinon 1 000 ¥ pèseraient autant que 1 000 €)
   const curData = curLabels.map((c) => inBase(portfolioTotalsByCurrency[c], c));
-  const pieDevise = {
-    labels: curLabels,
-    datasets: [
-      {
-        data: curData,
-        backgroundColor: curLabels.map((c) => currencyColorMap[c] || "#9CA3AF"),
-        borderWidth: 2,
-        borderColor: "#fff",
-      },
-    ],
-  };
+  const pieDevise = curLabels.map((c, i) => ({
+    label: c,
+    value: curData[i],
+    color: currencyColorMap[c] || "#9CA3AF",
+  }));
 
   // Données Pie Secteur - COULEURS FIXES
   const secLabels = Object.keys(totalsPerSector);
   const secData = Object.values(totalsPerSector);
-  const pieSecteur = {
-    labels: secLabels,
-    datasets: [
-      {
-        data: secData,
-        backgroundColor: secLabels.map(getSectorColor),
-        borderWidth: 2,
-        borderColor: "#fff",
-      },
-    ],
-  };
+  const pieSecteur = secLabels.map((l, i) => ({ label: l, value: secData[i], color: getSectorColor(l) }));
 
   const numberFormatter = new Intl.NumberFormat("fr-FR", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
 
-  const pieOptions = {
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { 
-        position: "bottom",
-        labels: {
-          color: "#8A9AA9", // lisible en clair comme en sombre
-          padding: 15,
-          font: {
-            size: 12,
-            family: "'Inter', sans-serif"
-          }
-        }
-      },
-      tooltip: {
-        callbacks: {
-          label(ctx) {
-            const raw = ctx.parsed;
-            const formatted = numberFormatter.format(raw);
-            const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
-            const pct = total ? ((raw / total) * 100).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0";
-            // Mode discret : pourcentage seulement
-            if (document.documentElement.classList.contains("discreet")) return `${ctx.label} : ${pct} %`;
-            return `${ctx.label} : ${formatted} (${pct} %)`;
-          },
-        },
-        backgroundColor: "rgba(0, 0, 0, 0.8)",
-        padding: 12,
-        titleFont: { size: 14, weight: "bold" },
-        bodyFont: { size: 13 },
-        cornerRadius: 8,
-      },
-    },
-  };
 
   return (
     <main className="min-h-screen bg-bg">
@@ -441,7 +384,7 @@ export default function Analytics() {
                   }
                 >
                   {typeLabels.length > 0 ? (
-                    <Pie data={pieType} options={pieOptions} />
+                    <AllocationPie slices={pieType} />
                   ) : (
                     <p className="text-sm text-ink-muted">Aucune position pour le moment.</p>
                   )}
@@ -472,7 +415,7 @@ export default function Analytics() {
                   role="img"
                   aria-label={`Graphique circulaire, répartition par devise : ${shareSummary(curLabels.map((c, i) => ({ label: c, value: curData[i] })))}`}
                 >
-                  <Pie data={pieDevise} options={pieOptions} />
+                  <AllocationPie slices={pieDevise} />
                 </div>
               </div>
 
@@ -495,7 +438,7 @@ export default function Analytics() {
                   role="img"
                   aria-label={`Graphique circulaire, répartition par secteur : ${shareSummary(secLabels.map((l, i) => ({ label: l, value: secData[i] })))}`}
                 >
-                  <Pie data={pieSecteur} options={pieOptions} />
+                  <AllocationPie slices={pieSecteur} />
                 </div>
               </div>
 
