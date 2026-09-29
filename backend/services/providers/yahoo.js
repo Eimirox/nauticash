@@ -38,9 +38,19 @@ class YahooProvider {
     this.baseUrl = this.config.baseUrl;
   }
 
-  request(path, params) {
+  /**
+   * Appel Yahoo ; si le serveur principal refuse (401/403/429, 5xx ou coupure réseau),
+   * nouvel essai sur le second serveur (query2), qui applique ses propres limites.
+   */
+  async request(path, params) {
     const query = new URLSearchParams(params).toString();
-    return trackedFetchJson("yahoo", `${this.baseUrl}/${path}?${query}`, { headers: HEADERS });
+    try {
+      return await trackedFetchJson("yahoo", `${this.baseUrl}/${path}?${query}`, { headers: HEADERS });
+    } catch (error) {
+      const retriable = !error.status || [401, 403, 429].includes(error.status) || error.status >= 500;
+      if (!retriable || error.code === "QUOTA_EXCEEDED" || !this.config.fallbackUrl) throw error;
+      return trackedFetchJson("yahoo", `${this.config.fallbackUrl}/${path}?${query}`, { headers: HEADERS });
+    }
   }
 
   /** Résultats de recherche bruts (quotes Yahoo) */

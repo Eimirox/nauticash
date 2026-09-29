@@ -15,6 +15,8 @@ const ROUTES = [
   ["GET", "/api/admin/health"],
   ["POST", "/api/admin/update-prices"],
   ["GET", "/api/admin/coverage"],
+  ["GET", "/api/admin/diagnose/AAPL"],
+  ["POST", "/api/admin/refresh/AAPL"],
 ];
 
 describe("Accès aux routes /api/admin", () => {

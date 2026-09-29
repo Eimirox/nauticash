@@ -81,7 +81,7 @@ class LivePrices {
 
       for (const { ticker } of candidates) {
         try {
-          await priceStore.refreshTicker(ticker, { live: true, providers: ["yahoo"] });
+          await priceStore.refreshTicker(ticker, { live: true, providers: ["yahoo", "finnhub"] });
           refreshed++;
           this.errors.delete(ticker);
         } catch (err) {

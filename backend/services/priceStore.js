@@ -80,8 +80,22 @@ async function refreshTicker(ticker, { maxAgeMs = 0, ageField = "lastUpdate", li
   if (cached && maxAgeMs > 0 && refDate && Date.now() - new Date(refDate).getTime() < maxAgeMs) {
     return { doc: cached, fromCache: true };
   }
-  const quote = await priceService.getQuote(ticker, { forceRefresh: true, previous: cached, live, providers });
+  let quote;
+  try {
+    quote = await priceService.getQuote(ticker, { forceRefresh: true, previous: cached, live, providers });
+  } catch (error) {
+    // L'échec est mémorisé sur le titre (sans toucher au dernier cours connu) pour le diagnostic
+    // et pour signaler un cours non actualisé dans l'interface.
+    if (cached) {
+      await prices().updateOne(
+        { symbol: ticker },
+        { $set: { lastError: { message: String(error.message).slice(0, 300), at: new Date(), live: Boolean(live) } } }
+      );
+    }
+    throw error;
+  }
   const doc = await saveQuote(ticker, quote, cached);
+  if (cached?.lastError) await prices().updateOne({ symbol: ticker }, { $unset: { lastError: "" } });
   return { doc, fromCache: false };
 }
 

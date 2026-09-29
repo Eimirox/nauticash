@@ -45,9 +45,10 @@ const COUNTRY_CODES = {
   "CCC": "CRYPTO", // Crypto
 };
 
-// Code ISO2 (renvoyé par le backend) → continent
+// Code ISO2 → zone (secours si le backend n'a pas encore renvoyé « zone »)
 const CONTINENTS = {
-  ...Object.fromEntries(["US", "CA", "MX", "BR", "AR", "UY", "BM", "KY"].map((c) => [c, "Amérique"])),
+  ...Object.fromEntries(["US", "CA", "BM", "KY"].map((c) => [c, "Amérique du Nord"])),
+  ...Object.fromEntries(["MX", "BR", "AR", "UY"].map((c) => [c, "Amérique latine"])),
   ...Object.fromEntries(
     ["FR", "DE", "GB", "NL", "BE", "LU", "IE", "CH", "IT", "ES", "PT", "AT", "SE", "NO", "DK", "FI", "PL", "GR", "JE", "CY"].map((c) => [c, "Europe"])
   ),
@@ -95,7 +96,8 @@ export default function GeographiePage() {
         total: 0,
         countryList: [],
         maxValue: 0,
-        topContinent: "N/A"
+        topContinent: "N/A",
+        zoneList: []
       };
     }
 
@@ -106,6 +108,7 @@ export default function GeographiePage() {
     stocks.forEach(s => {
       // Pays normalisé par le backend (nom + code ISO numérique utilisé par la carte)
       const country = s.country || "Inconnu";
+      const zone = s.zone || CONTINENTS[s.countryCode] || (country === "Crypto" ? "Crypto" : "Autre");
       const isoCode = s.countryNumeric || COUNTRY_CODES[country] || (country === "Crypto" ? "CRYPTO" : null);
       
       const value = (s.close || 0) * (s.quantity || 0);
@@ -118,6 +121,7 @@ export default function GeographiePage() {
           country,
           isoCode,
           countryCode: s.countryCode || null,
+          zone,
           valueBase: 0,
           valueOriginal: 0,
           currency: s.currency,
@@ -143,21 +147,21 @@ export default function GeographiePage() {
     // Valeur max pour l'échelle de couleurs
     const maxValue = Math.max(...countryList.map(c => c.valueBase));
 
-    // Continent principal : somme des valeurs par continent
+    // Répartition par zone (Europe, Amérique du Nord, Monde pour les ETF monde…), fournie par le backend
     const byContinent = {};
-    for (const c of countryList) {
-      const continent = CONTINENTS[c.countryCode];
-      if (continent) byContinent[continent] = (byContinent[continent] || 0) + c.valueBase;
-    }
-    const topContinent =
-      Object.entries(byContinent).sort((a, b) => b[1] - a[1])[0]?.[0] || "N/A";
+    for (const c of countryList) byContinent[c.zone] = (byContinent[c.zone] || 0) + c.valueBase;
+    const zoneList = Object.entries(byContinent)
+      .map(([zone, value]) => ({ zone, value }))
+      .sort((a, b) => b.value - a.value);
+    const topContinent = zoneList.find((z) => z.zone !== "Crypto")?.zone || zoneList[0]?.zone || "N/A";
 
     return {
       byCountry,
       total,
       countryList,
       maxValue,
-      topContinent
+      topContinent,
+      zoneList
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stocks, rates, base]);
@@ -253,7 +257,7 @@ export default function GeographiePage() {
                 <p className="text-2xl font-bold text-blue-600 dark:text-sky-300">
                   {geoData.topContinent}
                 </p>
-                <p className="text-xs text-ink-muted">continent dominant</p>
+                <p className="text-xs text-ink-muted">zone dominante</p>
               </div>
 
               {/* Diversification */}
@@ -364,6 +368,34 @@ export default function GeographiePage() {
                 )}
               </div>
             </div>
+
+            {/* Répartition par zone */}
+            {geoData.zoneList.length > 0 && (
+              <div className="bg-surface border border-line rounded-xl shadow-lg p-6">
+                <h3 className="mb-4 text-lg font-bold text-ink">Répartition par zone</h3>
+                <ul className="space-y-3">
+                  {geoData.zoneList.map((z) => {
+                    const pct = geoData.total > 0 ? (z.value / geoData.total) * 100 : 0;
+                    return (
+                      <li key={z.zone}>
+                        <div className="mb-1 flex justify-between text-sm">
+                          <span className="font-medium text-ink">{z.zone}</span>
+                          <span className="tabular-nums text-ink-muted">
+                            <span className="money">{formatCurrency(z.value)}</span> · {pct.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %
+                          </span>
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-surface-2">
+                          <div className="h-full rounded-full bg-accent" style={{ width: `${Math.max(pct, 1)}%` }} />
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <p className="mt-3 text-[11px] text-ink-muted">
+                  Les ETF sont rattachés à l&apos;indice qu&apos;ils suivent (S&amp;P 500 → États-Unis, MSCI World → Monde…) et non à leur place de cotation.
+                </p>
+              </div>
+            )}
 
             {/* Tableau Top Pays */}
             <div className="bg-surface border border-line rounded-xl shadow-lg p-6">

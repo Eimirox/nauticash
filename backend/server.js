@@ -138,6 +138,72 @@ app.get("/api/admin/coverage", async (req, res) => {
   }
 });
 
+// Diagnostic d'un titre : cours enregistré vs réponse en direct de chaque fournisseur
+// (GET /api/admin/diagnose/NVDA). Consomme au plus 1 à 3 appels par fournisseur.
+app.get("/api/admin/diagnose/:ticker", async (req, res) => {
+  const ticker = String(req.params.ticker || "").trim().toUpperCase();
+  if (!/^[A-Z0-9.\-^=]{1,20}$/.test(ticker)) return res.status(400).json({ error: "Ticker invalide." });
+  try {
+    const priceStore = require("./services/priceStore");
+    const { isMarketOpen } = require("./services/marketHours");
+    const stored = await priceStore.getCached(ticker);
+    const providers = {};
+    for (const [name, provider] of Object.entries(priceService.providers)) {
+      if (!provider.supportsTickerType(ticker)) {
+        providers[name] = { ok: false, skipped: "type de titre non couvert par ce fournisseur" };
+        continue;
+      }
+      const started = Date.now();
+      try {
+        const q = await provider.getQuote(ticker, { previous: stored });
+        providers[name] = {
+          ok: true,
+          ms: Date.now() - started,
+          price: q.price ?? q.close,
+          previousClose: q.previousClose ?? null,
+          currency: q.currency,
+          marketTime: q.marketTime || null,
+          exchange: q.exchange || null,
+          name: q.name || null,
+          diffWithStoredPct:
+            stored?.close > 0 && (q.price ?? q.close) > 0 ? (((q.price ?? q.close) - stored.close) / stored.close) * 100 : null,
+        };
+      } catch (err) {
+        providers[name] = { ok: false, ms: Date.now() - started, status: err.status || null, code: err.code || null, error: err.message };
+      }
+    }
+    const ageMinutes = stored?.lastUpdate ? Math.round((Date.now() - new Date(stored.lastUpdate).getTime()) / 60000) : null;
+    res.json({
+      ticker,
+      marketOpen: isMarketOpen(ticker, stored?.type),
+      stored: stored
+        ? {
+            close: stored.close, previousClose: stored.previousClose, currency: stored.currency, source: stored.source,
+            marketTime: stored.marketTime, lastUpdate: stored.lastUpdate, fullUpdateAt: stored.fullUpdateAt,
+            ageMinutes, lastError: stored.lastError || null, fmpNotCoveredAt: stored.fmpNotCoveredAt || null,
+            name: stored.name, type: stored.type, sector: stored.sector, country: stored.country,
+            dividend: stored.dividend, dividendFrequency: stored.dividendFrequency, exDividendDate: stored.exDividendDate,
+          }
+        : null,
+      providers,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Actualisation complète d'un titre, sans délai d'attente (POST /api/admin/refresh/NVDA)
+app.post("/api/admin/refresh/:ticker", async (req, res) => {
+  const ticker = String(req.params.ticker || "").trim().toUpperCase();
+  if (!/^[A-Z0-9.\-^=]{1,20}$/.test(ticker)) return res.status(400).json({ error: "Ticker invalide." });
+  try {
+    const { doc } = await require("./services/priceStore").refreshTicker(ticker);
+    res.json({ ticker, close: doc.close, previousClose: doc.previousClose, currency: doc.currency, source: doc.source, marketTime: doc.marketTime, lastUpdate: doc.lastUpdate });
+  } catch (error) {
+    res.status(502).json({ ticker, error: error.message });
+  }
+});
+
 // Forcer une actualisation manuelle (admin uniquement)
 app.post("/api/admin/update-prices", async (req, res) => {
   try {
@@ -291,6 +357,8 @@ const startServer = async () => {
       console.log("   GET    /api/admin/health");
       console.log("   GET    /api/admin/coverage");
       console.log("   POST   /api/admin/update-prices");
+      console.log("   GET    /api/admin/diagnose/:ticker");
+      console.log("   POST   /api/admin/refresh/:ticker");
       console.log("");
 
       // Afficher la prochaine exécution du cron
