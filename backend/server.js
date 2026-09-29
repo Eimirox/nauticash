@@ -147,6 +147,7 @@ app.get("/api/admin/diagnose/:ticker", async (req, res) => {
     const priceStore = require("./services/priceStore");
     const { isMarketOpen } = require("./services/marketHours");
     const stored = await priceStore.getCached(ticker);
+    const storedCount = (await require("mongoose").connection.collection("prices").find({ symbol: ticker }).toArray()).length;
     const providers = {};
     for (const [name, provider] of Object.entries(priceService.providers)) {
       if (!provider.supportsTickerType(ticker)) {
@@ -176,6 +177,7 @@ app.get("/api/admin/diagnose/:ticker", async (req, res) => {
     res.json({
       ticker,
       marketOpen: isMarketOpen(ticker, stored?.type),
+      storedDocuments: storedCount,
       stored: stored
         ? {
             close: stored.close, previousClose: stored.previousClose, currency: stored.currency, source: stored.source,
@@ -270,6 +272,14 @@ const startServer = async () => {
   try {
     // 1. Connexion à MongoDB
     await connectDB();
+
+    // 1 bis. Fiches de prix en double (ancienne version : une fiche par ticker et par jour)
+    try {
+      const removed = await require("./services/priceStore").dedupeAll();
+      if (removed) console.log(`🧹 ${removed} ancienne(s) fiche(s) de prix en double supprimée(s)`);
+    } catch (err) {
+      console.error("❌ Nettoyage des doublons de prix :", err.message);
+    }
 
     // 2. Vérifier la configuration des providers
     console.log("\n" + "=".repeat(60));

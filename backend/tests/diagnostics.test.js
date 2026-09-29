@@ -134,3 +134,49 @@ describe("Zones et exposition des ETF", () => {
     assert.deepEqual([by["TTE.PA"].country, by["TTE.PA"].zone], ["France", "Europe"]);
   });
 });
+
+describe("Anciennes fiches de prix en double (une par jour, version 2025)", () => {
+  const priceStore = require("../services/priceStore");
+
+  async function seedLegacy() {
+    // Deux vieilles fiches sans lastUpdate (script Python : { symbol, date, close })
+    await h.db.collection("prices").insertOne({ symbol: "TTE.PA", date: "2025-05-10", close: 50.1 });
+    await h.db.collection("prices").insertOne({ symbol: "TTE.PA", date: "2025-05-11", close: 52.52 });
+  }
+
+  test("l'actualisation écrit dans une seule fiche, supprime les doublons, et le portefeuille affiche le bon cours", async () => {
+    await seedLegacy();
+    h.fmp.notCovered["TTE.PA"] = true;
+    h.yahoo.charts["TTE.PA"] = chart(58.4, 57.9);
+    const { token, email } = await h.registerUser();
+    await h.db.collection("users").updateOne({ email }, { $set: { portfolio: [{ ticker: "TTE.PA", quantity: 10, pru: 50 }] } });
+
+    await priceStore.refreshTicker("TTE.PA");
+    const docs = await h.db.collection("prices").find({ symbol: "TTE.PA" }).toArray();
+    assert.equal(docs.length, 1, "une seule fiche reste");
+    const [s] = (await h.request("GET", "/api/user/portfolio", { token })).body.stocks;
+    assert.equal(s.close, 58.4);
+    assert.equal(s.previousClose, 57.9);
+    assert.ok(s.priceTime, "le cours est daté");
+    assert.equal(s.source, "yahoo");
+  });
+
+  test("sans actualisation, la lecture prend la fiche la plus récente", async () => {
+    await seedLegacy();
+    await h.db.collection("prices").insertOne({ symbol: "TTE.PA", close: 58, lastUpdate: new Date(), source: "yahoo" });
+    const doc = await priceStore.getCached("TTE.PA");
+    assert.equal(doc.close, 58);
+    const [many] = await priceStore.getCachedMany(["TTE.PA"]);
+    assert.equal(many.close, 58);
+  });
+
+  test("dedupeAll supprime les doublons au démarrage", async () => {
+    await seedLegacy();
+    await h.db.collection("prices").insertOne({ symbol: "V", close: 360, lastUpdate: new Date() });
+    const removed = await priceStore.dedupeAll();
+    assert.equal(removed, 1);
+    const tte = await h.db.collection("prices").find({ symbol: "TTE.PA" }).toArray();
+    assert.equal(tte.length, 1);
+    assert.equal(tte[0].date, "2025-05-11", "la plus récente est gardée");
+  });
+});
