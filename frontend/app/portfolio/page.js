@@ -701,6 +701,10 @@ export default function Portfolio() {
                   <td className="px-6 py-4 text-right">
                     <input
                       type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="any"
+                      aria-label={`Quantité ${stock.ticker}`}
                       key={`qty-${stock.ticker}-${stock.quantity}`}
                       defaultValue={stock.quantity}
                       onBlur={(e) => {
@@ -722,6 +726,10 @@ export default function Portfolio() {
                   <td className="px-6 py-4 text-right">
                     <input
                       type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="any"
+                      aria-label={`Prix de revient unitaire ${stock.ticker}`}
                       key={`pru-${stock.ticker}-${stock.pru}`}
                       defaultValue={stock.pru}
                       onBlur={(e) => {
@@ -866,8 +874,9 @@ export default function Portfolio() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {error && (
-          <div className="mb-6 p-4 bg-loss/10 border border-loss/30 rounded-lg flex items-start gap-3">
+          <div role="alert" className="mb-6 p-4 bg-loss/10 border border-loss/30 rounded-lg flex items-start gap-3">
             <svg
+              aria-hidden="true"
               className="w-5 h-5 text-loss mt-0.5 flex-shrink-0"
               fill="currentColor"
               viewBox="0 0 20 20"
@@ -942,7 +951,10 @@ export default function Portfolio() {
           ))}
 
           <button
+            type="button"
             onClick={() => setShowCashSection(!showCashSection)}
+            aria-expanded={showCashSection}
+            aria-controls="cash-section"
             className="relative p-5 bg-gradient-to-br from-emerald-50 to-blue-50 dark:from-accent/10 dark:to-accent-2/10 border-2 border-dashed border-accent/40 rounded-xl hover:border-accent/50 transition-all group"
           >
             <div className="flex items-center justify-between">
@@ -955,6 +967,7 @@ export default function Portfolio() {
                 </p>
               </div>
               <svg
+                aria-hidden="true"
                 className={`w-5 h-5 text-accent transition-transform ${
                   showCashSection ? "rotate-180" : ""
                 }`}
@@ -974,9 +987,10 @@ export default function Portfolio() {
         </div>
 
         {showCashSection && (
-          <div className="mb-6 p-5 bg-gradient-to-br from-emerald-50 to-blue-50 dark:from-accent/10 dark:to-accent-2/10 border border-accent/40 rounded-xl animate-fade-in-up">
+          <section id="cash-section" aria-labelledby="cash-title" aria-describedby="cash-hint" className="mb-6 p-5 bg-gradient-to-br from-emerald-50 to-blue-50 dark:from-accent/10 dark:to-accent-2/10 border border-accent/40 rounded-xl animate-fade-in-up">
             <div className="flex items-center gap-2 mb-4">
               <svg
+                aria-hidden="true"
                 className="w-5 h-5 text-accent"
                 fill="currentColor"
                 viewBox="0 0 20 20"
@@ -988,20 +1002,24 @@ export default function Portfolio() {
                   clipRule="evenodd"
                 />
               </svg>
-              <h3 className="text-sm font-bold text-ink">
+              <h3 id="cash-title" className="text-sm font-bold text-ink">
                 Gérer le cash disponible
               </h3>
-              <span className="text-xs text-ink-muted">
+              <span id="cash-hint" className="text-xs text-ink-muted">
                 (Optionnel - Non inclus dans les totaux de positions)
               </span>
             </div>
             <div className="flex flex-wrap gap-4">
               <div>
-                <label className="block text-xs font-medium text-ink mb-1.5">
+                <label htmlFor="cash-amount" className="block text-xs font-medium text-ink mb-1.5">
                   Montant
                 </label>
                 <input
+                  id="cash-amount"
                   type="number"
+                  inputMode="decimal"
+                  step="any"
+                  aria-describedby="cash-kind"
                   value={cash.amount}
                   onChange={(e) => {
                     const newVal = parseFloat(e.target.value) || 0;
@@ -1013,10 +1031,11 @@ export default function Portfolio() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-ink mb-1.5">
+                <label htmlFor="cash-currency" className="block text-xs font-medium text-ink mb-1.5">
                   Devise
                 </label>
                 <select
+                  id="cash-currency"
                   value={cash.currency}
                   onChange={(e) => {
                     const newCurrency = e.target.value;
@@ -1032,19 +1051,19 @@ export default function Portfolio() {
                 </select>
               </div>
               <div className="flex items-end">
-                <div className="flex items-center gap-2 px-3 py-2 bg-surface/60 rounded-lg text-xs text-ink-muted">
-                  <span className="text-base">
+                <div id="cash-kind" className="flex items-center gap-2 px-3 py-2 bg-surface/60 rounded-lg text-xs text-ink-muted">
+                  <span aria-hidden="true" className="text-base">
                     {cash.amount < 0 ? "💸" : "💰"}
                   </span>
                   {cash.amount < 0 ? "Dette" : "Épargne"}
                 </div>
               </div>
             </div>
-          </div>
+          </section>
         )}
 
         {/* Add Stock */}
-        <div className="mb-6 flex flex-wrap items-center gap-3 p-4 bg-surface border border-line rounded-xl shadow">
+        <div role="group" aria-label="Ajouter une position" className="mb-6 flex flex-wrap items-center gap-3 p-4 bg-surface border border-line rounded-xl shadow">
           <TickerSearch
             value={ticker}
             onChange={setTicker}
@@ -1053,12 +1072,15 @@ export default function Portfolio() {
             existing={stocks.map((s) => s.ticker)}
           />
           <button
+            type="button"
             onClick={() => addStock()}
             disabled={adding}
+            aria-busy={adding}
             className="disabled:opacity-50 disabled:cursor-wait px-5 py-2 bg-gradient-to-r from-emerald-700 to-blue-600 text-white text-sm font-semibold rounded-lg hover:shadow-lg hover:scale-105 transition-all"
           >
             <span className="flex items-center gap-2">
               <svg
+                aria-hidden="true"
                 className="w-4 h-4"
                 fill="none"
                 stroke="currentColor"

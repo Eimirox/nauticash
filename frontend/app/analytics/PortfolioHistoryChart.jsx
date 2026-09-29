@@ -288,10 +288,14 @@ export default function PortfolioHistoryChart() {
 
         <div className="flex items-center gap-2">
           <button
+            type="button"
             onClick={() => setShowManualEdit(!showManualEdit)}
+            aria-expanded={showManualEdit}
+            aria-controls="manual-snapshot"
             className="px-4 py-2 bg-surface border-2 border-line text-ink text-sm font-medium rounded-lg hover:bg-surface-2 transition-all flex items-center gap-2"
           >
             <svg
+              aria-hidden="true"
               className="w-4 h-4"
               fill="none"
               stroke="currentColor"
@@ -363,16 +367,17 @@ export default function PortfolioHistoryChart() {
 
       {/* Édition manuelle */}
       {showManualEdit && (
-        <div className="mb-6 p-4 bg-surface-2 border border-line rounded-lg">
-          <h4 className="text-sm font-semibold text-ink mb-3">
+        <div id="manual-snapshot" className="mb-6 p-4 bg-surface-2 border border-line rounded-lg">
+          <h4 id="manual-snapshot-title" className="text-sm font-semibold text-ink mb-3">
             Ajouter/Modifier
           </h4>
-          <form onSubmit={saveManualSnapshot} className="flex flex-wrap gap-3">
+          <form onSubmit={saveManualSnapshot} aria-labelledby="manual-snapshot-title" className="flex flex-wrap gap-3">
             <div>
-              <label className="block text-xs font-medium text-ink mb-1">
-                Date
+              <label htmlFor="manual-date" className="block text-xs font-medium text-ink mb-1">
+                Mois
               </label>
               <input
+                id="manual-date"
                 type="month"
                 value={manualForm.date}
                 onChange={(e) =>
@@ -383,11 +388,13 @@ export default function PortfolioHistoryChart() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-ink mb-1">
+              <label htmlFor="manual-value" className="block text-xs font-medium text-ink mb-1">
                 Valeur (€)
               </label>
               <input
+                id="manual-value"
                 type="number"
+                inputMode="decimal"
                 step="0.01"
                 value={manualForm.value}
                 onChange={(e) =>
@@ -402,7 +409,8 @@ export default function PortfolioHistoryChart() {
               <button
                 type="submit"
                 disabled={loading}
-                className="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition"
+                aria-busy={loading}
+                className="px-4 py-2 bg-emerald-700 text-white text-sm font-medium rounded-lg hover:bg-emerald-800 transition"
               >
                 Sauvegarder
               </button>
