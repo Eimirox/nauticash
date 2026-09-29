@@ -362,7 +362,7 @@ export default function Portfolio() {
     if (sort.key !== k) return "";
     if (sort.dir === "asc")
       return (
-        <svg className="inline w-4 h-4 ml-1" fill="currentColor" viewBox="0 0 20 20">
+        <svg aria-hidden="true" className="inline w-4 h-4 ml-1" fill="currentColor" viewBox="0 0 20 20">
           <path
             fillRule="evenodd"
             d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z"
@@ -372,7 +372,7 @@ export default function Portfolio() {
       );
     if (sort.dir === "desc")
       return (
-        <svg className="inline w-4 h-4 ml-1" fill="currentColor" viewBox="0 0 20 20">
+        <svg aria-hidden="true" className="inline w-4 h-4 ml-1" fill="currentColor" viewBox="0 0 20 20">
           <path
             fillRule="evenodd"
             d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
@@ -540,7 +540,9 @@ export default function Portfolio() {
                     {stock.myDividendYield != null && ` · ${nf2.format(stock.myDividendYield)} %`}
                   </span>
                   <button
+                    type="button"
                     onClick={() => removeStock(stock.ticker)}
+                    aria-label={`Supprimer ${stock.ticker}`}
                     className="rounded-lg border border-loss/30 bg-loss/10 px-3 py-2 text-xs font-medium text-loss transition hover:bg-loss hover:text-white"
                   >
                     Supprimer
@@ -554,66 +556,63 @@ export default function Portfolio() {
     </div>
   );
 
+  // En-tête triable : bouton focusable au clavier + état annoncé via aria-sort
+  const sortableTh = (k, label) => {
+    const active = sort.key === k && sort.dir !== SORT_DIR.NONE;
+    const ariaSort = active ? (sort.dir === SORT_DIR.ASC ? "ascending" : "descending") : "none";
+    return (
+      <th
+        scope="col"
+        aria-sort={ariaSort}
+        className="px-6 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider"
+      >
+        <button
+          type="button"
+          onClick={() => toggleSort(k)}
+          className="uppercase tracking-wider font-semibold hover:text-accent transition select-none"
+        >
+          {label} {caret(k)}
+          <span className="sr-only">
+            {active ? (sort.dir === SORT_DIR.ASC ? " (tri croissant)" : " (tri décroissant)") : " (trier)"}
+          </span>
+        </button>
+      </th>
+    );
+  };
+
   // Composant Tableau (écrans ≥ 768 px) + cartes sur mobile
   const TableContent = () => (
     <>
     <MobileCards />
     <div className="hidden md:block overflow-x-auto">
       <table className="w-full">
+        <caption className="sr-only">
+          Positions du portefeuille : prix, variation du jour, quantité, PRU, performance, dividende, rendement et total. Les colonnes avec un bouton peuvent être triées.
+        </caption>
         <thead className="bg-surface-2 border-b-2 border-line">
           <tr>
-            <th className="px-6 py-4 text-left text-xs font-semibold text-ink uppercase tracking-wider">
+            <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-ink uppercase tracking-wider">
               Titre
             </th>
-            <th className="px-6 py-4 text-left text-xs font-semibold text-ink uppercase tracking-wider">
+            <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-ink uppercase tracking-wider">
               Pays
             </th>
-            <th className="px-6 py-4 text-left text-xs font-semibold text-ink uppercase tracking-wider">
+            <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-ink uppercase tracking-wider">
               Type
             </th>
-            <th
-              className="px-6 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider cursor-pointer hover:text-accent transition select-none"
-              onClick={() => toggleSort("price")}
-            >
-              Prix {caret("price")}
-            </th>
-            <th
-              className="px-6 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider cursor-pointer hover:text-accent transition select-none"
-              onClick={() => toggleSort("day")}
-            >
-              Jour {caret("day")}
-            </th>
-            <th className="px-6 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider">
+            {sortableTh("price", "Prix")}
+            {sortableTh("day", "Jour")}
+            <th scope="col" className="px-6 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider">
               Quantité
             </th>
-            <th className="px-6 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider">
+            <th scope="col" className="px-6 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider">
               PRU
             </th>
-            <th
-              className="px-6 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider cursor-pointer hover:text-accent transition select-none"
-              onClick={() => toggleSort("performance")}
-            >
-              Performance {caret("performance")}
-            </th>
-            <th
-              className="px-6 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider cursor-pointer hover:text-accent transition select-none"
-              onClick={() => toggleSort("dividend")}
-            >
-              Dividende {caret("dividend")}
-            </th>
-            <th
-              className="px-6 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider cursor-pointer hover:text-accent transition select-none"
-              onClick={() => toggleSort("yield")}
-            >
-              Rendement {caret("yield")}
-            </th>
-            <th
-              className="px-6 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider cursor-pointer hover:text-accent transition select-none"
-              onClick={() => toggleSort("total")}
-            >
-              Total {caret("total")}
-            </th>
-            <th className="px-6 py-4 text-xs font-semibold text-ink uppercase tracking-wider">
+            {sortableTh("performance", "Performance")}
+            {sortableTh("dividend", "Dividende")}
+            {sortableTh("yield", "Rendement")}
+            {sortableTh("total", "Total")}
+            <th scope="col" className="px-6 py-4 text-xs font-semibold text-ink uppercase tracking-wider">
               Actions
             </th>
           </tr>
@@ -778,7 +777,9 @@ export default function Portfolio() {
                   </td>
                   <td className="px-6 py-4">
                     <button
+                      type="button"
                       onClick={() => removeStock(stock.ticker)}
+                      aria-label={`Supprimer ${stock.ticker}`}
                       className="px-3 py-2 bg-loss/10 text-loss border border-loss/30 rounded-lg hover:bg-loss hover:text-white transition-all text-sm font-medium"
                     >
                       Supprimer
@@ -837,10 +838,11 @@ export default function Portfolio() {
             Mes Positions - Mode Plein Écran
           </h2>
           <button
+            type="button"
             onClick={() => setFullscreenTable(false)}
             className="px-4 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-all flex items-center gap-2"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg aria-hidden="true" className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
             Fermer
@@ -1144,11 +1146,13 @@ export default function Portfolio() {
                 {stocks.length} {stocks.length > 1 ? "positions" : "position"}
               </span>
               <button
+                type="button"
                 onClick={() => setFullscreenTable(true)}
                 className="hidden md:flex px-3 py-1.5 bg-white/10 text-white text-xs font-medium rounded-lg hover:bg-white/20 transition-all items-center gap-1.5"
                 title="Mode plein écran"
+                aria-label="Afficher le tableau en plein écran"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg aria-hidden="true" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
                 </svg>
                 <span className="hidden sm:inline">Plein écran</span>

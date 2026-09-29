@@ -398,13 +398,14 @@ export default function PerformancePage() {
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
+                  <caption className="sr-only">Performance mensuelle : valeur de début, valeur de fin, performance en pourcentage et montant.</caption>
                   <thead>
                     <tr className="border-b border-line">
-                      <th className="text-left py-3 px-4 text-sm font-semibold text-ink-muted">Période</th>
-                      <th className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Valeur Début</th>
-                      <th className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Valeur Fin</th>
-                      <th className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Performance</th>
-                      <th className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Montant</th>
+                      <th scope="col" className="text-left py-3 px-4 text-sm font-semibold text-ink-muted">Période</th>
+                      <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Valeur Début</th>
+                      <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Valeur Fin</th>
+                      <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Performance</th>
+                      <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Montant</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -442,14 +443,15 @@ export default function PerformancePage() {
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
+                  <caption className="sr-only">Performance annuelle : valeur de début, valeur de fin, performance en pourcentage et montant.</caption>
                   <thead>
                     <tr className="border-b border-line">
-                      <th className="text-left py-3 px-4 text-sm font-semibold text-ink-muted">Année</th>
-                      <th className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Valeur Début</th>
-                      <th className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Valeur Fin</th>
-                      <th className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Performance</th>
-                      <th className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Montant</th>
-                      <th className="text-center py-3 px-4 text-sm font-semibold text-ink-muted">Mois</th>
+                      <th scope="col" className="text-left py-3 px-4 text-sm font-semibold text-ink-muted">Année</th>
+                      <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Valeur Début</th>
+                      <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Valeur Fin</th>
+                      <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Performance</th>
+                      <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Montant</th>
+                      <th scope="col" className="text-center py-3 px-4 text-sm font-semibold text-ink-muted">Mois</th>
                     </tr>
                   </thead>
                   <tbody>

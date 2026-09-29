@@ -266,6 +266,8 @@ export default function PortfolioHistoryChart() {
           {availableYears.map((year) => (
             <button
               key={year}
+              type="button"
+              aria-pressed={selectedYears.includes(year)}
               onClick={() => toggleYear(year)}
               className={`px-3 py-1.5 text-sm font-medium rounded-lg border-2 transition-all ${
                 selectedYears.includes(year)

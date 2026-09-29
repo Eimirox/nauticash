@@ -363,12 +363,13 @@ export default function GeographiePage() {
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
+                  <caption className="sr-only">Répartition par pays : valeur, part du portefeuille et nombre d’actions.</caption>
                   <thead>
                     <tr className="border-b border-line">
-                      <th className="text-left py-3 px-4 text-sm font-semibold text-ink-muted">Pays</th>
-                      <th className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Valeur</th>
-                      <th className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">% Portfolio</th>
-                      <th className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Actions</th>
+                      <th scope="col" className="text-left py-3 px-4 text-sm font-semibold text-ink-muted">Pays</th>
+                      <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Valeur</th>
+                      <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">% Portfolio</th>
+                      <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
