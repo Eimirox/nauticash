@@ -8,6 +8,7 @@ import { estimateDividends, FREQUENCY_LABELS } from "@/lib/dividendCalendar";
 import DividendCalendar from "../../components/DividendCalendar";
 import TickerLogo from "../../components/TickerLogo";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { barsSummary } from "@/lib/chartSummary";
 import { formatCurrencySymbol } from "../../portfolio/utils/formats";
 import AppHeader from "../../components/AppHeader";
 import { useRouter } from "next/navigation";
@@ -249,7 +250,14 @@ export default function DividendesPage() {
                   <h3 className="text-lg font-bold text-ink">Revenus attendus sur 12 mois</h3>
                   <p className="text-xs text-ink-muted">Par mois de détachement, en {base} (estimation)</p>
                 </div>
-                <div className="money-chart h-56">
+                <div
+                  className="money-chart h-56"
+                  role="img"
+                  aria-label={`Histogramme des dividendes attendus par mois sur 12 mois : ${barsSummary(
+                    dividendData.months.map((m) => ({ label: m.label, value: m.total })),
+                    (v) => formatCurrency(v, base)
+                  )}`}
+                >
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={dividendData.months} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#94A3B8" strokeOpacity={0.25} vertical={false} />

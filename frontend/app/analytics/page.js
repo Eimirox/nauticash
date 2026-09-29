@@ -16,6 +16,7 @@ import { formatCurrencySymbol } from "../portfolio/utils/formats";
 import PortfolioHistoryChart from "./PortfolioHistoryChart";
 import WealthHero from "../components/WealthHero";
 import { wealthSummary, allocationByType, allocationByCountry } from "@/lib/wealth";
+import { shareSummary } from "@/lib/chartSummary";
 
 // Types d'actif : ordre des séries de DESIGN.md (accent, accent-2, teintes intermédiaires)
 const TYPE_COLORS = {
@@ -435,7 +436,15 @@ export default function Analytics() {
                   </svg>
                   <h3 className="text-lg font-bold text-ink">Répartition par type d&apos;actif</h3>
                 </div>
-                <div style={{ height: 320 }}>
+                <div
+                  style={{ height: 320 }}
+                  role={typeLabels.length > 0 ? "img" : undefined}
+                  aria-label={
+                    typeLabels.length > 0
+                      ? `Graphique circulaire, répartition par type d'actif : ${shareSummary(typeLabels.map((t) => ({ label: t, value: totalsPerType[t] })))}`
+                      : undefined
+                  }
+                >
                   {typeLabels.length > 0 ? (
                     <Pie data={pieType} options={pieOptions} />
                   ) : (
@@ -463,7 +472,11 @@ export default function Analytics() {
                     Répartition par devise
                   </h3>
                 </div>
-                <div style={{ height: 320 }}>
+                <div
+                  style={{ height: 320 }}
+                  role="img"
+                  aria-label={`Graphique circulaire, répartition par devise : ${shareSummary(curLabels.map((c, i) => ({ label: c, value: curData[i] })))}`}
+                >
                   <Pie data={pieDevise} options={pieOptions} />
                 </div>
               </div>
@@ -482,7 +495,11 @@ export default function Analytics() {
                     Répartition par secteur
                   </h3>
                 </div>
-                <div style={{ height: 320 }}>
+                <div
+                  style={{ height: 320 }}
+                  role="img"
+                  aria-label={`Graphique circulaire, répartition par secteur : ${shareSummary(secLabels.map((l, i) => ({ label: l, value: secData[i] })))}`}
+                >
                   <Pie data={pieSecteur} options={pieOptions} />
                 </div>
               </div>

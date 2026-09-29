@@ -14,6 +14,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { trendSummary } from "@/lib/chartSummary";
 
 // Mapping mois anglais -> numéro
 const MONTH_MAP = {
@@ -254,6 +255,7 @@ export default function PortfolioHistoryChart() {
   };
 
   const hasData = history.length > 0 && selectedYears.length > 0;
+  const formatEuro = (v) => `${Number(v).toLocaleString("fr-FR", { maximumFractionDigits: 0 })} €`;
 
   return (
     <div>
@@ -487,6 +489,12 @@ export default function PortfolioHistoryChart() {
           </p>
         </div>
       ) : (
+        <div
+          role="img"
+          aria-label={`Histogramme de la valeur du portefeuille par mois. ${selectedYears
+            .map((year) => `${year} : ${trendSummary(chartData.map((m) => ({ label: m.month, value: m[`year${year}`] })), formatEuro)}`)
+            .join(". ")}.`}
+        >
         <ResponsiveContainer width="100%" height={400}>
           <BarChart data={chartData} barGap={4}>
             <CartesianGrid strokeDasharray="3 3" stroke="#94A3B8" strokeOpacity={0.25} />
@@ -518,6 +526,7 @@ export default function PortfolioHistoryChart() {
             ))}
           </BarChart>
         </ResponsiveContainer>
+        </div>
       )}
 
       {/* Astuce */}

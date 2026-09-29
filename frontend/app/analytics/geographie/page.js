@@ -12,6 +12,7 @@ import {
   Geography,
   ZoomableGroup,
 } from "react-simple-maps";
+import { shareSummary } from "@/lib/chartSummary";
 
 // URL de la carte du monde (TopoJSON)
 // Fond de carte servi par le site (world-atlas 2.0.2, Natural Earth) : pas de dépendance à un CDN externe
@@ -300,6 +301,13 @@ export default function GeographiePage() {
               </div>
 
               <div className="relative bg-surface-2 rounded-lg overflow-hidden" style={{ height: "500px" }}>
+                <div
+                  role="img"
+                  aria-label={`Carte du monde de l'exposition par pays : ${shareSummary(
+                    geoData.countryList.map((c) => ({ label: c.country, value: c.valueBase }))
+                  )}. Le détail est dans le tableau par pays.`}
+                  className="h-full"
+                >
                 <ComposableMap
                   projection="geoMercator"
                   projectionConfig={{
@@ -343,6 +351,7 @@ export default function GeographiePage() {
                     </Geographies>
                   </ZoomableGroup>
                 </ComposableMap>
+                </div>
 
                 {/* Tooltip */}
                 {tooltipContent && (
