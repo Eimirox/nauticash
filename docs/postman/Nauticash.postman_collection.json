@@ -1,0 +1,773 @@
+{
+  "info": {
+    "_postman_id": "2457b404-3291-4c76-81ba-f1b6640333f7",
+    "name": "Nauticash API",
+    "description": "Collection de tests de l'API Nauticash (backend Railway) et des fournisseurs de cours.\n\n1. Importez cette collection et l'environnement « Nauticash – Production ».\n2. Renseignez email et password dans l'environnement, puis lancez « Auth / Connexion » : le token est enregistré automatiquement.\n3. Les dossiers Admin nécessitent un compte listé dans ADMIN_EMAILS (Railway).\n4. Le dossier « Fournisseurs (appels directs) » interroge Yahoo / FMP / Finnhub sans passer par Nauticash, pour comparer.\n\nVoir docs/postman/README.md.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "0 · Santé",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health",
+            "description": "Le serveur répond (pas d'authentification).",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 2xx\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1 · Auth",
+      "item": [
+        {
+          "name": "Connexion",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/login",
+            "description": "Enregistre le token dans l'environnement.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 2xx\", () => pm.expect(pm.response.code).to.be.within(200, 299));",
+                  "const json = pm.response.json();",
+                  "if (json.token) { pm.environment.set(\"token\", json.token); console.log(\"Token enregistré dans l'environnement\"); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Créer un compte de test",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/register",
+            "description": "Mot de passe : 10 caractères min., majuscule, minuscule, chiffre, caractère spécial.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 2xx\", () => pm.expect(pm.response.code).to.be.within(200, 299));",
+                  "const json = pm.response.json();",
+                  "if (json.token) { pm.environment.set(\"token\", json.token); console.log(\"Token enregistré dans l'environnement\"); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Moi",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/auth/me",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 2xx\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2 · Portefeuille",
+      "item": [
+        {
+          "name": "Portefeuille (contrôle des cours)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/user/portfolio",
+            "description": "Affiche dans la console Postman un tableau ticker / prix / veille / date du cours / source / erreur, et vérifie que chaque cours est daté et actualisé."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 200\", () => pm.response.to.have.status(200));",
+                  "const { stocks = [] } = pm.response.json();",
+                  "const now = Date.now();",
+                  "const rows = stocks.map((s) => ({",
+                  "  ticker: s.ticker, prix: s.close, devise: s.currency, veille: s.previousClose, jour: s.dayChangePercent,",
+                  "  coteLe: s.priceTime, ageMin: s.priceTime ? Math.round((now - new Date(s.priceTime)) / 60000) : null,",
+                  "  place: s.exchange, zone: s.zone, indice: s.exposure, source: s.source, erreur: s.priceError,",
+                  "}));",
+                  "console.log(JSON.stringify(rows, null, 2));",
+                  "const tpl = `<style>table{border-collapse:collapse;font:13px sans-serif}td,th{border:1px solid #ccc;padding:4px 8px}th{background:#eee}.ko{background:#fdd}</style><table><tr>{{#each cols}}<th>{{this}}</th>{{/each}}</tr>{{#each rows}}<tr class=\"{{#if bad}}ko{{/if}}\">{{#each cells}}<td>{{this}}</td>{{/each}}</tr>{{/each}}</table>`;",
+                  "const cols = [\"Ticker\", \"Prix\", \"Devise\", \"Veille\", \"Jour %\", \"Coté le\", \"Âge (min)\", \"Place\", \"Zone\", \"Indice\", \"Source\", \"Erreur\"];",
+                  "pm.visualizer.set(tpl, { cols, rows: rows.map((r) => ({ bad: !r.coteLe || r.erreur || r.veille == null, cells: [r.ticker, r.prix, r.devise, r.veille, r.jour != null ? r.jour.toFixed(2) : \"—\", r.coteLe ? new Date(r.coteLe).toLocaleString(\"fr-FR\") : \"NON DATÉ\", r.ageMin, r.place, r.zone, r.indice || \"\", r.source, r.erreur || \"\"] })) });",
+                  "pm.test(\"Tous les titres ont un cours > 0\", () => pm.expect(stocks.filter((s) => !(s.close > 0)).map((s) => s.ticker)).to.eql([]));",
+                  "pm.test(\"Tous les cours sont datés\", () => pm.expect(stocks.filter((s) => !s.priceTime).map((s) => s.ticker)).to.eql([]));",
+                  "pm.test(\"Aucune actualisation en échec\", () => pm.expect(stocks.filter((s) => s.priceError).map((s) => `${s.ticker}: ${s.priceError}`)).to.eql([]));",
+                  "pm.test(\"Variation du jour connue (veille renseignée)\", () => pm.expect(stocks.filter((s) => s.type !== \"Crypto\" && s.previousClose == null).map((s) => s.ticker)).to.eql([]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ajouter {{ticker}}",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/user/portfolio",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ticker\": \"{{ticker}}\",\n  \"quantity\": 1,\n  \"pru\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 2xx\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Modifier quantité / PRU / enveloppe",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/user/portfolio/{{ticker}}",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 2,\n  \"pru\": 150,\n  \"account\": \"CTO\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 2xx\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Supprimer {{ticker}}",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/user/portfolio/{{ticker}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 2xx\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Actualiser mes cours (15 min entre deux)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/user/portfolio/force-refresh",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 2xx\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Statistiques",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/user/portfolio/stats",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 2xx\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cash",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/user/cash",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 1000,\n  \"currency\": \"EUR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 2xx\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3 · Marché",
+      "item": [
+        {
+          "name": "Recherche de titres (autocomplétion)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/market/search?q=nvidia",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 200\", () => pm.response.to.have.status(200));",
+                  "console.log(JSON.stringify(pm.response.json().results, null, 2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Taux de change BCE",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/fx",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 2xx\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Indices disponibles",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/market/benchmarks",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 2xx\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Historique CAC 40",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/market/benchmarks/CAC40",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 2xx\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4 · Historique et profil",
+      "item": [
+        {
+          "name": "Historique mensuel",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/user/history",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 2xx\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Historique quotidien (90 j)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/user/history/daily?days=90",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 2xx\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Profil",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/user/profile",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 2xx\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Modifier le profil",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/user/profile",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"baseCurrency\": \"EUR\",\n  \"discreetMode\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 2xx\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5 · Admin (ADMIN_EMAILS)",
+      "item": [
+        {
+          "name": "Diagnostic d'un titre",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/admin/diagnose/{{ticker}}",
+            "description": "Compare le cours enregistré avec la réponse en direct de chaque fournisseur (FMP, Finnhub, Yahoo). Consomme 1 à 3 appels FMP."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 200\", () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json();",
+                  "console.log(\"Marché ouvert :\", d.marketOpen, \"| enregistré :\", d.stored);",
+                  "const prov = Object.entries(d.providers).map(([p, r]) => ({ fournisseur: p, ok: r.ok, prix: r.price, veille: r.previousClose, devise: r.currency, ecartPct: r.diffWithStoredPct != null ? r.diffWithStoredPct.toFixed(2) : null, erreur: r.error || r.skipped || \"\" }));",
+                  "console.log(JSON.stringify(prov, null, 2));",
+                  "const tpl = `<style>table{border-collapse:collapse;font:13px sans-serif}td,th{border:1px solid #ccc;padding:4px 8px}th{background:#eee}.ko{background:#fdd}</style><table><tr>{{#each cols}}<th>{{this}}</th>{{/each}}</tr>{{#each rows}}<tr class=\"{{#if bad}}ko{{/if}}\">{{#each cells}}<td>{{this}}</td>{{/each}}</tr>{{/each}}</table>`;",
+                  "pm.visualizer.set(tpl, { cols: [\"Fournisseur\", \"OK\", \"Prix\", \"Veille\", \"Devise\", \"Écart vs enregistré (%)\", \"Erreur\"], rows: prov.map((r) => ({ bad: !r.ok, cells: [r.fournisseur, r.ok ? \"oui\" : \"non\", r.prix, r.veille, r.devise, r.ecartPct, r.erreur] })) });",
+                  "pm.test(\"Au moins un fournisseur répond\", () => pm.expect(Object.values(d.providers).some((r) => r.ok)).to.be.true);",
+                  "pm.test(\"Écart avec le cours enregistré < 2 %\", () => { const ok = Object.values(d.providers).filter((r) => r.ok && r.diffWithStoredPct != null); pm.expect(ok.every((r) => Math.abs(r.diffWithStoredPct) < 2)).to.be.true; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Actualiser un titre maintenant",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/admin/refresh/{{ticker}}",
+            "description": "Actualisation complète immédiate, sans délai d'attente."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 2xx\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Statistiques (quotas, jobs)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/admin/stats",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 2xx\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Couverture des fournisseurs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/admin/coverage",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 2xx\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Santé des fournisseurs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/admin/health",
+            "description": "Consomme 1 appel par fournisseur."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 2xx\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lancer l'actualisation complète",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/admin/update-prices",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 2xx\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6 · Fournisseurs (appels directs)",
+      "item": [
+        {
+          "name": "Yahoo – cours {{ticker}}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "https://query1.finance.yahoo.com/v8/finance/chart/{{ticker}}?range=5d&interval=1d",
+            "description": "Sans clé. Référence pour comparer avec le cours affiché dans Nauticash.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 200\", () => pm.response.to.have.status(200));",
+                  "const m = pm.response.json().chart.result[0].meta;",
+                  "console.log({ prix: m.regularMarketPrice, veille: m.chartPreviousClose, devise: m.currency, place: m.fullExchangeName, cotéLe: new Date(m.regularMarketTime * 1000).toLocaleString(\"fr-FR\") });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Yahoo – recherche",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "https://query1.finance.yahoo.com/v1/finance/search?q=nvidia&quotesCount=5&newsCount=0",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 2xx\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "FMP – cours {{ticker}}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "https://financialmodelingprep.com/stable/quote?symbol={{ticker}}&apikey={{fmpApiKey}}",
+            "description": "402 = symbole hors de l'offre gratuite FMP (normal pour beaucoup de titres, Yahoo prend alors le relais).",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 2xx\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Finnhub – cours {{ticker}}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "https://finnhub.io/api/v1/quote?symbol={{ticker}}&token={{finnhubApiKey}}",
+            "description": "Actions US uniquement (offre gratuite). c = cours, pc = clôture de la veille, t = horodatage.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Statut 2xx\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

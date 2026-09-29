@@ -53,19 +53,66 @@ function buildDoc(ticker, quote, previous = {}) {
   };
 }
 
+// L'ancienne version (script Python, 2025) enregistrait une fiche par ticker ET par jour :
+// plusieurs documents peuvent exister pour un même symbole. On retient toujours la fiche
+// la plus récente (lastUpdate, sinon ancien champ « date ») et on supprime les autres.
+const timeOf = (d) => {
+  const t = new Date(d?.lastUpdate || d?.date || 0).getTime();
+  return Number.isFinite(t) ? t : 0;
+};
+
+/** Fiche la plus fiable : celle actualisée par le code actuel (lastUpdate), la plus récente d'abord */
+function pickLatest(docs) {
+  let best = null;
+  for (const d of docs) {
+    if (!best) best = d;
+    else if (Boolean(d.lastUpdate) !== Boolean(best.lastUpdate)) best = d.lastUpdate ? d : best;
+    else if (timeOf(d) > timeOf(best)) best = d;
+  }
+  return best;
+}
+
 async function getCached(ticker) {
-  return prices().findOne({ symbol: ticker });
+  const docs = await prices().find({ symbol: ticker }).toArray();
+  return pickLatest(docs);
 }
 
 async function getCachedMany(tickers) {
   if (!tickers.length) return [];
-  return prices().find({ symbol: { $in: tickers } }).toArray();
+  const docs = await prices().find({ symbol: { $in: tickers } }).toArray();
+  const bySymbol = new Map();
+  for (const d of docs) bySymbol.set(d.symbol, pickLatest([bySymbol.get(d.symbol), d].filter(Boolean)));
+  return [...bySymbol.values()];
+}
+
+/** Supprime les fiches en double d'un symbole en gardant `keep` (ou la plus récente) */
+async function removeDuplicates(ticker, keep = null) {
+  const docs = await prices().find({ symbol: ticker }).toArray();
+  if (docs.length < 2) return 0;
+  const kept = keep ? docs.find((d) => String(d._id) === String(keep._id)) || pickLatest(docs) : pickLatest(docs);
+  const others = docs.filter((d) => String(d._id) !== String(kept._id)).map((d) => d._id);
+  if (!others.length) return 0;
+  const { deletedCount } = await prices().deleteMany({ _id: { $in: others } });
+  return deletedCount || 0;
+}
+
+/** Nettoyage global des doublons (lancé au démarrage du serveur) */
+async function dedupeAll() {
+  const docs = await prices().find({}).toArray();
+  const counts = new Map();
+  for (const d of docs) counts.set(d.symbol, (counts.get(d.symbol) || 0) + 1);
+  let removed = 0;
+  for (const [symbol, n] of counts) if (n > 1) removed += await removeDuplicates(symbol);
+  return removed;
 }
 
 async function saveQuote(ticker, quote, previous) {
   const old = previous === undefined ? await getCached(ticker) : previous;
   const doc = buildDoc(ticker, quote, old || {});
-  await prices().updateOne({ symbol: ticker }, { $set: doc }, { upsert: true });
+  // Écrit dans la fiche retenue (par son _id) pour ne pas mettre à jour un ancien doublon
+  const filter = old?._id ? { _id: old._id } : { symbol: ticker };
+  await prices().updateOne(filter, { $set: doc }, { upsert: true });
+  if (old?._id) await removeDuplicates(ticker, old);
   return doc;
 }
 
@@ -80,9 +127,23 @@ async function refreshTicker(ticker, { maxAgeMs = 0, ageField = "lastUpdate", li
   if (cached && maxAgeMs > 0 && refDate && Date.now() - new Date(refDate).getTime() < maxAgeMs) {
     return { doc: cached, fromCache: true };
   }
-  const quote = await priceService.getQuote(ticker, { forceRefresh: true, previous: cached, live, providers });
+  let quote;
+  try {
+    quote = await priceService.getQuote(ticker, { forceRefresh: true, previous: cached, live, providers });
+  } catch (error) {
+    // L'échec est mémorisé sur le titre (sans toucher au dernier cours connu) pour le diagnostic
+    // et pour signaler un cours non actualisé dans l'interface.
+    if (cached) {
+      await prices().updateOne(
+        { _id: cached._id },
+        { $set: { lastError: { message: String(error.message).slice(0, 300), at: new Date(), live: Boolean(live) } } }
+      );
+    }
+    throw error;
+  }
   const doc = await saveQuote(ticker, quote, cached);
+  if (cached?.lastError) await prices().updateOne({ _id: cached._id }, { $unset: { lastError: "" } });
   return { doc, fromCache: false };
 }
 
-module.exports = { buildDoc, getCached, getCachedMany, saveQuote, refreshTicker };
+module.exports = { pickLatest, removeDuplicates, dedupeAll, buildDoc, getCached, getCachedMany, saveQuote, refreshTicker };

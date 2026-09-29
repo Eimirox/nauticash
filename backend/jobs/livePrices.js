@@ -79,9 +79,24 @@ class LivePrices {
         .sort((a, b) => new Date(a.doc?.lastUpdate || 0) - new Date(b.doc?.lastUpdate || 0))
         .slice(0, maxPerRun);
 
+      // Fiches jamais actualisées par la version actuelle (anciennes données sans date) :
+      // actualisation complète immédiate, même marché fermé (3 par minute au plus).
+      const undated = tickers
+        .map((t) => ({ ticker: t, doc: bySymbol.get(t) }))
+        .filter(({ ticker, doc }) => (!doc || !doc.lastUpdate || !doc.marketTime) && !candidates.some((c) => c.ticker === ticker))
+        .slice(0, 3);
+      for (const { ticker } of undated) {
+        try {
+          await priceStore.refreshTicker(ticker, { providers: ["yahoo", "finnhub"] });
+          refreshed++;
+        } catch {
+          failed++;
+        }
+      }
+
       for (const { ticker } of candidates) {
         try {
-          await priceStore.refreshTicker(ticker, { live: true, providers: ["yahoo"] });
+          await priceStore.refreshTicker(ticker, { live: true, providers: ["yahoo", "finnhub"] });
           refreshed++;
           this.errors.delete(ticker);
         } catch (err) {

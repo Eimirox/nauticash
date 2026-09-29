@@ -402,7 +402,21 @@ export default function Portfolio() {
   // Heure de cotation sous le prix ; badge orange si le cours date de plus de 3 jours ouvrés
   const QuoteTime = ({ stock }) => {
     const f = quoteFreshness(stock.priceTime);
-    if (!f) return null;
+    const badge = "mt-1 inline-block whitespace-nowrap rounded-md border px-1.5 py-0.5 text-[11px] font-medium";
+    if (stock.priceError) {
+      return (
+        <span title={`Dernière actualisation en échec : ${stock.priceError}`} className={`${badge} border-loss/30 bg-loss/10 text-loss`}>
+          ⚠ non actualisé{f ? ` · ${f.label}` : ""}
+        </span>
+      );
+    }
+    if (!f) {
+      return (
+        <span title="Ce cours n'a pas de date : il sera actualisé en priorité." className={`${badge} border-warn/30 bg-warn/10 text-warn`}>
+          cours non daté
+        </span>
+      );
+    }
     return f.stale ? (
       <span title={f.title} className="mt-1 inline-block whitespace-nowrap rounded-md border border-warn/30 bg-warn/10 px-1.5 py-0.5 text-[11px] font-medium text-warn">
         cours du {f.label}
@@ -501,7 +515,7 @@ export default function Portfolio() {
                         <p className="truncate text-sm text-ink">{stock.name}</p>
                       )}
                       <p className="truncate text-xs text-ink-muted">
-                        {[stock.exchange, stock.currency, exchangeToCountry[stock.country] || stock.country].filter(Boolean).join(" · ")}
+                        {[stock.exchange, stock.currency, stock.zone, stock.exposure && `indice ${stock.exposure}`].filter(Boolean).join(" · ")}
                       </p>
                       <AccountSelect stock={stock} className="mt-1" />
                     </div>
@@ -598,7 +612,7 @@ export default function Portfolio() {
               Titre
             </th>
             <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-ink uppercase tracking-wider">
-              Pays
+              Zone
             </th>
             <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-ink uppercase tracking-wider">
               Type
@@ -662,8 +676,15 @@ export default function Portfolio() {
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-ink-muted">
-                    {exchangeToCountry[stock.country] || stock.country}
+                  <td className="min-w-[10rem] px-6 py-4 text-sm text-ink-muted">
+                    <span className="block font-medium text-ink">{stock.zone || exchangeToCountry[stock.country] || stock.country || "—"}</span>
+                    <span className="block text-xs text-ink-muted" title={stock.exposure ? `Exposition déduite de l'indice suivi (${stock.exposure}), cotation : ${stock.listingCountry}` : undefined}>
+                      {stock.exposure
+                        ? `${stock.country !== stock.zone ? stock.country + " · " : ""}indice ${stock.exposure}`
+                        : stock.zone && stock.country !== stock.zone
+                          ? stock.country
+                          : ""}
+                    </span>
                   </td>
                   <td className="px-6 py-4">{typeBadge(stock.type)}</td>
                   <td className="px-6 py-4 text-right text-ink font-medium">

@@ -93,6 +93,7 @@ module.exports = {
   yahoo: {
     enabled: process.env.YAHOO_ENABLED !== "false",
     baseUrl: process.env.YAHOO_BASE_URL || "https://query1.finance.yahoo.com",
+    fallbackUrl: process.env.YAHOO_FALLBACK_URL || "https://query2.finance.yahoo.com",
     limits: {
       free: {
         requestsPerDay: null,

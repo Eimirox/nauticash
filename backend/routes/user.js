@@ -8,6 +8,7 @@ const priceStore = require("../services/priceStore");
 const { validateProfilePatch, readProfile } = require("../services/profile");
 const { resolveCountry } = require("../services/countries");
 const { exchangeLabel, logoUrl } = require("../services/exchanges");
+const { zoneOf, etfExposure } = require("../services/zones");
 const { buildExport, CSV_DATASETS } = require("../services/accountExport");
 
 const MONTH_MS = 30.44 * 24 * 60 * 60 * 1000;
@@ -60,7 +61,21 @@ function countryFields(ticker, priceInfo = {}) {
     ticker,
     type: priceInfo.type,
   });
-  return { country: c.name, countryCode: c.code, countryNumeric: c.numeric };
+  // ETF : exposition réelle d'après l'indice suivi (S&P 500 → États-Unis, MSCI World → Monde…)
+  const etf = etfExposure(priceInfo.name, priceInfo.type);
+  if (etf) {
+    const byIndex = etf.country ? resolveCountry({ countryCode: etf.country }) : null;
+    return {
+      country: byIndex ? byIndex.name : etf.zone,
+      countryCode: byIndex ? byIndex.code : null,
+      countryNumeric: byIndex ? byIndex.numeric : null,
+      zone: etf.zone,
+      exposure: etf.label,
+      listingCountry: c.name,
+    };
+  }
+  const zone = c.name === "Crypto" ? "Crypto" : zoneOf(c.code);
+  return { country: c.name, countryCode: c.code, countryNumeric: c.numeric, zone, exposure: null, listingCountry: c.name };
 }
 
 function enrich(position, priceInfo) {
@@ -104,6 +119,12 @@ function enrich(position, priceInfo) {
     dayChangePercent,
     dayChangeValue: dayChange !== null ? dayChange * position.quantity : null,
     priceTime: priceInfo.marketTime || priceInfo.lastUpdate || null,
+    priceUpdatedAt: priceInfo.lastUpdate || null,
+    // Dernière tentative d'actualisation en échec (plus récente que le cours affiché)
+    priceError:
+      priceInfo.lastError && (!priceInfo.lastUpdate || new Date(priceInfo.lastError.at) > new Date(priceInfo.lastUpdate))
+        ? priceInfo.lastError.message
+        : null,
     dividend: priceInfo.dividend ?? null,
     dividendYield: priceInfo.dividendYield ?? null,
     dividendFrequency: priceInfo.dividendFrequency ?? null,

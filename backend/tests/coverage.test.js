@@ -239,3 +239,20 @@ describe("Actualisation intraday (jobs/livePrices.js)", () => {
     }
   });
 });
+
+describe("Fiches anciennes sans date", () => {
+  const live = require("../jobs/livePrices");
+  test("actualisées par le job minute même marché fermé", async () => {
+    h.fmp.notCovered["GTT.PA"] = true;
+    h.yahoo.charts["GTT.PA"] = { meta: { currency: "EUR", regularMarketPrice: 170, regularMarketTime: now, instrumentType: "EQUITY", exchangeName: "PAR", longName: "Gaztransport & Technigaz" }, timestamp: [now - 86400, now], indicators: { quote: [{ close: [167.1, 170] }] } };
+    await h.db.collection("prices").insertOne({ symbol: "GTT.PA", date: "2025-05-11", close: 167.1 });
+    const { email } = await h.registerUser();
+    await h.db.collection("users").updateOne({ email }, { $set: { portfolio: [{ ticker: "GTT.PA", quantity: 5, pru: 100 }] } });
+    await live.run(new Date("2026-09-27T12:00:00Z")); // dimanche : marché fermé
+    const docs = await h.db.collection("prices").find({ symbol: "GTT.PA" }).toArray();
+    assert.equal(docs.length, 1);
+    assert.equal(docs[0].close, 170);
+    assert.equal(docs[0].previousClose, 167.1);
+    assert.ok(docs[0].lastUpdate);
+  });
+});

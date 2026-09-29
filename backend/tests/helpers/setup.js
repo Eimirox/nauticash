@@ -82,6 +82,8 @@ const yahoo = {
   charts: {},       // symbole -> { meta, indicators?, events? }
   search: {},       // requête en minuscules -> tableau « quotes »
   failWith: null,
+  blockPrimary: null, // code HTTP renvoyé par query1 uniquement
+  hosts: [],
 };
 
 // Finnhub simulé : endpoint /quote uniquement
@@ -126,8 +128,11 @@ globalThis.fetch = async (input, init = {}) => {
     return jsonResponse(404, { error: "unknown endpoint" });
   }
 
-  if (url.hostname === "query1.finance.yahoo.com") {
+  if (url.hostname === "query1.finance.yahoo.com" || url.hostname === "query2.finance.yahoo.com") {
     if (yahoo.failWith) return jsonResponse(yahoo.failWith, { error: "simulated failure" });
+    // Serveur principal bloqué (ex. 429 depuis l'hébergeur) : seul query2 répond
+    if (yahoo.blockPrimary && url.hostname === "query1.finance.yahoo.com") return jsonResponse(yahoo.blockPrimary, { error: "blocked" });
+    yahoo.hosts.push(url.hostname);
     if (url.pathname.startsWith("/v8/finance/chart/")) {
       const symbol = decodeURIComponent(url.pathname.split("/").pop());
       yahoo.calls.push({ endpoint: "chart", symbol });
@@ -319,6 +324,8 @@ function resetState() {
   yahoo.charts = {};
   yahoo.search = {};
   yahoo.failWith = null;
+  yahoo.blockPrimary = null;
+  yahoo.hosts.length = 0;
   finnhub.calls.length = 0;
   finnhub.quotes = {};
   finnhub.failWith = null;

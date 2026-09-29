@@ -93,7 +93,16 @@ class PriceUpdater {
       }
 
       // 2. Prioriser les tickers (les plus populaires en premier)
-      const prioritizedTickers = await this.prioritizeTickers(allTickers);
+      let prioritizedTickers = await this.prioritizeTickers(allTickers);
+
+      // Titres sans cours daté ou dont la dernière actualisation a échoué : en premier
+      const docs = await priceStore.getCachedMany(prioritizedTickers);
+      const byTicker = new Map(docs.map((d) => [d.symbol, d]));
+      const needsFix = (t) => {
+        const d = byTicker.get(t);
+        return !d || !d.lastUpdate || !d.marketTime || Boolean(d.lastError);
+      };
+      prioritizedTickers = [...prioritizedTickers.filter(needsFix), ...prioritizedTickers.filter((t) => !needsFix(t))];
 
       // 3. Limiter au batch size si nécessaire
       const batchSize = config.cron.updatePrices.batchSize;
