@@ -5,7 +5,7 @@
 // utilise le rendement réel (rendement espéré corrigé de l'inflation) et suppose une épargne
 // mensuelle revalorisée chaque année comme les prix.
 
-import { monthsToReach, dateAfterMonths, capitalForIncome, realRate } from './projection.js';
+import { monthsToReach, dateAfterMonths, capitalForIncome, realRate, futureValue, monthlyContributionNeeded, monthsUntil } from './projection.js';
 
 export const DEFAULT_ASSUMPTIONS = Object.freeze({
   goalAmount: 1000000,
@@ -103,4 +103,71 @@ export function assumptionsPatch(saved = {}, next = {}) {
     if (Number(saved?.[key]) !== v || saved?.[key] === null || saved?.[key] === undefined) out[key] = v;
   }
   return out;
+}
+
+// ─── Courbe de projection (Objectifs 3/3) ───────────────────────────────────
+
+/**
+ * Scénarios de rendement autour du rendement espéré choisi (en %/an) :
+ * prudent = espéré − 3 (au moins 0), médian = espéré, optimiste = espéré + 2 → 3 / 6 / 8 % par défaut.
+ */
+export function scenarioRates(expectedReturn = DEFAULT_ASSUMPTIONS.expectedReturn) {
+  const r = Number.isFinite(num(expectedReturn)) ? num(expectedReturn) : DEFAULT_ASSUMPTIONS.expectedReturn;
+  return [
+    { key: 'prudent', label: 'Prudent', rate: Math.max(0, r - 3) },
+    { key: 'median', label: 'Médian', rate: r },
+    { key: 'optimiste', label: 'Optimiste', rate: r + 2 },
+  ];
+}
+
+/**
+ * Durée affichée par la courbe (en années) : jusqu'à l'arrivée du scénario médian + 3 ans,
+ * au moins 10 ans, au plus 50 ans ; 30 ans si l'objectif est hors d'atteinte.
+ */
+export function chartHorizonYears(medianMonths) {
+  if (medianMonths == null || !Number.isFinite(Number(medianMonths))) return 30;
+  return Math.min(50, Math.max(10, Math.ceil(Number(medianMonths) / 12) + 3));
+}
+
+/**
+ * Points annuels des trois scénarios, en euros d'aujourd'hui (rendement réel) :
+ * [{ year: 2026, prudent, median, optimiste }, …] (year = année civile, la première est l'année en cours).
+ */
+export function scenarioSeries({ current = 0, monthlySavings = 0, expectedReturn, inflationRate = 0, years = 30, now = new Date() } = {}) {
+  const scenarios = scenarioRates(expectedReturn);
+  const initial = Math.max(0, Number(current) || 0);
+  const monthly = Math.max(0, Number(monthlySavings) || 0);
+  const inf = (Number(inflationRate) || 0) / 100;
+  const total = Math.max(1, Math.min(100, Math.round(Number(years) || 0)));
+  const startYear = now.getFullYear();
+  const points = [];
+  for (let y = 0; y <= total; y += 1) {
+    const point = { year: startYear + y };
+    for (const s of scenarios) {
+      point[s.key] = futureValue({ initial, monthly, annualRate: realRate(s.rate / 100, inf), months: y * 12 });
+    }
+    points.push(point);
+  }
+  return points;
+}
+
+/**
+ * Épargne mensuelle nécessaire (euros d'aujourd'hui) pour atteindre `target` fin `targetYear`
+ * avec le rendement espéré. Renvoie { months, monthly } ; monthly = 0 si le capital suffit déjà ;
+ * null si l'année est passée ou invalide.
+ */
+export function savingsNeededBy({ current = 0, target, targetYear, expectedReturn = 0, inflationRate = 0, now = new Date() } = {}) {
+  const year = Math.round(num(targetYear));
+  if (!(Number(target) > 0) || !Number.isFinite(year)) return null;
+  const months = monthsUntil(new Date(year, 11, 31, 12), now);
+  if (!(months > 0)) return null;
+  const rate = realRate(Number(expectedReturn) / 100, Number(inflationRate) / 100);
+  const monthly = monthlyContributionNeeded({ initial: Math.max(0, Number(current) || 0), target: Number(target), annualRate: rate, months });
+  return monthly == null ? null : { months, monthly };
+}
+
+/** Année cible proposée : celle de l'échéance du profil si elle est à venir, sinon dans 15 ans. */
+export function defaultTargetYear(goalDate, now = new Date()) {
+  const y = goalDate ? Number(String(goalDate).slice(0, 4)) : NaN;
+  return Number.isFinite(y) && y > now.getFullYear() ? y : now.getFullYear() + 15;
 }

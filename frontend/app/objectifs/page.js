@@ -17,6 +17,7 @@ import {
 import AppHeader from "../components/AppHeader";
 import { Card, Button, useToast } from "../components/ui";
 import Skeleton, { SkeletonRegion } from "../components/ui/Skeleton";
+import ProjectionChart from "./ProjectionChart";
 
 const nf0 = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 });
 const nf1 = new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -264,6 +265,18 @@ export default function Objectifs() {
             )}
           </Card>
         </div>
+
+        {ready && (
+          <ProjectionChart
+            current={current}
+            goalAmount={values.goalAmount}
+            monthlySavings={Number(values.monthlySavings) || 0}
+            expectedReturn={Number(values.expectedReturn) || 0}
+            inflationRate={Number(values.inflationRate) || 0}
+            goalDate={profile?.goalDate}
+            symbol={symbol}
+          />
+        )}
       </div>
     </main>
   );

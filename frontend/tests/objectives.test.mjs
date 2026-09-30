@@ -78,3 +78,53 @@ test('enregistrement : seules les hypothèses modifiées sont envoyées', () => 
   assert.deepEqual(assumptionsPatch(saved, next), { incomeGoalMonthly: 2000, monthlySavings: 400 });
   assert.deepEqual(assumptionsPatch(saved, { ...saved, incomeGoalMonthly: undefined }), {});
 });
+
+// ─── Objectifs 3/3 : courbe de projection ───
+import { scenarioRates, chartHorizonYears, scenarioSeries, savingsNeededBy, defaultTargetYear } from '../lib/objectives.js';
+
+test('scénarios : 3 / 6 / 8 % par défaut, prudent jamais négatif', () => {
+  assert.deepEqual(scenarioRates(6).map((s) => s.rate), [3, 6, 8]);
+  assert.deepEqual(scenarioRates(1).map((s) => s.rate), [0, 1, 3]);
+  assert.deepEqual(scenarioRates(undefined).map((s) => s.key), ['prudent', 'median', 'optimiste']);
+});
+
+test('horizon de la courbe : arrivée médiane + 3 ans, bornée 10–50, 30 si hors d’atteinte', () => {
+  assert.equal(chartHorizonYears(null), 30);
+  assert.equal(chartHorizonYears(0), 10);
+  assert.equal(chartHorizonYears(20 * 12 + 1), 24);
+  assert.equal(chartHorizonYears(80 * 12), 50);
+});
+
+test('séries des scénarios : années civiles, ordre prudent < médian < optimiste', () => {
+  const pts = scenarioSeries({ current: 10000, monthlySavings: 0, expectedReturn: 6, inflationRate: 0, years: 10, now: NOW });
+  assert.equal(pts.length, 11);
+  assert.equal(pts[0].year, 2026);
+  assert.equal(pts[10].year, 2036);
+  assert.equal(pts[0].median, 10000);
+  assert.ok(Math.abs(pts[10].median - 10000 * 1.06 ** 10) < 0.01);
+  assert.ok(Math.abs(pts[10].prudent - 10000 * 1.03 ** 10) < 0.01);
+  assert.ok(pts[10].prudent < pts[10].median && pts[10].median < pts[10].optimiste);
+  // Inflation : le médian à 6 % avec 2 % d'inflation vaut moins en euros d'aujourd'hui
+  const real = scenarioSeries({ current: 10000, expectedReturn: 6, inflationRate: 2, years: 10, now: NOW });
+  assert.ok(real[10].median < pts[10].median);
+});
+
+test('épargne nécessaire pour une année cible', () => {
+  // Fin 2027 depuis le 30/09/2026 : 15 mois ; sans rendement, 15 000 € = 1 000 €/mois
+  const r = savingsNeededBy({ current: 0, target: 15000, targetYear: 2027, expectedReturn: 0, inflationRate: 0, now: NOW });
+  assert.equal(r.months, 15);
+  assert.ok(Math.abs(r.monthly - 1000) < 1e-9);
+  assert.equal(savingsNeededBy({ current: 20000, target: 15000, targetYear: 2030, now: NOW }).monthly, 0, 'déjà atteint');
+  assert.equal(savingsNeededBy({ current: 0, target: 15000, targetYear: 2025, now: NOW }), null, 'année passée');
+  assert.equal(savingsNeededBy({ current: 0, target: 0, targetYear: 2030, now: NOW }), null);
+  // Plus d'années ou plus de rendement → moins d'épargne
+  const a = savingsNeededBy({ current: 0, target: 1e6, targetYear: 2046, expectedReturn: 6, inflationRate: 2, now: NOW });
+  const b = savingsNeededBy({ current: 0, target: 1e6, targetYear: 2056, expectedReturn: 6, inflationRate: 2, now: NOW });
+  assert.ok(b.monthly < a.monthly);
+});
+
+test('année cible proposée : échéance du profil si future, sinon + 15 ans', () => {
+  assert.equal(defaultTargetYear('2040-06-30', NOW), 2040);
+  assert.equal(defaultTargetYear('2020-01-01', NOW), 2041);
+  assert.equal(defaultTargetYear(null, NOW), 2041);
+});
