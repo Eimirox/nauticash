@@ -3,7 +3,11 @@
 import { useState, useEffect } from "react";
 import { apiFetch } from "@/lib/api";
 import { useFxRates, toCurrency, ratePer, currencySymbol } from "@/lib/fx";
-import { useBaseCurrency } from "@/lib/profile";
+import { useBaseCurrency, useProfile } from "@/lib/profile";
+import { dashboardAlerts } from "@/lib/alerts";
+import DashboardAlerts from "../components/DashboardAlerts";
+import GoalGauge from "../components/GoalGauge";
+import EmergencyFund from "../components/EmergencyFund";
 import DividendIncomeCard from "../components/DividendIncomeCard";
 import { estimateDividends } from "@/lib/dividendCalendar";
 import AppHeader from "../components/AppHeader";
@@ -30,6 +34,7 @@ export default function TableauDeBord() {
   const { rates, date: fxDate, stale: fxStale } = useFxRates();
   // Montants convertis dans la devise de référence du profil (EUR par défaut)
   const base = useBaseCurrency();
+  const { profile } = useProfile();
   const baseSymbol = currencySymbol(base);
   const inBase = (value, currency) => toCurrency(value, currency, base, rates) ?? ((currency || "EUR") === base ? value : 0);
 
@@ -74,6 +79,10 @@ export default function TableauDeBord() {
   const typeLabels = Object.keys(totalsPerType);
   const countryRows = allocationByCountry(stocks, toBaseOrNull, 5);
   const dividendEstimate = summaryReady ? estimateDividends(stocks, inBase) : null;
+  // Cash dans la devise de référence (null tant que le taux est inconnu)
+  const cashInBase = toBaseOrNull(Number(cash.amount) || 0, cash.currency || "EUR");
+  const hasData = stocks.length > 0 || cash.amount !== 0;
+  const alerts = dashboardAlerts({ stocks, cashInBase, monthlyExpenses: profile?.monthlyExpenses });
   const pieType = typeLabels.map((t) => ({
     label: t,
     value: totalsPerType[t],
@@ -103,7 +112,7 @@ export default function TableauDeBord() {
             Tableau de bord
           </h1>
           <p className="text-ink-muted">
-            Votre patrimoine en un coup d'œil : valeur totale, variation du jour, évolution, dividendes et répartition en bref. Le détail est dans Analyses.
+            Votre patrimoine en un coup d'œil : synthèse, alertes, objectifs, évolution, dividendes et répartition en bref. Le détail est dans Analyses.
           </p>
         </div>
 
@@ -119,8 +128,33 @@ export default function TableauDeBord() {
                   <Skeleton className="h-4 w-36" />
                 </div>
               </SkeletonRegion>
-            ) : summaryReady && (stocks.length > 0 || cash.amount !== 0) && (
+            ) : summaryReady && hasData && (
               <WealthHero summary={summary} symbol={baseSymbol} base={base} />
+            )}
+
+            {/* Alertes : cours en échec / non datés / anciens, fonds de précaution insuffisant */}
+            {!loading && !loadError && hasData && <DashboardAlerts alerts={alerts} />}
+
+            {/* Objectifs en bref : objectif de patrimoine et fonds de précaution (profil) */}
+            {!loading && summaryReady && hasData && (
+              <section id="objectifs-en-bref" aria-labelledby="goals-brief-title" className="mb-8 scroll-mt-24">
+                <div className="mb-3 flex items-baseline justify-between gap-2">
+                  <h2 id="goals-brief-title" className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                    Objectifs en bref
+                  </h2>
+                  <Link href="/objectifs" className="text-sm font-medium text-accent hover:underline">
+                    Voir mes objectifs
+                  </Link>
+                </div>
+                <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
+                  <GoalGauge current={summary.total} goalAmount={profile?.goalAmount} goalDate={profile?.goalDate} symbol={baseSymbol} />
+                  {cash.amount >= 0 ? (
+                    <EmergencyFund cash={cashInBase ?? 0} monthlyExpenses={profile?.monthlyExpenses} symbol={baseSymbol} />
+                  ) : (
+                    <p className="text-sm text-ink-muted">Fonds de précaution : votre solde de cash est négatif (dette).</p>
+                  )}
+                </div>
+              </section>
             )}
 
             {/* Evolution Chart */}
