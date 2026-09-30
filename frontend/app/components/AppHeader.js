@@ -24,6 +24,7 @@ const ANALYSES = [
   { href: "/analyses/performance", label: "Performance" },
   { href: "/analyses/dividendes", label: "Dividendes" },
   { href: "/analyses/repartition", label: "Répartition" },
+  { href: "/analyses/frais", label: "Frais" },
 ];
 
 const NAV = [

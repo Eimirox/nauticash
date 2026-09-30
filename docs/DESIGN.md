@@ -72,7 +72,8 @@ framer-motion est disponible. Animations **sobres** : apparition en fondu + 8 px
 
 ## Navigation
 
-- Onglets de l'espace connecté (`AppHeader`) : **Tableau de bord** (`/tableau-de-bord`), **Portefeuille** (`/portfolio`), **Analyses ▾** (menu : Performance, Dividendes, Répartition sous `/analyses/…`), **Objectifs** (`/objectifs`), **Stratégie** (`/strategie`) ; « Mon profil » est l'avatar à droite.
+- Onglets de l'espace connecté (`AppHeader`) : **Tableau de bord** (`/tableau-de-bord`), **Portefeuille** (`/portfolio`), **Analyses ▾** (menu : Performance, Dividendes, Répartition, Frais sous `/analyses/…`), **Objectifs** (`/objectifs`), **Stratégie** (`/strategie`) ; « Mon profil » est l'avatar à droite.
+- Le Tableau de bord reste une synthèse (patrimoine, évolution, dividendes, répartition en bref) ; le détail vit dans Analyses (Répartition : zones, pays, types d'actif, devises, secteurs, diversification ; Frais : TER des ETF et fonds).
 - Le menu « Analyses » suit le motif *disclosure* (bouton `aria-expanded` + liste de liens, ↓/↑, Échap) ; sur mobile la liste est à plat dans la barre défilante.
 - Les anciennes adresses `/analytics/…` sont redirigées (`next.config.mjs`) ; un onglet pas encore construit utilise `ComingSoonPage` (« Bientôt »).
 

@@ -4,8 +4,6 @@ import { useState, useEffect } from "react";
 import { apiFetch } from "@/lib/api";
 import { useFxRates, toCurrency, ratePer, currencySymbol } from "@/lib/fx";
 import { useBaseCurrency } from "@/lib/profile";
-import DiversificationCard from "../components/DiversificationCard";
-import FeesCard from "../components/FeesCard";
 import DividendIncomeCard from "../components/DividendIncomeCard";
 import { estimateDividends } from "@/lib/dividendCalendar";
 import AppHeader from "../components/AppHeader";
@@ -15,82 +13,19 @@ import { formatCurrencySymbol } from "../portfolio/utils/formats";
 import PortfolioHistoryChart from "./PortfolioHistoryChart";
 import WealthHero from "../components/WealthHero";
 import { wealthSummary, allocationByType, allocationByCountry } from "@/lib/wealth";
+import { TYPE_COLORS } from "../components/AllocationBreakdown";
 import { shareSummary } from "@/lib/chartSummary";
 import Skeleton, { SkeletonRegion, SkeletonStat } from "../components/ui/Skeleton";
-
-// Types d'actif : ordre des séries de DESIGN.md (accent, accent-2, teintes intermédiaires)
-const TYPE_COLORS = {
-  "Actions": "#2563EB",
-  "ETF et fonds": "#059669",
-  "Crypto": "#0891B2",
-  "Cash": "#14B8A6",
-  "Autres": "#64748B",
-};
 
 // Pays : séries de DESIGN.md dans l'ordre, « Autres » en ardoise
 const COUNTRY_COLORS = ["#059669", "#2563EB", "#14B8A6", "#0891B2", "#4F46E5"];
 const OTHER_COLOR = "#64748B";
 
-// COULEURS SECTORIELLES FIXES - Optimisées pour contraste maximum
-const SECTOR_COLORS = {
-  // Technologie = VERT
-  "Technology": "#10B981",           // Vert emerald
-  "Communication Services": "#8B5CF6", // Violet (pas teal, trop proche vert)
-  "Information Technology": "#10B981",
-  
-  // Crypto = OR
-  "Cryptocurrency": "#F59E0B",       // Or/Amber
-  "Crypto": "#F59E0B",
-  
-  // Finance = INDIGO (pas bleu comme santé)
-  "Financial Services": "#4F46E5",   // Indigo
-  "Financial": "#4F46E5",
-  "Financials": "#4F46E5",
-  "Banks": "#6366F1",                // Indigo clair
-  "Insurance": "#818CF8",            // Indigo très clair
-  
-  // Santé = BLEU
-  "Healthcare": "#3B82F6",           // Bleu
-  "Health Care": "#3B82F6",
-  "Biotechnology": "#60A5FA",        // Bleu clair
-  
-  // Énergie = JAUNE
-  "Energy": "#EAB308",               // Jaune
-  "Oil & Gas": "#FBBF24",            // Jaune clair
-  
-  // Consommation = ORANGE
-  "Consumer Cyclical": "#F97316",    // Orange
-  "Consumer Defensive": "#FB923C",   // Orange clair
-  "Consumer Discretionary": "#F97316",
-  "Consumer Staples": "#FB923C",
-  
-  // Industrie = GRIS
-  "Industrials": "#6B7280",          // Gris
-  "Industrial": "#6B7280",
-  "Basic Materials": "#78716C",      // Gris-brun
-  "Materials": "#78716C",
-  
-  // Utilities = CYAN
-  "Utilities": "#06B6D4",            // Cyan
-  
-  // Immobilier = ROSE/MAGENTA
-  "Real Estate": "#EC4899",          // Rose vif
-  
-  // Cash & Dette
-  "Cash": "#22C55E",                 // Vert clair (différent de tech)
-  "Dette": "#EF4444",                // Rouge
-  
-  // Défaut
-  "Unknown": "#9CA3AF",              // Gris
-  "Other": "#9CA3AF",
-};
-
-export default function Analytics() {
+export default function TableauDeBord() {
   const [loadError, setLoadError] = useState(null);
   const [stocks, setStocks] = useState([]);
   const [cash, setCash] = useState({ amount: 0, currency: "EUR" });
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("vue");
   // Taux BCE servis par le backend : toutes les devises sont converties (pas seulement l'USD)
   const { rates, date: fxDate, stale: fxStale } = useFxRates();
   // Montants convertis dans la devise de référence du profil (EUR par défaut)
@@ -130,31 +65,6 @@ export default function Analytics() {
     return sum + inBase(val, s.currency);
   }, 0);
 
-  // Totaux par secteur dans la devise de référence
-  const totalsPerSector = stocks.reduce((acc, s) => {
-    const val = (s.close || 0) * (s.quantity || 0);
-    const valBase = inBase(val, s.currency);
-
-    if (s.composition && typeof s.composition === "object") {
-      // ETF avec composition { secteur: %, ... }
-      Object.entries(s.composition).forEach(([sect, pct]) => {
-        acc[sect] = (acc[sect] || 0) + (valBase * pct) / 100;
-      });
-    } else {
-      const sect =
-        s.sector && s.sector !== "Unknown" ? s.sector : String(s.type).toUpperCase() === "ETF" ? "ETF" : "Non renseigné";
-      acc[sect] = (acc[sect] || 0) + valBase;
-    }
-    return acc;
-  }, {});
-
-  // Ajout du cash comme secteur (converti dans la devise de référence)
-  if (!isNaN(cash?.amount) && cash?.currency && Math.abs(cash.amount) > 0) {
-    const sectorName = cash.amount < 0 ? "Dette" : "Cash";
-    const cashBase = inBase(Math.abs(cash.amount), cash.currency);
-    totalsPerSector[sectorName] = (totalsPerSector[sectorName] || 0) + cashBase;
-  }
-
   // Synthèse et répartition par type d'actif dans la devise de référence
   const toBaseOrNull = (value, currency) => toCurrency(value, currency, base, rates);
   const summary = wealthSummary(stocks, cash, toBaseOrNull);
@@ -169,32 +79,6 @@ export default function Analytics() {
     value: totalsPerType[t],
     color: TYPE_COLORS[t] || TYPE_COLORS.Autres,
   }));
-
-  // Fonction pour obtenir la couleur d'un secteur
-  const getSectorColor = (sector) => {
-    return SECTOR_COLORS[sector] || SECTOR_COLORS["Unknown"];
-  };
-
-  // Couleurs devises
-  const currencyColorMap = { 
-    USD: "#10B981", // Vert
-    EUR: "#3B82F6"  // Bleu
-  };
-
-  // Données Pie Devise (par devise ORIGINALE)
-  const curLabels = Object.keys(portfolioTotalsByCurrency);
-  // Parts comparées dans une même devise (sinon 1 000 ¥ pèseraient autant que 1 000 €)
-  const curData = curLabels.map((c) => inBase(portfolioTotalsByCurrency[c], c));
-  const pieDevise = curLabels.map((c, i) => ({
-    label: c,
-    value: curData[i],
-    color: currencyColorMap[c] || "#9CA3AF",
-  }));
-
-  // Données Pie Secteur - COULEURS FIXES
-  const secLabels = Object.keys(totalsPerSector);
-  const secData = Object.values(totalsPerSector);
-  const pieSecteur = secLabels.map((l, i) => ({ label: l, value: secData[i], color: getSectorColor(l) }));
 
   const numberFormatter = new Intl.NumberFormat("fr-FR", {
     minimumFractionDigits: 2,
@@ -219,13 +103,12 @@ export default function Analytics() {
             Tableau de bord
           </h1>
           <p className="text-ink-muted">
-            Votre patrimoine en un coup d'œil : valeur totale, variation du jour, évolution et répartition par type d'actif, devise, secteur et pays.
+            Votre patrimoine en un coup d'œil : valeur totale, variation du jour, évolution, dividendes et répartition en bref. Le détail est dans Analyses.
           </p>
         </div>
 
 
-        {activeTab === "vue" && (
-          <section>
+        <section>
             {/* Synthèse : valeur totale, cap du jour, depuis l'achat */}
             {loading ? (
               <SkeletonRegion label="Chargement de votre patrimoine…" className="mb-8 rounded-2xl border border-line bg-surface p-6 shadow-card">
@@ -335,34 +218,6 @@ export default function Analytics() {
             {/* Revenus de dividendes : revenu annuel estimé et prochain versement */}
             {!loading && <DividendIncomeCard estimate={dividendEstimate} portfolioValue={summary.invested} base={base} />}
 
-            {/* Score de diversification */}
-            <DiversificationCard
-              positions={stocks.map((s) => ({
-                ticker: s.ticker,
-                value: inBase((s.close || 0) * (s.quantity || 0), s.currency),
-                sector: s.sector,
-                country: s.country,
-                currency: s.currency,
-                type: s.type,
-                composition: s.composition,
-              }))}
-            />
-
-            {/* Frais des ETF et fonds */}
-            <FeesCard
-              symbol={baseSymbol}
-              positions={stocks.map((s) => ({
-                ticker: s.ticker,
-                name: s.name,
-                type: s.type,
-                fees: s.fees ?? null,
-                value: inBase((s.close || 0) * (s.quantity || 0), s.currency),
-              }))}
-              onFeesChange={(ticker, fees) =>
-                setStocks((prev) => prev.map((s) => (s.ticker === ticker ? { ...s, fees } : s)))
-              }
-            />
-
             {/* Charts */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
               {/* Répartition par type d'actif */}
@@ -391,57 +246,6 @@ export default function Analytics() {
                 </div>
               </div>
 
-              {/* Répartition Devise */}
-              <div className="bg-surface border border-line rounded-xl shadow-lg p-6">
-                <div className="flex items-center gap-2 mb-6">
-                  <svg
-                    className="w-5 h-5 text-accent"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z" />
-                    <path
-                      fillRule="evenodd"
-                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  <h3 className="text-lg font-bold text-ink">
-                    Répartition par devise
-                  </h3>
-                </div>
-                <div
-                  style={{ height: 320 }}
-                  role="img"
-                  aria-label={`Graphique circulaire, répartition par devise : ${shareSummary(curLabels.map((c, i) => ({ label: c, value: curData[i] })))}`}
-                >
-                  <AllocationPie slices={pieDevise} />
-                </div>
-              </div>
-
-              {/* Répartition Sectorielle */}
-              <div className="bg-surface border border-line rounded-xl shadow-lg p-6">
-                <div className="flex items-center gap-2 mb-6">
-                  <svg
-                    className="w-5 h-5 text-accent"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
-                  </svg>
-                  <h3 className="text-lg font-bold text-ink">
-                    Répartition par secteur
-                  </h3>
-                </div>
-                <div
-                  style={{ height: 320 }}
-                  role="img"
-                  aria-label={`Graphique circulaire, répartition par secteur : ${shareSummary(secLabels.map((l, i) => ({ label: l, value: secData[i] })))}`}
-                >
-                  <AllocationPie slices={pieSecteur} />
-                </div>
-              </div>
-
               {/* Répartition par pays : 5 premiers + autres */}
               <div className="bg-surface border border-line rounded-xl shadow-lg p-6">
                 <div className="flex items-center justify-between gap-2 mb-6">
@@ -452,7 +256,7 @@ export default function Analytics() {
                     <h3 className="text-lg font-bold text-ink">Répartition par pays</h3>
                   </div>
                   <Link href="/analyses/repartition" className="text-sm font-medium text-accent hover:underline">
-                    Voir la carte
+                    Voir la répartition
                   </Link>
                 </div>
                 {countryRows.length > 0 ? (
@@ -495,34 +299,7 @@ export default function Analytics() {
               </div>
             </div>
 
-          </section>
-        )}
-
-        {activeTab !== "vue" && (
-          <section>
-            <div className="bg-surface border border-line rounded-xl shadow-lg p-12 text-center">
-              <svg
-                className="w-16 h-16 mx-auto mb-4 text-ink-muted/40"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-                />
-              </svg>
-              <h3 className="text-xl font-bold text-ink mb-2">
-                Section en développement
-              </h3>
-              <p className="text-ink-muted">
-                Le contenu "{activeTab}" sera disponible prochainement.
-              </p>
-            </div>
-          </section>
-        )}
+        </section>
       </div>
     </main>
   );
