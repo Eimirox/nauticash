@@ -71,6 +71,8 @@ describe("PATCH /api/user/profile", () => {
       { displayName: "x".repeat(41) },
       { displayName: "<script>" },
       { homePage: "https://exemple.com" },
+      { homePage: "/analytics/inconnue" },
+      { homePage: "constructor" },
       { email: "pirate@exemple.fr" },
       { password: "Nouveau#123456" },
       {},
@@ -82,6 +84,25 @@ describe("PATCH /api/user/profile", () => {
     const stored = await h.db.collection("users").findOne({ email: u.email });
     assert.equal(stored.profile, undefined, "aucune écriture en base");
     assert.equal((await h.request("POST", "/api/auth/login", { body: { email: u.email, password: u.password } })).status, 200);
+  });
+
+  test("page d'accueil : nouvelles adresses acceptées, anciennes (/analytics…) converties", async () => {
+    const u = await h.registerUser();
+    const res = await patch(u.token, { homePage: "/tableau-de-bord" });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.profile.homePage, "/tableau-de-bord");
+
+    const legacy = await patch(u.token, { homePage: "/analytics/geographie" });
+    assert.equal(legacy.status, 200);
+    assert.equal(legacy.body.profile.homePage, "/analyses/repartition");
+    const stored = await h.db.collection("users").findOne({ email: u.email });
+    assert.equal(stored.profile.homePage, "/analyses/repartition", "enregistrée sous la nouvelle adresse");
+  });
+
+  test("page d'accueil enregistrée avant les onglets : relue sous la nouvelle adresse", async () => {
+    const u = await h.registerUser();
+    await h.db.collection("users").updateOne({ email: u.email }, { $set: { "profile.homePage": "/analytics" } });
+    assert.equal((await get(u.token)).body.profile.homePage, "/tableau-de-bord");
   });
 
   test("un utilisateur ne modifie que son propre profil", async () => {

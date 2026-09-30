@@ -216,7 +216,7 @@ export default function Analytics() {
         {/* Title */}
         <div className="mb-8">
           <h1 className="text-3xl md:text-4xl font-bold text-ink mb-2">
-            Vue d'ensemble
+            Tableau de bord
           </h1>
           <p className="text-ink-muted">
             Votre patrimoine en un coup d'œil : valeur totale, variation du jour, évolution et répartition par type d'actif, devise, secteur et pays.
@@ -451,7 +451,7 @@ export default function Analytics() {
                     </svg>
                     <h3 className="text-lg font-bold text-ink">Répartition par pays</h3>
                   </div>
-                  <Link href="/analytics/geographie" className="text-sm font-medium text-accent hover:underline">
+                  <Link href="/analyses/repartition" className="text-sm font-medium text-accent hover:underline">
                     Voir la carte
                   </Link>
                 </div>

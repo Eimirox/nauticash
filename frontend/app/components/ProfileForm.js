@@ -34,11 +34,11 @@ function Choice({ name, value, current, onChange, children }) {
 }
 
 const HOME_PAGES = [
+  ["/tableau-de-bord", "Tableau de bord"],
   ["/portfolio", "Portefeuille"],
-  ["/analytics", "Vue d'ensemble"],
-  ["/analytics/performance", "Performance"],
-  ["/analytics/dividendes", "Dividendes"],
-  ["/analytics/geographie", "Géographie"],
+  ["/analyses/performance", "Performance"],
+  ["/analyses/dividendes", "Dividendes"],
+  ["/analyses/repartition", "Répartition"],
 ];
 
 /**

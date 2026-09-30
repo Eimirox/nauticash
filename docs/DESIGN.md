@@ -70,6 +70,12 @@ framer-motion est disponible. Animations **sobres** : apparition en fondu + 8 px
 - Beaucoup d'espace : `gap-4` à `gap-6` entre cartes.
 - Mode clair et mode sombre : suivre la préférence du système, avec un bouton pour forcer l'un ou l'autre (mémorisé localement).
 
+## Navigation
+
+- Onglets de l'espace connecté (`AppHeader`) : **Tableau de bord** (`/tableau-de-bord`), **Portefeuille** (`/portfolio`), **Analyses ▾** (menu : Performance, Dividendes, Répartition sous `/analyses/…`), **Objectifs** (`/objectifs`), **Stratégie** (`/strategie`) ; « Mon profil » est l'avatar à droite.
+- Le menu « Analyses » suit le motif *disclosure* (bouton `aria-expanded` + liste de liens, ↓/↑, Échap) ; sur mobile la liste est à plat dans la barre défilante.
+- Les anciennes adresses `/analytics/…` sont redirigées (`next.config.mjs`) ; un onglet pas encore construit utilise `ComingSoonPage` (« Bientôt »).
+
 ## Accessibilité (niveau AA)
 
 - Contraste texte ≥ 4,5:1 (≥ 3:1 pour les grands textes et les éléments d'interface).

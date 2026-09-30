@@ -24,6 +24,10 @@ export const PUBLIC_PATHS = ["/", "/register", "/login", "/cgu", "/confidentiali
 // Pages privées ou sans intérêt pour les moteurs de recherche.
 export const PRIVATE_PATHS = [
   "/portfolio",
+  "/tableau-de-bord",
+  "/analyses",
+  "/objectifs",
+  "/strategie",
   "/analytics",
   "/profil",
   "/compte",

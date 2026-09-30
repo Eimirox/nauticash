@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout } from "@/lib/api";
@@ -17,17 +18,148 @@ function feedbackHref(pathname) {
   return `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
-// Navigation principale de l'espace connecté (voir docs/DESIGN.md)
+// Navigation principale de l'espace connecté (voir docs/DESIGN.md) :
+// Tableau de bord, Portefeuille, Analyses ▾ (menu), Objectifs, Stratégie ; « Mon profil » = avatar à droite.
+const ANALYSES = [
+  { href: "/analyses/performance", label: "Performance" },
+  { href: "/analyses/dividendes", label: "Dividendes" },
+  { href: "/analyses/repartition", label: "Répartition" },
+];
+
 const NAV = [
+  { href: "/tableau-de-bord", label: "Tableau de bord" },
   { href: "/portfolio", label: "Portefeuille" },
-  { href: "/analytics", label: "Vue d'ensemble", exact: true },
-  { href: "/analytics/performance", label: "Performance" },
-  { href: "/analytics/dividendes", label: "Dividendes" },
-  { href: "/analytics/geographie", label: "Géographie" },
+  { menu: "Analyses", base: "/analyses", items: ANALYSES },
+  { href: "/objectifs", label: "Objectifs" },
+  { href: "/strategie", label: "Stratégie" },
 ];
 
 function isActive(pathname, { href, exact }) {
   return exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
+}
+
+const tabClass = (active) =>
+  cx(
+    "whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+    active ? "bg-accent/10 text-accent" : "text-ink-muted hover:bg-surface-2 hover:text-ink"
+  );
+
+function NavLink({ item, pathname, className }) {
+  const active = isActive(pathname, item);
+  return (
+    <Link href={item.href} aria-current={active ? "page" : undefined} className={className ?? tabClass(active)}>
+      {item.label}
+    </Link>
+  );
+}
+
+/**
+ * Menu déroulant « Analyses ▾ » (motif « disclosure ») : bouton aria-expanded + liste de liens.
+ * Clavier : Entrée/Espace ouvre, ↓ ouvre et va au premier lien, ↑/↓ entre les liens,
+ * Échap referme et rend le focus au bouton ; se referme en quittant le menu ou en changeant de page.
+ */
+function NavMenu({ item, pathname }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef(null);
+  const buttonRef = useRef(null);
+  const listId = useId();
+  const active = pathname === item.base || pathname.startsWith(`${item.base}/`);
+
+  useEffect(() => setOpen(false), [pathname]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onPointer = (e) => {
+      if (rootRef.current && !rootRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointer);
+    return () => document.removeEventListener("pointerdown", onPointer);
+  }, [open]);
+
+  const links = () => Array.from(rootRef.current?.querySelectorAll("a") || []);
+  const focusLink = (index) => {
+    const list = links();
+    if (list.length) list[(index + list.length) % list.length].focus();
+  };
+
+  const onButtonKeyDown = (e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setOpen(true);
+      requestAnimationFrame(() => focusLink(0));
+    }
+  };
+
+  const onKeyDown = (e) => {
+    if (e.key === "Escape" && open) {
+      e.preventDefault();
+      setOpen(false);
+      buttonRef.current?.focus();
+      return;
+    }
+    const current = links().indexOf(document.activeElement);
+    if (current === -1) return;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      focusLink(current + (e.key === "ArrowDown" ? 1 : -1));
+    } else if (e.key === "Home" || e.key === "End") {
+      e.preventDefault();
+      focusLink(e.key === "Home" ? 0 : -1);
+    }
+  };
+
+  const onBlur = (e) => {
+    if (!rootRef.current?.contains(e.relatedTarget)) setOpen(false);
+  };
+
+  return (
+    <div ref={rootRef} className="relative" onKeyDown={onKeyDown} onBlur={onBlur}>
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-expanded={open}
+        aria-controls={listId}
+        onClick={() => setOpen((o) => !o)}
+        onKeyDown={onButtonKeyDown}
+        className={cx(tabClass(active), "inline-flex items-center gap-1")}
+      >
+        {item.menu}
+        <svg
+          className={cx("h-4 w-4 transition-transform", open && "rotate-180")}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+      <ul
+        id={listId}
+        hidden={!open}
+        className="absolute left-0 top-full z-50 mt-1 min-w-[12rem] rounded-xl border border-line bg-surface p-1 shadow-card"
+      >
+        {item.items.map((sub) => {
+          const subActive = isActive(pathname, sub);
+          return (
+            <li key={sub.href}>
+              <NavLink
+                item={sub}
+                pathname={pathname}
+                className={cx(
+                  "block rounded-lg px-3 py-2 text-sm font-medium transition",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+                  subActive ? "bg-accent/10 text-accent" : "text-ink-muted hover:bg-surface-2 hover:text-ink"
+                )}
+              />
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
 }
 
 /**
@@ -40,23 +172,18 @@ export default function AppHeader({ actions }) {
   const [discreet, toggleDiscreet] = useDiscreet();
   const firstName = (profile.displayName || "").trim().split(/\s+/)[0];
 
-  const links = NAV.map((item) => {
-    const active = isActive(pathname, item);
-    return (
-      <Link
-        key={item.href}
-        href={item.href}
-        aria-current={active ? "page" : undefined}
-        className={cx(
-          "whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
-          active ? "bg-accent/10 text-accent" : "text-ink-muted hover:bg-surface-2 hover:text-ink"
-        )}
-      >
-        {item.label}
-      </Link>
-    );
-  });
+  // Bureau : onglets + menu déroulant « Analyses »
+  const desktopLinks = NAV.map((item) =>
+    item.menu ? (
+      <NavMenu key={item.menu} item={item} pathname={pathname} />
+    ) : (
+      <NavLink key={item.href} item={item} pathname={pathname} />
+    )
+  );
+  // Mobile / tablette : liste à plat (un menu déroulant serait coupé par la zone défilante)
+  const mobileLinks = NAV.flatMap((item) => (item.menu ? item.items : [item])).map((item) => (
+    <NavLink key={item.href} item={item} pathname={pathname} />
+  ));
 
   return (
     <>
@@ -64,7 +191,7 @@ export default function AppHeader({ actions }) {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between gap-4">
           <Link
-            href="/portfolio"
+            href="/tableau-de-bord"
             className="flex shrink-0 items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             <img src="/logo_nauticash.webp?v=3" alt="" width={32} height={32} className="rounded-lg shadow-sm" />
@@ -80,7 +207,7 @@ export default function AppHeader({ actions }) {
           </Link>
 
           <nav aria-label="Navigation principale" className="hidden flex-1 items-center gap-1 lg:flex">
-            {links}
+            {desktopLinks}
           </nav>
 
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
@@ -151,7 +278,7 @@ export default function AppHeader({ actions }) {
 
         {/* Mobile / tablette : navigation défilante sous le logo */}
         <nav aria-label="Navigation principale" className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-2 lg:hidden">
-          {links}
+          {mobileLinks}
           {CONTACT_EMAIL && (
             <a
               href={feedbackHref(pathname)}

@@ -211,10 +211,10 @@ export default function GeographiePage() {
         {/* Title */}
         <div className="mb-8">
           <h1 className="text-3xl md:text-4xl font-bold text-ink mb-2">
-            Géographie
+            Répartition
           </h1>
           <p className="text-ink-muted">
-            Exposition de votre portefeuille par pays et par continent.
+            Exposition géographique de votre portefeuille : par pays, par zone et par continent.
           </p>
         </div>
 

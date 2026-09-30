@@ -110,10 +110,10 @@ export default function DividendesPage() {
             <p className="text-lg font-medium mb-2">Aucun dividende</p>
             <p className="text-sm mb-4">Les actions de votre portfolio ne versent pas de dividendes</p>
             <button
-              onClick={() => router.push("/analytics")}
+              onClick={() => router.push("/tableau-de-bord")}
               className="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition"
             >
-              Retour à Analytics
+              Retour au tableau de bord
             </button>
           </div>
         ) : (

@@ -42,9 +42,16 @@ const securityHeaders = [
 
 const nextConfig = {
   poweredByHeader: false,
-  // Ancienne adresse de la page « Mon compte »
+  // Anciennes adresses : « Mon compte » et pages analytics (nouvelle navigation par onglets)
   async redirects() {
-    return [{ source: "/compte", destination: "/profil", permanent: true }];
+    return [
+      { source: "/compte", destination: "/profil", permanent: true },
+      { source: "/analytics", destination: "/tableau-de-bord", permanent: true },
+      { source: "/analytics/performance", destination: "/analyses/performance", permanent: true },
+      { source: "/analytics/dividendes", destination: "/analyses/dividendes", permanent: true },
+      { source: "/analytics/geographie", destination: "/analyses/repartition", permanent: true },
+      { source: "/analyses", destination: "/analyses/performance", permanent: false },
+    ];
   },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];

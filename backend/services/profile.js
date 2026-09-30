@@ -5,7 +5,15 @@
 const CURRENCIES = ["EUR", "USD", "GBP", "CHF"];
 const AVATAR_COLORS = ["emerald", "blue", "teal", "indigo", "amber", "rose", "slate"];
 const THEMES = ["system", "light", "dark"];
-const HOME_PAGES = ["/portfolio", "/analytics", "/analytics/performance", "/analytics/dividendes", "/analytics/geographie"];
+const HOME_PAGES = ["/tableau-de-bord", "/portfolio", "/analyses/performance", "/analyses/dividendes", "/analyses/repartition"];
+// Anciennes adresses (avant la navigation par onglets) : acceptées et converties
+const LEGACY_HOME_PAGES = Object.freeze({
+  "/analytics": "/tableau-de-bord",
+  "/analytics/performance": "/analyses/performance",
+  "/analytics/dividendes": "/analyses/dividendes",
+  "/analytics/geographie": "/analyses/repartition",
+});
+const homePage = (v) => oneOf(HOME_PAGES)(Object.hasOwn(LEGACY_HOME_PAGES, v) ? LEGACY_HOME_PAGES[v] : v);
 const HORIZONS = ["court", "moyen", "long"]; // < 3 ans, 3 à 8 ans, > 8 ans
 const RISK_PROFILES = ["prudent", "equilibre", "dynamique", "offensif"];
 
@@ -47,7 +55,7 @@ const RULES = {
   baseCurrency: (v) => oneOf(CURRENCIES)(typeof v === "string" ? v.toUpperCase() : v),
   theme: oneOf(THEMES),
   discreetMode: (v) => (typeof v === "boolean" ? [true, v] : [false]),
-  homePage: oneOf(HOME_PAGES),
+  homePage,
   goalAmount: nullable(amount),
   goalDate: nullable(isoDate),
   horizon: nullable(oneOf(HORIZONS)),
@@ -97,6 +105,7 @@ function readProfile(user) {
   for (const key of Object.keys(DEFAULT_PROFILE)) {
     if (stored[key] !== undefined) out[key] = stored[key];
   }
+  if (Object.hasOwn(LEGACY_HOME_PAGES, out.homePage)) out.homePage = LEGACY_HOME_PAGES[out.homePage];
   return out;
 }
 
@@ -106,6 +115,7 @@ module.exports = {
   AVATAR_COLORS,
   THEMES,
   HOME_PAGES,
+  LEGACY_HOME_PAGES,
   HORIZONS,
   RISK_PROFILES,
   validateProfilePatch,

@@ -21,7 +21,7 @@ export default function DividendIncomeCard({ estimate, portfolioValue, base = "E
           Revenus de dividendes
         </h2>
         <Link
-          href="/analytics/dividendes"
+          href="/analyses/dividendes"
           className="rounded text-sm font-medium text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
         >
           Voir le calendrier →
