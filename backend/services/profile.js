@@ -29,6 +29,12 @@ const DEFAULT_PROFILE = Object.freeze({
   horizon: null,
   riskProfile: null,
   monthlyExpenses: null,
+  // Page Objectifs : rente de dividendes visée et hypothèses de projection (null = valeur proposée par la page)
+  incomeGoalMonthly: null, // rente de dividendes visée, en devise de référence par mois
+  monthlySavings: null, // épargne investie chaque mois
+  expectedReturn: null, // rendement annuel espéré, en % (6 = 6 %/an)
+  dividendYield: null, // rendement du dividende visé à l'arrivée, en %
+  inflationRate: null, // inflation annuelle supposée, en %
 });
 
 const MAX_AMOUNT = 1e12;
@@ -37,6 +43,11 @@ const nullable = (check) => (v) => (v === null || v === "" ? [true, null] : chec
 const amount = (v) => {
   const n = typeof v === "string" ? Number(v.replace(",", ".")) : v;
   return typeof n === "number" && Number.isFinite(n) && n >= 0 && n < MAX_AMOUNT ? [true, Math.round(n * 100) / 100] : [false];
+};
+// Pourcentage borné (6 = 6 %), arrondi à 2 décimales ; accepte « 6,5 »
+const percent = (min, max) => (v) => {
+  const n = typeof v === "string" && v.trim() !== "" ? Number(v.replace(",", ".")) : v;
+  return typeof n === "number" && Number.isFinite(n) && n >= min && n <= max ? [true, Math.round(n * 100) / 100] : [false];
 };
 const isoDate = (v) => {
   if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return [false];
@@ -61,6 +72,11 @@ const RULES = {
   horizon: nullable(oneOf(HORIZONS)),
   riskProfile: nullable(oneOf(RISK_PROFILES)),
   monthlyExpenses: nullable(amount),
+  incomeGoalMonthly: nullable(amount),
+  monthlySavings: nullable(amount),
+  expectedReturn: nullable(percent(-10, 20)),
+  dividendYield: nullable(percent(0.1, 15)),
+  inflationRate: nullable(percent(0, 15)),
 };
 
 const MESSAGES = {
@@ -75,6 +91,11 @@ const MESSAGES = {
   horizon: "Horizon : court, moyen ou long.",
   riskProfile: "Profil de risque : prudent, équilibré, dynamique ou offensif.",
   monthlyExpenses: "Dépenses mensuelles invalides.",
+  incomeGoalMonthly: "Rente mensuelle visée invalide.",
+  monthlySavings: "Épargne mensuelle invalide.",
+  expectedReturn: "Rendement espéré : entre −10 et 20 % par an.",
+  dividendYield: "Rendement du dividende : entre 0,1 et 15 %.",
+  inflationRate: "Inflation : entre 0 et 15 % par an.",
 };
 
 /** Valide une mise à jour partielle. Renvoie { value } ou { errors }. */

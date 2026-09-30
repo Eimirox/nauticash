@@ -105,6 +105,53 @@ describe("PATCH /api/user/profile", () => {
     assert.equal((await get(u.token)).body.profile.homePage, "/tableau-de-bord");
   });
 
+  test("objectifs : rente visée et hypothèses de projection enregistrées et normalisées", async () => {
+    const u = await h.registerUser();
+    const res = await patch(u.token, {
+      goalAmount: 1000000,
+      incomeGoalMonthly: "2000",
+      monthlySavings: 500,
+      expectedReturn: "6,5",
+      dividendYield: 3.456,
+      inflationRate: 2,
+    });
+    assert.equal(res.status, 200);
+    const p = res.body.profile;
+    assert.equal(p.incomeGoalMonthly, 2000);
+    assert.equal(p.monthlySavings, 500);
+    assert.equal(p.expectedReturn, 6.5);
+    assert.equal(p.dividendYield, 3.46);
+    assert.equal(p.inflationRate, 2);
+    const again = (await get(u.token)).body.profile;
+    assert.equal(again.expectedReturn, 6.5, "relu après enregistrement");
+
+    const cleared = await patch(u.token, { incomeGoalMonthly: null, expectedReturn: "" });
+    assert.equal(cleared.body.profile.incomeGoalMonthly, null);
+    assert.equal(cleared.body.profile.expectedReturn, null);
+    assert.equal(cleared.body.profile.monthlySavings, 500, "les autres hypothèses sont conservées");
+  });
+
+  test("objectifs : rendement négatif accepté, hypothèses hors bornes refusées", async () => {
+    const u = await h.registerUser();
+    assert.equal((await patch(u.token, { expectedReturn: -2 })).status, 200);
+    const bad = [
+      { incomeGoalMonthly: -1 },
+      { monthlySavings: "beaucoup" },
+      { expectedReturn: 25 },
+      { expectedReturn: -11 },
+      { dividendYield: 0 },
+      { dividendYield: 16 },
+      { inflationRate: -1 },
+      { inflationRate: 20 },
+      { inflationRate: true },
+    ];
+    for (const body of bad) {
+      const res = await patch(u.token, body);
+      assert.equal(res.status, 400, `refusé : ${JSON.stringify(body)}`);
+    }
+    assert.equal((await get(u.token)).body.profile.expectedReturn, -2, "rien d'autre n'est modifié");
+  });
+
   test("un utilisateur ne modifie que son propre profil", async () => {
     const a = await h.registerUser();
     const b = await h.registerUser();
