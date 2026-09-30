@@ -152,6 +152,60 @@ describe("PATCH /api/user/profile", () => {
     assert.equal((await get(u.token)).body.profile.expectedReturn, -2, "rien d'autre n'est modifié");
   });
 
+  test("stratégie : style, allocation cible et limite par ligne enregistrés et normalisés", async () => {
+    const u = await h.registerUser();
+    const res = await patch(u.token, {
+      strategy: "dividendes",
+      targetAllocation: { europe: "45", northAmerica: 35, asiaPacific: 10, emerging: "4,5", commodities: 5.5 },
+      maxPositionWeight: "8",
+    });
+    assert.equal(res.status, 200);
+    const p = res.body.profile;
+    assert.equal(p.strategy, "dividendes");
+    assert.deepEqual(p.targetAllocation, {
+      europe: 45, northAmerica: 35, asiaPacific: 10, emerging: 4.5, world: 0, commodities: 5.5, crypto: 0,
+    });
+    assert.equal(p.maxPositionWeight, 8);
+
+    // Nouvelle allocation : remplace entièrement l'ancienne
+    await patch(u.token, { targetAllocation: { world: 90, emerging: 10 } });
+    const again = (await get(u.token)).body.profile;
+    assert.equal(again.targetAllocation.europe, 0);
+    assert.equal(again.targetAllocation.world, 90);
+    assert.equal(again.strategy, "dividendes", "les autres champs sont conservés");
+
+    const cleared = await patch(u.token, { strategy: null, targetAllocation: null, maxPositionWeight: "" });
+    assert.equal(cleared.body.profile.strategy, null);
+    assert.equal(cleared.body.profile.targetAllocation, null);
+    assert.equal(cleared.body.profile.maxPositionWeight, null);
+  });
+
+  test("stratégie : valeurs invalides refusées sans rien modifier", async () => {
+    const u = await h.registerUser();
+    await patch(u.token, { strategy: "passive", targetAllocation: { world: 100 }, maxPositionWeight: 50 });
+    const bad = [
+      { strategy: "spéculative" },
+      { strategy: 3 },
+      { targetAllocation: { world: 60 } }, // total 60 %
+      { targetAllocation: { world: 80, europe: 30 } }, // total 110 %
+      { targetAllocation: { world: 90, mars: 10 } }, // poche inconnue
+      { targetAllocation: { world: 110, europe: -10 } },
+      { targetAllocation: { world: "tout" } },
+      { targetAllocation: [100] },
+      { targetAllocation: "world" },
+      { maxPositionWeight: 0 },
+      { maxPositionWeight: 101 },
+    ];
+    for (const body of bad) {
+      const res = await patch(u.token, body);
+      assert.equal(res.status, 400, `refusé : ${JSON.stringify(body)}`);
+    }
+    const p = (await get(u.token)).body.profile;
+    assert.equal(p.strategy, "passive");
+    assert.equal(p.targetAllocation.world, 100);
+    assert.equal(p.maxPositionWeight, 50);
+  });
+
   test("un utilisateur ne modifie que son propre profil", async () => {
     const a = await h.registerUser();
     const b = await h.registerUser();
