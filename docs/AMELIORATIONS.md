@@ -83,6 +83,17 @@ Quand ces tâches et l'harmonisation visuelle sont faites, la boucle peut s'arr�
 - [x] Tests : renommer le test « quota atteint pendant l'enrichissement » (il vérifie que rien n'est enregistré) et faire que FMP_DAILY_LIMIT=0 bloque les appels au lieu de supprimer la limite
 - [ ] ESLint (`npm run lint`) sans avertissement
 
+### Suite (relance du 30/09, priorité à la fiabilité et aux retours des premiers testeurs)
+
+- [ ] Contrôle quotidien de cohérence des cours (après l'actualisation du soir) : pour chaque titre détenu, écart entre le cours enregistré et un second fournisseur, cours non daté ou en échec → résumé dans /api/admin/stats et journal serveur ; tests
+- [ ] Portefeuille vide : accueil guidé (3 étapes : chercher un titre, saisir quantité et PRU, choisir l'enveloppe) pour les nouveaux testeurs
+- [ ] Ajout d'une position en une fois : après le choix dans l'autocomplétion, petite fenêtre quantité + PRU + enveloppe (au lieu d'ajouter à 0 puis modifier)
+- [ ] Import CSV de positions (colonnes ticker, quantité, PRU, enveloppe ; aperçu avant import, erreurs par ligne) ; tests
+- [ ] Page détail d'un titre (clic sur une ligne) : courbe du cours sur 1 an (cache partagé, comme les indices), dividendes, place, zone, secteur, poids dans le portefeuille
+- [ ] Transactions : enregistrer achats / ventes (date, quantité, prix) et recalculer PRU et plus-value réalisée ; tests
+- [ ] Performance hors apports (pondérée dans le temps) à partir des transactions, à côté de la variation de valeur
+- [ ] Application installable sur mobile (manifest + icônes, PWA simple sans mode hors ligne)
+
 ## Journal
 
 <!-- Une ligne par session : date – tâche – résultat (commit) -->
