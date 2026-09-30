@@ -11,6 +11,9 @@ import {
   contributionPlan,
   styleRules,
   strategyReview,
+  severityLevel,
+  proposalsBrief,
+  gaugeScale,
 } from '../lib/strategyReview.js';
 
 const id = (v) => v;
@@ -145,4 +148,25 @@ test('bilan sans stratégie enregistrée : valeurs proposées du style équilibr
   assert.equal(r.strategy, 'equilibree');
   assert.equal(r.maxPositionWeight, 10);
   assert.equal(r.gaps.buckets.find((b) => b.key === 'europe').target, 35);
+});
+
+test('niveaux d’importance, résumé du Tableau de bord et échelle des jauges', () => {
+  assert.equal(severityLevel(3).label, 'Prioritaire');
+  assert.equal(severityLevel(9).tone, 'loss');
+  assert.equal(severityLevel(undefined).label, 'Pour info');
+  assert.deepEqual(proposalsBrief(null), { total: 0, counts: { 3: 0, 2: 0, 1: 0 }, top: [] });
+  const r = strategyReview({
+    profile: { strategy: 'equilibree', targetAllocation: { europe: 50, northAmerica: 50 }, maxPositionWeight: 30, monthlySavings: 500 },
+    stocks: [stock('AIR', 8000, { zone: 'Europe', dividendYield: 2 }), stock('MSFT', 2000, { zone: 'Amérique du Nord' })],
+    cashInBase: 5000,
+  });
+  const b = proposalsBrief(r, 2);
+  assert.equal(b.total, 5);
+  assert.equal(b.top.length, 2);
+  assert.equal(b.top[0].id, 'lines-over-limit');
+  assert.equal(b.counts[3] + b.counts[2] + b.counts[1], 5);
+  assert.deepEqual(Object.keys(b.top[0]).sort(), ['id', 'severity', 'title']);
+  assert.equal(gaugeScale(r.gaps.buckets), 80);
+  assert.equal(gaugeScale([{ target: 10, actual: 12 }]), 50);
+  assert.equal(gaugeScale([{ target: 100, actual: 95 }]), 100);
 });

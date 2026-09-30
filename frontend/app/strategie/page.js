@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
-import { useProfile, setCachedProfile } from "@/lib/profile";
+import { useProfile, setCachedProfile, useBaseCurrency } from "@/lib/profile";
+import { useFxRates, toCurrency, currencySymbol } from "@/lib/fx";
+import { strategyReview } from "@/lib/strategyReview";
 import {
   STRATEGIES,
   ALLOCATION_BUCKETS,
@@ -16,6 +18,7 @@ import {
 import AppHeader from "../components/AppHeader";
 import { Card, Button, useToast } from "../components/ui";
 import Skeleton, { SkeletonRegion } from "../components/ui/Skeleton";
+import { ProposalCards, AllocationGauges, INVESTMENT_DISCLAIMER } from "../components/StrategyReview";
 
 const nf1 = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 });
 
@@ -92,6 +95,23 @@ export default function Strategie() {
   const { email, profile, loading } = useProfile();
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
+  const { rates } = useFxRates();
+  const base = useBaseCurrency();
+  const symbol = currencySymbol(base);
+  const [stocks, setStocks] = useState([]);
+  const [cash, setCash] = useState({ amount: 0, currency: "EUR" });
+  const [portfolioLoading, setPortfolioLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
+
+  useEffect(() => {
+    apiFetch("/api/user/portfolio")
+      .then((data) => {
+        setStocks(data.stocks || []);
+        setCash(data.cash || { amount: 0, currency: "EUR" });
+      })
+      .catch((err) => setLoadError(`Impossible de charger votre portefeuille : ${err.message}`))
+      .finally(() => setPortfolioLoading(false));
+  }, []);
 
   const baseline = useMemo(() => initialStrategy(profile), [profile]);
   useEffect(() => {
@@ -106,6 +126,19 @@ export default function Strategie() {
   const changes = form ? strategyPatch(profile, form) : null;
   const dirty = Boolean(changes && Object.keys(changes).length);
   const isDefault = isDefaultForStrategy(values);
+
+  // Bilan : valeurs du formulaire si elles sont valides (aperçu avant enregistrement), sinon profil enregistré
+  const fxReady = Boolean(rates) || (stocks.every((s) => (s.currency || "EUR") === base) && (cash.currency || "EUR") === base);
+  const review = useMemo(() => {
+    if (portfolioLoading || !fxReady) return null;
+    const toBase = (value, currency) => toCurrency(value, currency, base, rates);
+    const cashInBase = Math.max(0, toBase(Number(cash.amount) || 0, cash.currency || "EUR") ?? 0);
+    const reviewProfile =
+      totalOk && weightOk
+        ? { ...profile, strategy: values.strategy, targetAllocation: values.allocation, maxPositionWeight: values.maxPositionWeight }
+        : profile;
+    return strategyReview({ profile: reviewProfile, stocks, cashInBase, toBase });
+  }, [portfolioLoading, fxReady, rates, base, cash, stocks, profile, values, totalOk, weightOk]);
 
   // Choisir un style applique ses valeurs proposées (modifiables ensuite)
   const chooseStrategy = (key) => setForm({ ...values, strategy: key, ...strategyDefaults(key) });
@@ -133,9 +166,49 @@ export default function Strategie() {
         <div className="mb-8">
           <h1 className="mb-2 text-3xl font-bold text-ink md:text-4xl">Stratégie</h1>
           <p className="text-ink-muted">
-            Choisissez votre style d&apos;investissement et la répartition que vous visez. Nauticash la comparera bientôt à votre portefeuille réel.
+            Choisissez votre style d&apos;investissement et la répartition que vous visez. Nauticash la compare à votre portefeuille réel et vous propose des pistes chiffrées.
           </p>
         </div>
+
+        {loadError && (
+          <div role="alert" className="mb-6 rounded-lg border border-loss/30 bg-loss/10 px-4 py-3 text-sm text-loss">{loadError}</div>
+        )}
+
+        {portfolioLoading || !form ? (
+          <SkeletonRegion label="Chargement du bilan de votre stratégie…" className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <Skeleton className="h-48 rounded-2xl lg:col-span-2" />
+            <Skeleton className="h-48 rounded-2xl" />
+          </SkeletonRegion>
+        ) : review ? (
+          <div className="mb-6 grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+            <Card as="section" aria-labelledby="proposals-title" className="lg:col-span-2">
+              <h2 id="proposals-title" className="mb-1 text-lg font-semibold text-ink">Vos propositions</h2>
+              <p className="mb-4 text-sm text-ink-muted">
+                Classées par importance{dirty && totalOk && weightOk ? ", selon les valeurs ci-dessous (pas encore enregistrées)" : ""}.
+              </p>
+              <ProposalCards proposals={review.proposals} symbol={symbol} />
+              <p className="mt-4 text-xs text-ink-muted">{INVESTMENT_DISCLAIMER}</p>
+            </Card>
+            <Card as="section" aria-labelledby="gauges-title">
+              <h2 id="gauges-title" className="mb-1 text-lg font-semibold text-ink">Cible et réel</h2>
+              <p className="mb-4 text-sm text-ink-muted">
+                Part de chaque poche dans votre portefeuille investi ; le trait marque votre cible.
+              </p>
+              <AllocationGauges gaps={review.gaps} />
+              <p className="mt-4 text-xs text-ink-muted">
+                Cash : <span className="font-semibold text-ink">{nf1.format(review.gaps.cashShare)} %</span> de votre patrimoine.
+              </p>
+            </Card>
+          </div>
+        ) : (
+          !loadError && (
+            <Card as="section" className="mb-6">
+              <p className="text-sm text-ink-muted">
+                Ajoutez des positions dans votre portefeuille pour comparer votre stratégie à la réalité.
+              </p>
+            </Card>
+          )
+        )}
 
         {!form ? (
           <SkeletonRegion label="Chargement de votre stratégie…" className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -213,16 +286,6 @@ export default function Strategie() {
                 )}
               </Card>
 
-              <Card as="section" aria-labelledby="next-title">
-                <h2 id="next-title" className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">Bientôt</h2>
-                <ul className="space-y-2 text-sm text-ink">
-                  <li>Écarts entre votre portefeuille et votre cible (zones, lignes, cash)</li>
-                  <li>Où orienter vos prochains versements, montants à l&apos;appui</li>
-                </ul>
-                <p className="mt-4 text-xs text-ink-muted">
-                  Outil d&apos;aide à la réflexion, pas un conseil en investissement : Nauticash ne recommande jamais l&apos;achat d&apos;un titre précis.
-                </p>
-              </Card>
             </div>
           </div>
         )}

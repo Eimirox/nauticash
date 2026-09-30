@@ -346,3 +346,36 @@ export function strategyReview({ profile = {}, stocks = [], cashInBase = 0, toBa
   proposals.sort((a, b) => b.severity - a.severity || (Number(b.amount) || 0) - (Number(a.amount) || 0));
   return { strategy, maxPositionWeight: maxWeight, gaps, overLimit, rebalance, contribution, plan, proposals };
 }
+
+// Niveaux d'importance des propositions (Stratégie 3/3) : libellé et ton du badge (docs/DESIGN.md)
+export const SEVERITY_LEVELS = Object.freeze({
+  3: { label: 'Prioritaire', tone: 'loss' },
+  2: { label: 'À surveiller', tone: 'warn' },
+  1: { label: 'Pour info', tone: 'neutral' },
+});
+
+/** Libellé et ton d'un niveau d'importance (1 par défaut) */
+export function severityLevel(severity) {
+  return SEVERITY_LEVELS[Math.min(3, Math.max(1, Math.round(Number(severity) || 1)))];
+}
+
+/**
+ * Résumé pour le Tableau de bord : les `max` premières propositions (déjà triées) et le décompte par niveau.
+ * @returns { total, counts: { 3, 2, 1 }, top: [{ id, severity, title }] }
+ */
+export function proposalsBrief(review, max = 3) {
+  const list = review?.proposals || [];
+  const counts = { 3: 0, 2: 0, 1: 0 };
+  for (const p of list) counts[Math.min(3, Math.max(1, Math.round(Number(p.severity) || 1)))] += 1;
+  return {
+    total: list.length,
+    counts,
+    top: list.slice(0, Math.max(0, max)).map(({ id, severity, title }) => ({ id, severity, title })),
+  };
+}
+
+/** Échelle commune des jauges cible vs réel : maximum arrondi à 10 au-dessus (au moins 50 %) */
+export function gaugeScale(buckets) {
+  const m = Math.max(0, ...(buckets || []).flatMap((b) => [Number(b.target) || 0, Number(b.actual) || 0]));
+  return Math.min(100, Math.max(50, Math.ceil(m / 10) * 10));
+}

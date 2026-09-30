@@ -5,6 +5,8 @@ import { apiFetch } from "@/lib/api";
 import { useFxRates, toCurrency, ratePer, currencySymbol } from "@/lib/fx";
 import { useBaseCurrency, useProfile } from "@/lib/profile";
 import { dashboardAlerts } from "@/lib/alerts";
+import { strategyReview } from "@/lib/strategyReview";
+import { StrategyBrief } from "../components/StrategyReview";
 import DashboardAlerts from "../components/DashboardAlerts";
 import GoalGauge from "../components/GoalGauge";
 import EmergencyFund from "../components/EmergencyFund";
@@ -83,6 +85,8 @@ export default function TableauDeBord() {
   const cashInBase = toBaseOrNull(Number(cash.amount) || 0, cash.currency || "EUR");
   const hasData = stocks.length > 0 || cash.amount !== 0;
   const alerts = dashboardAlerts({ stocks, cashInBase, monthlyExpenses: profile?.monthlyExpenses });
+  // Stratégie en bref : propositions issues de la stratégie du profil (valeurs proposées sinon)
+  const review = summaryReady && !loading ? strategyReview({ profile, stocks, cashInBase: Math.max(0, cashInBase ?? 0), toBase: toBaseOrNull }) : null;
   const pieType = typeLabels.map((t) => ({
     label: t,
     value: totalsPerType[t],
@@ -156,6 +160,9 @@ export default function TableauDeBord() {
                 </div>
               </section>
             )}
+
+            {/* Stratégie en bref : propositions principales (page Stratégie) */}
+            {!loading && !loadError && <StrategyBrief review={review} />}
 
             {/* Evolution Chart */}
             <div className="bg-surface border border-line rounded-xl shadow-lg p-6 mb-8">
