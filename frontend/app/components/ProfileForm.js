@@ -242,7 +242,7 @@ export default function ProfileForm({ onLoaded }) {
 
       {error && <p id="profile-error" role="alert" className="rounded-lg border border-loss/30 bg-loss/10 px-3 py-2 text-sm text-loss">{error}</p>}
 
-      <div className="sticky bottom-4 z-10 flex justify-end">
+      <div className="sticky bottom-[calc(1rem+var(--tabbar-h,0px))] z-10 flex justify-end">
         <Button type="submit" loading={saving} disabled={!dirty} className="shadow-lg">
           {dirty ? "Enregistrer le profil" : "Profil à jour"}
         </Button>

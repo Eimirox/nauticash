@@ -163,8 +163,103 @@ function NavMenu({ item, pathname }) {
   );
 }
 
+// Barre d'onglets fixe en bas de l'écran (mobile / tablette, < lg) : 5 onglets avec icône et libellé court.
+// « Analyses » ouvre Performance ; les autres sections d'analyse sont des sous-onglets sous l'en-tête.
+const ICON_PROPS = { fill: "none", stroke: "currentColor", strokeWidth: 1.8, viewBox: "0 0 24 24", "aria-hidden": true };
+const TABS = [
+  {
+    href: "/tableau-de-bord",
+    label: "Accueil",
+    icon: (
+      <svg {...ICON_PROPS}>
+        <rect x="4" y="4" width="6.5" height="7" rx="1.5" />
+        <rect x="13.5" y="4" width="6.5" height="4" rx="1.5" />
+        <rect x="4" y="14" width="6.5" height="6" rx="1.5" />
+        <rect x="13.5" y="11" width="6.5" height="9" rx="1.5" />
+      </svg>
+    ),
+  },
+  {
+    href: "/portfolio",
+    label: "Portefeuille",
+    icon: (
+      <svg {...ICON_PROPS}>
+        <rect x="3" y="7" width="18" height="13" rx="2" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M16 7V5.5A1.5 1.5 0 0014.5 4h-5A1.5 1.5 0 008 5.5V7M3 13h18" />
+      </svg>
+    ),
+  },
+  {
+    href: "/analyses/performance",
+    base: "/analyses",
+    label: "Analyses",
+    icon: (
+      <svg {...ICON_PROPS}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 20h16M7 16v-5M12 16V6M17 16v-8" />
+      </svg>
+    ),
+  },
+  {
+    href: "/objectifs",
+    label: "Objectifs",
+    icon: (
+      <svg {...ICON_PROPS}>
+        <circle cx="12" cy="12" r="8.5" />
+        <circle cx="12" cy="12" r="4.5" />
+        <circle cx="12" cy="12" r="1" fill="currentColor" />
+      </svg>
+    ),
+  },
+  {
+    href: "/strategie",
+    label: "Stratégie",
+    icon: (
+      <svg {...ICON_PROPS}>
+        <circle cx="12" cy="12" r="8.5" />
+        <path strokeLinejoin="round" d="M15.5 8.5l-2 5-5 2 2-5 5-2z" />
+      </svg>
+    ),
+  },
+];
+
+function MobileTabBar({ pathname }) {
+  return (
+    <nav
+      id="barre-onglets"
+      aria-label="Navigation principale"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden"
+    >
+      <ul className="mx-auto grid h-16 max-w-xl grid-cols-5">
+        {TABS.map((tab) => {
+          const root = tab.base || tab.href;
+          const active = pathname === root || pathname.startsWith(`${root}/`);
+          return (
+            <li key={tab.href} className="flex">
+              <Link
+                href={tab.href}
+                aria-current={active ? "page" : undefined}
+                className={cx(
+                  "relative flex flex-1 flex-col items-center justify-center gap-1 rounded-lg text-[11px] font-medium leading-none transition",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent",
+                  active ? "text-accent" : "text-ink-muted hover:text-ink"
+                )}
+              >
+                {active && <span aria-hidden="true" className="absolute inset-x-5 top-0 h-0.5 rounded-full bg-accent" />}
+                <span className={cx("flex h-7 w-12 items-center justify-center rounded-full transition", active && "bg-accent/10")}>
+                  <span className="h-5 w-5 [&>svg]:h-5 [&>svg]:w-5">{tab.icon}</span>
+                </span>
+                {tab.label}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}
+
 /**
- * En-tête commun : logo, navigation (défilante sur mobile), actions propres à la page, déconnexion.
+ * En-tête commun : logo, navigation (onglets sur grand écran, barre fixe en bas sur mobile), actions propres à la page, déconnexion.
  * <AppHeader actions={<Button ...>Actualiser</Button>} />
  */
 export default function AppHeader({ actions }) {
@@ -181,11 +276,8 @@ export default function AppHeader({ actions }) {
       <NavLink key={item.href} item={item} pathname={pathname} />
     )
   );
-  // Mobile / tablette : liste à plat (un menu déroulant serait coupé par la zone défilante)
-  const mobileLinks = NAV.flatMap((item) => (item.menu ? item.items : [item])).map((item) => (
-    <NavLink key={item.href} item={item} pathname={pathname} />
-  ));
-
+  // Mobile / tablette : sous-onglets d'Analyses sous l'en-tête (la barre du bas n'a qu'un onglet « Analyses »)
+  const inAnalyses = pathname === "/analyses" || pathname.startsWith("/analyses/");
   return (
     <>
     <header className="sticky top-0 z-50 border-b border-line bg-surface/90 backdrop-blur-xl">
@@ -193,14 +285,15 @@ export default function AppHeader({ actions }) {
         <div className="flex h-16 items-center justify-between gap-4">
           <Link
             href="/tableau-de-bord"
+            aria-label="Nauticash (bêta), tableau de bord"
             className="flex shrink-0 items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             <img src="/logo_nauticash.webp?v=3" alt="" width={32} height={32} className="rounded-lg shadow-sm" />
-            <span className="bg-gradient-to-r from-slate-900 via-emerald-600 to-blue-600 bg-clip-text text-xl font-bold text-transparent dark:from-white dark:via-emerald-300 dark:to-sky-300">
+            <span className="hidden bg-gradient-to-r from-slate-900 via-emerald-600 to-blue-600 bg-clip-text text-xl font-bold text-transparent dark:from-white dark:via-emerald-300 dark:to-sky-300 sm:inline">
               Nauticash
             </span>
             <span
-              className="hidden rounded-md border border-accent/30 bg-accent/10 px-1.5 py-0.5 text-[10px] min-[400px]:inline font-semibold uppercase tracking-wider text-accent"
+              className="hidden rounded-md border border-accent/30 bg-accent/10 px-1.5 py-0.5 text-[10px] sm:inline font-semibold uppercase tracking-wider text-accent"
               title="Nauticash est en version bêta : certaines fonctionnalités peuvent évoluer."
             >
               Bêta
@@ -217,7 +310,7 @@ export default function AppHeader({ actions }) {
               <a
                 href={feedbackHref(pathname)}
                 aria-label="Donner mon avis sur la bêta"
-                className="hidden min-h-10 items-center gap-2 rounded-xl border border-line bg-surface px-3 text-sm font-medium text-ink-muted transition hover:border-accent/40 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:inline-flex"
+                className="min-h-10 items-center gap-2 rounded-xl border border-line bg-surface px-3 text-sm font-medium text-ink-muted transition hover:border-accent/40 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent inline-flex"
               >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h8M8 14h5M21 12a9 9 0 01-13.3 7.9L3 21l1.1-4.7A9 9 0 1121 12z" />
@@ -277,22 +370,19 @@ export default function AppHeader({ actions }) {
           </div>
         </div>
 
-        {/* Mobile / tablette : navigation défilante sous le logo */}
-        <nav aria-label="Navigation principale" className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-2 lg:hidden">
-          {mobileLinks}
-          {CONTACT_EMAIL && (
-            <a
-              href={feedbackHref(pathname)}
-              className="whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium text-accent hover:bg-accent/10 sm:hidden"
-            >
-              Donner mon avis
-            </a>
-          )}
-        </nav>
+        {/* Mobile / tablette : sous-onglets d'Analyses (la navigation principale est dans la barre du bas) */}
+        {inAnalyses && (
+          <nav aria-label="Sections d'analyse" className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-2 lg:hidden">
+            {ANALYSES.map((item) => (
+              <NavLink key={item.href} item={item} pathname={pathname} />
+            ))}
+          </nav>
+        )}
       </div>
     </header>
     {/* Cible du lien d'évitement « Aller au contenu » (app/layout.js) */}
     <div id="contenu" tabIndex={-1} className="scroll-mt-28 outline-none" />
+    <MobileTabBar pathname={pathname} />
     </>
   );
 }

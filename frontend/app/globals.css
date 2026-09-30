@@ -581,3 +581,15 @@ summary:focus-visible,
 .discreet .money-chart .recharts-yAxis .recharts-cartesian-axis-tick {
   visibility: hidden;
 }
+
+/* ================================
+   BARRE D'ONGLETS MOBILE (AppHeader, < lg)
+   Hauteur réservée en bas de page pour que la barre fixe ne masque ni le contenu,
+   ni les toasts, ni les boutons « collants » (--tabbar-h, 0 sur grand écran).
+   ================================ */
+@media (max-width: 1023.98px) {
+  body:has(#barre-onglets) {
+    --tabbar-h: calc(4rem + 1px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: var(--tabbar-h);
+  }
+}
