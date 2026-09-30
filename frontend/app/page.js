@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import Compass from "./components/Compass";
 import DepthLines from "./components/DepthLines";
+import Logo from "./components/Logo";
 
 /**
  * Page d'accueil Nauticash — voir docs/DESIGN.md (identité « abysse / lagon »)
@@ -50,7 +51,7 @@ function DashboardPreview() {
     <div className="relative w-full max-w-md rounded-2xl border border-white/10 bg-white/5 p-5 shadow-2xl backdrop-blur" aria-hidden="true">
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Patrimoine</p>
       <p className="mt-1 text-4xl font-semibold tabular-nums text-white">48 231,57 €</p>
-      <p className="mt-1 text-sm font-semibold text-emerald-400">▲ +3,42 % <span className="font-normal text-slate-400">depuis l'achat</span></p>
+      <p className="mt-1 text-sm font-semibold text-emerald-400">▲ +3,42 % <span className="font-normal text-slate-400">depuis l&apos;achat</span></p>
 
       <svg viewBox="0 0 300 70" className="mt-4 h-16 w-full" preserveAspectRatio="none">
         <defs>
@@ -100,7 +101,7 @@ export default function Home() {
 
         <header className="relative mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-2.5">
-            <img src="/logo_nauticash.webp?v=3" alt="" width={32} height={32} className="rounded-lg" />
+            <Logo size={32} className="rounded-lg" />
             <span className="text-xl font-bold">Nauticash</span>
           </Link>
           <nav className="flex items-center gap-2">
@@ -140,7 +141,7 @@ export default function Home() {
                   href="/login"
                   className="inline-flex min-h-12 items-center justify-center rounded-xl border border-white/20 px-6 text-base font-semibold text-white transition hover:bg-white/10"
                 >
-                  J'ai déjà un compte
+                  J&apos;ai déjà un compte
                 </Link>
               )}
             </div>
@@ -166,7 +167,7 @@ export default function Home() {
         <h2 id="features-title" className="max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">
           Ce que Nauticash fait pour vous
         </h2>
-        <p className="mt-3 max-w-2xl text-ink-muted">L'essentiel pour piloter vos investissements, sans jargon ni tableur.</p>
+        <p className="mt-3 max-w-2xl text-ink-muted">L&apos;essentiel pour piloter vos investissements, sans jargon ni tableur.</p>
         <div className="mt-10 grid gap-6 md:grid-cols-3">
           {FEATURES.map((f) => (
             <article key={f.title} className="rounded-2xl border border-line bg-surface p-6 shadow-card">
@@ -207,7 +208,7 @@ export default function Home() {
           <div className="relative">
             <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">Prenez la barre de vos investissements</h2>
             <p className="mx-auto mt-4 max-w-xl text-slate-300">
-              Créez votre compte gratuitement et ajoutez vos premières positions dès aujourd'hui.
+              Créez votre compte gratuitement et ajoutez vos premières positions dès aujourd&apos;hui.
             </p>
             <Link href={primaryCta.href} className={`${btnPrimary} mt-8`}>{primaryCta.label}</Link>
           </div>
@@ -218,12 +219,12 @@ export default function Home() {
       <footer className="mt-auto border-t border-line">
         <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-10 text-sm text-ink-muted sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
           <div className="flex items-center gap-2">
-            <img src="/logo_nauticash.webp?v=3" alt="" width={24} height={24} className="rounded" />
+            <Logo size={24} className="rounded" />
             <span className="font-semibold text-ink">Nauticash</span>
             <span>· Outil de suivi, pas un conseil en investissement.</span>
           </div>
           <nav className="flex flex-wrap gap-x-6 gap-y-2" aria-label="Liens légaux">
-            <Link href="/cgu" className="hover:text-ink">Conditions d'utilisation</Link>
+            <Link href="/cgu" className="hover:text-ink">Conditions d&apos;utilisation</Link>
             <Link href="/confidentialite" className="hover:text-ink">Confidentialité</Link>
             <span>© {new Date().getFullYear()} Nauticash</span>
           </nav>

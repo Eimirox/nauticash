@@ -70,6 +70,16 @@ framer-motion est disponible. Animations **sobres** : apparition en fondu + 8 px
 - Beaucoup d'espace : `gap-4` à `gap-6` entre cartes.
 - Mode clair et mode sombre : suivre la préférence du système, avec un bouton pour forcer l'un ou l'autre (mémorisé localement).
 
+## Navigation
+
+- Onglets de l'espace connecté (`AppHeader`) : **Tableau de bord** (`/tableau-de-bord`), **Portefeuille** (`/portfolio`), **Analyses ▾** (menu : Performance, Dividendes, Répartition, Frais sous `/analyses/…`), **Objectifs** (`/objectifs`), **Stratégie** (`/strategie`) ; « Mon profil » est l'avatar à droite.
+- Le Tableau de bord reste une synthèse (patrimoine, évolution, dividendes, répartition en bref) ; le détail vit dans Analyses (Répartition : zones, pays, types d'actif, devises, secteurs, diversification ; Frais : TER des ETF et fonds).
+- Le menu « Analyses » suit le motif *disclosure* (bouton `aria-expanded` + liste de liens, ↓/↑, Échap).
+- **Mobile / tablette (< `lg`)** : barre d'onglets fixe en bas (`MobileTabBar` dans `AppHeader`, `#barre-onglets`) — 5 onglets icône + libellé court (**Accueil** = Tableau de bord, Portefeuille, Analyses → Performance, Objectifs, Stratégie), onglet actif en `--accent` avec trait supérieur et `aria-current="page"`, zone tactile 64 px de haut. Dans Analyses, les sous-onglets (Performance, Dividendes, Répartition, Frais) sont une rangée défilante sous l'en-tête.
+- En-tête mobile allégé : logo seul (nom et badge Bêta dès `sm`), actions en boutons icônes (avis, mode discret, profil, déconnexion).
+- La hauteur de la barre est réservée par `--tabbar-h` (`globals.css`, 0 sur grand écran) : tout élément fixe ou collant en bas d'écran (toasts, bouton d'enregistrement) se place à `bottom-[calc(1rem+var(--tabbar-h,0px))]`.
+- Les anciennes adresses `/analytics/…` sont redirigées (`next.config.mjs`) ; un onglet pas encore construit utilise `ComingSoonPage` (« Bientôt »).
+
 ## Accessibilité (niveau AA)
 
 - Contraste texte ≥ 4,5:1 (≥ 3:1 pour les grands textes et les éléments d'interface).

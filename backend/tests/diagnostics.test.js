@@ -180,3 +180,37 @@ describe("Anciennes fiches de prix en double (une par jour, version 2025)", () =
     assert.equal(tte[0].date, "2025-05-11", "la plus récente est gardée");
   });
 });
+
+describe("Or et matières premières", () => {
+  test("un ETC d'or coté à Francfort n'est pas classé en Allemagne", async () => {
+    h.fmp.notCovered["PPFB.DE"] = true;
+    h.yahoo.charts["PPFB.DE"] = chart(71.1, 72.9, { longName: "iShares Physical Gold ETC", exchangeName: "GER" });
+    const { token } = await h.registerUser();
+    await add(token, { ticker: "PPFB.DE", quantity: 1 });
+    const [s] = (await h.request("GET", "/api/user/portfolio", { token })).body.stocks;
+    assert.equal(s.zone, "Matières premières");
+    assert.equal(s.exposure, "Or");
+    assert.equal(s.sector, "Matières premières");
+    assert.equal(s.listingCountry, "Allemagne");
+  });
+
+  test("une société minière reste une action", () => {
+    assert.equal(etfExposure("Barrick Gold Corp", "Stock"), null);
+  });
+});
+
+describe("Dividendes calculés par une ancienne version", () => {
+  test("recalculés (fréquence) à l'actualisation complète même dans les 7 jours", async () => {
+    h.fmp.notCovered.NVDA = true;
+    const t = Math.floor(Date.now() / 1000);
+    h.yahoo.charts.NVDA = {
+      meta: { currency: "USD", regularMarketPrice: 228, regularMarketTime: t, instrumentType: "EQUITY", exchangeName: "NMS", longName: "NVIDIA Corporation" },
+      timestamp: [t - 86400, t], indicators: { quote: [{ close: [228.8, 228] }] },
+      events: { dividends: { a: { amount: 0.25, date: t - 110 * 86400 }, b: { amount: 0.25, date: t - 20 * 86400 } } },
+    };
+    await h.db.collection("prices").insertOne({ symbol: "NVDA", close: 220, currency: "USD", quoteCurrency: "USD", source: "yahoo", sector: "Technology", profileUpdatedAt: new Date(), dividend: 0.52, dividendsUpdatedAt: new Date(), lastUpdate: new Date(Date.now() - 3600e3), marketTime: new Date(), fmpNotCoveredAt: new Date() });
+    const doc = (await require("../services/priceStore").refreshTicker("NVDA")).doc;
+    assert.equal(doc.dividendFrequency, 4);
+    assert.ok(Math.abs(doc.dividend - 1) < 1e-9, `annuel ${doc.dividend}`);
+  });
+});

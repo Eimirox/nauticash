@@ -91,7 +91,9 @@ class FMPProvider {
       }
 
       // Dividendes : un changement par trimestre au plus
-      if (quote.type !== "ETF" && (isStale(previous?.dividendsUpdatedAt, DIVIDENDS_TTL) || !previous?.quoteCurrency)) {
+      // Dividendes : périmés, ou calculés par une ancienne version (fréquence inconnue)
+      const oldDividendData = previous?.dividend > 0 && !previous?.dividendFrequency;
+      if (quote.type !== "ETF" && (isStale(previous?.dividendsUpdatedAt, DIVIDENDS_TTL) || !previous?.quoteCurrency || oldDividendData)) {
         const div = await this.getDividends(mappedTicker, quote.price);
         if (div) {
           Object.assign(quote, div);

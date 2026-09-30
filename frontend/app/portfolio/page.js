@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { formatCurrencySymbol } from "./utils/formats";
@@ -22,6 +22,64 @@ import { wealthSummary } from "@/lib/wealth";
 // Enveloppes proposées (doivent correspondre à ACCOUNTS côté backend)
 const ACCOUNT_LABELS = { PEA: "PEA", CTO: "Compte-titres", AV: "Assurance-vie", PER: "PER", CRYPTO: "Crypto" };
 
+const SORT_DIR = { NONE: "none", ASC: "asc", DESC: "desc" };
+
+function getSortableValue(stock, key) {
+  switch (key) {
+    case "price":
+      return typeof stock.close === "number" ? stock.close : null;
+    case "day":
+      return Number.isFinite(stock.dayChangePercent) ? stock.dayChangePercent : null;
+    case "performance": {
+      const perf =
+        stock.pru > 0 ? ((stock.close - stock.pru) / stock.pru) * 100 : null;
+      return Number.isFinite(perf) ? perf : null;
+    }
+    case "dividend":
+      return typeof stock.dividend === "number" ? stock.dividend : null;
+    case "yield":
+      return typeof stock.myDividendYield === "number"
+        ? stock.myDividendYield
+        : null;
+    case "total": {
+      const total =
+        typeof stock.close === "number" && typeof stock.quantity === "number"
+          ? stock.close * stock.quantity
+          : null;
+      return Number.isFinite(total) ? total : null;
+    }
+    case "ticker":
+      return stock.ticker || "";
+    case "quantity":
+      return typeof stock.quantity === "number" ? stock.quantity : null;
+    case "pru":
+      return typeof stock.pru === "number" ? stock.pru : null;
+    default:
+      return null;
+  }
+}
+
+function sortStocksGeneric(list, { key, dir }) {
+  if (!key || dir === SORT_DIR.NONE) return list;
+  const factor = dir === SORT_DIR.ASC ? 1 : -1;
+  return [...list].sort((a, b) => {
+    const va = getSortableValue(a, key);
+    const vb = getSortableValue(b, key);
+    const an = va == null;
+    const bn = vb == null;
+    if (an && bn) return 0;
+    if (an) return 1;
+    if (bn) return -1;
+
+    if (typeof va === "string" && typeof vb === "string") {
+      return va.localeCompare(vb) * factor;
+    }
+    if (va < vb) return -1 * factor;
+    if (va > vb) return 1 * factor;
+    return (a.ticker || "").localeCompare(b.ticker || "");
+  });
+}
+
 export default function Portfolio() {
   const router = useRouter();
   const [ticker, setTicker] = useState("");
@@ -32,69 +90,12 @@ export default function Portfolio() {
   const [showCashSection, setShowCashSection] = useState(false);
   const [fullscreenTable, setFullscreenTable] = useState(false);
 
-  const SORT_DIR = { NONE: "none", ASC: "asc", DESC: "desc" };
   const [sort, setSort] = useState({ key: null, dir: SORT_DIR.NONE });
 
   const nf2 = new Intl.NumberFormat("fr-FR", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
-
-  function getSortableValue(stock, key) {
-    switch (key) {
-      case "price":
-        return typeof stock.close === "number" ? stock.close : null;
-      case "day":
-        return Number.isFinite(stock.dayChangePercent) ? stock.dayChangePercent : null;
-      case "performance": {
-        const perf =
-          stock.pru > 0 ? ((stock.close - stock.pru) / stock.pru) * 100 : null;
-        return Number.isFinite(perf) ? perf : null;
-      }
-      case "dividend":
-        return typeof stock.dividend === "number" ? stock.dividend : null;
-      case "yield":
-        return typeof stock.myDividendYield === "number"
-          ? stock.myDividendYield
-          : null;
-      case "total": {
-        const total =
-          typeof stock.close === "number" && typeof stock.quantity === "number"
-            ? stock.close * stock.quantity
-            : null;
-        return Number.isFinite(total) ? total : null;
-      }
-      case "ticker":
-        return stock.ticker || "";
-      case "quantity":
-        return typeof stock.quantity === "number" ? stock.quantity : null;
-      case "pru":
-        return typeof stock.pru === "number" ? stock.pru : null;
-      default:
-        return null;
-    }
-  }
-
-  function sortStocksGeneric(list, { key, dir }) {
-    if (!key || dir === SORT_DIR.NONE) return list;
-    const factor = dir === SORT_DIR.ASC ? 1 : -1;
-    return [...list].sort((a, b) => {
-      const va = getSortableValue(a, key);
-      const vb = getSortableValue(b, key);
-      const an = va == null;
-      const bn = vb == null;
-      if (an && bn) return 0;
-      if (an) return 1;
-      if (bn) return -1;
-
-      if (typeof va === "string" && typeof vb === "string") {
-        return va.localeCompare(vb) * factor;
-      }
-      if (va < vb) return -1 * factor;
-      if (va > vb) return 1 * factor;
-      return (a.ticker || "").localeCompare(b.ticker || "");
-    });
-  }
 
   function toggleSort(columnKey) {
     setSort((prev) => {
@@ -115,12 +116,18 @@ export default function Portfolio() {
     setStocks((prev) => sortStocksGeneric(prev, sort));
   }, [sort]);
 
-  const fetchPortfolio = async () => {
+  // Tri courant lu par fetchPortfolio sans le recréer à chaque changement de tri
+  const sortRef = useRef(sort);
+  useEffect(() => {
+    sortRef.current = sort;
+  }, [sort]);
+
+  const fetchPortfolio = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const data = await apiFetch("/api/user/portfolio");
-      setStocks(sortStocksGeneric(data.stocks || [], sort));
+      setStocks(sortStocksGeneric(data.stocks || [], sortRef.current));
       setCash({
         amount: Number.isFinite(Number(data.cash?.amount)) ? Number(data.cash.amount) : 0,
         currency: data.cash?.currency || "EUR",
@@ -130,7 +137,7 @@ export default function Portfolio() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const [refreshing, setRefreshing] = useState(false);
   const toast = useToast();
@@ -154,7 +161,7 @@ export default function Portfolio() {
 
   useEffect(() => {
     fetchPortfolio();
-  }, []);
+  }, [fetchPortfolio]);
 
   // Cours rafraîchis automatiquement chaque minute (lecture de la base uniquement : les appels
   // aux fournisseurs de cours sont faits côté serveur, une fois pour tous les utilisateurs).
@@ -190,7 +197,6 @@ export default function Portfolio() {
       clearInterval(id);
       document.removeEventListener("visibilitychange", onVisible);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sort]);
 
   const [adding, setAdding] = useState(false);
@@ -474,7 +480,7 @@ export default function Portfolio() {
           }}
           className="rounded-lg border border-line px-2 py-1.5 text-sm"
         >
-          <option value="">Ordre d'ajout</option>
+          <option value="">Ordre d&apos;ajout</option>
           <option value="total:desc">Montant (décroissant)</option>
           <option value="performance:desc">Performance (meilleure)</option>
           <option value="performance:asc">Performance (pire)</option>
@@ -515,7 +521,7 @@ export default function Portfolio() {
                         <p className="truncate text-sm text-ink">{stock.name}</p>
                       )}
                       <p className="truncate text-xs text-ink-muted">
-                        {[stock.exchange, stock.currency, stock.zone, stock.exposure && `indice ${stock.exposure}`].filter(Boolean).join(" · ")}
+                        {[stock.exchange, stock.currency, stock.zone, stock.exposure && (stock.commodity ? stock.exposure : `indice ${stock.exposure}`)].filter(Boolean).join(" · ")}
                       </p>
                       <AccountSelect stock={stock} className="mt-1" />
                     </div>
@@ -680,7 +686,9 @@ export default function Portfolio() {
                     <span className="block font-medium text-ink">{stock.zone || exchangeToCountry[stock.country] || stock.country || "—"}</span>
                     <span className="block text-xs text-ink-muted" title={stock.exposure ? `Exposition déduite de l'indice suivi (${stock.exposure}), cotation : ${stock.listingCountry}` : undefined}>
                       {stock.exposure
-                        ? `${stock.country !== stock.zone ? stock.country + " · " : ""}indice ${stock.exposure}`
+                        ? stock.commodity
+                          ? stock.exposure
+                          : `${stock.country !== stock.zone ? stock.country + " · " : ""}indice ${stock.exposure}`
                         : stock.zone && stock.country !== stock.zone
                           ? stock.country
                           : ""}

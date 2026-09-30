@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
+import Logo from "../components/Logo";
 
 const passwordRules = [
   { id: "len", test: (s) => s.length >= 10, label: "Au moins 10 caractères" },
@@ -90,13 +91,7 @@ export default function Register() {
         {/* Logo & Brand */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-3 group mb-2">
-            <img
-              src="/logo_nauticash.webp?v=2"
-              alt="Logo Nauticash"
-              width={40}
-              height={40}
-              className="rounded-lg shadow-md group-hover:scale-110 transition-transform"
-            />
+            <Logo size={40} alt="Logo Nauticash" className="rounded-lg shadow-md group-hover:scale-110 transition-transform" />
             <span className="text-3xl font-bold bg-gradient-to-r from-slate-900 via-emerald-600 to-blue-600 dark:from-white dark:via-emerald-300 dark:to-sky-300 bg-clip-text text-transparent">
               Nauticash
             </span>
@@ -358,9 +353,9 @@ export default function Register() {
                 className="mt-0.5 w-4 h-4 text-accent border-line rounded focus:ring-accent"
               />
               <label htmlFor="accept" className="text-sm text-ink">
-                J'accepte les{" "}
+                J&apos;accepte les{" "}
                 <a href="/cgu" target="_blank" rel="noopener noreferrer" className="text-accent hover:text-accent font-medium">
-                  conditions d'utilisation<span className="sr-only"> (nouvel onglet)</span>
+                  conditions d&apos;utilisation<span className="sr-only"> (nouvel onglet)</span>
                 </a>{" "}
                 et la{" "}
                 <a href="/confidentialite" target="_blank" rel="noopener noreferrer" className="text-accent hover:text-accent font-medium">
@@ -436,7 +431,7 @@ export default function Register() {
             <svg aria-hidden="true" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
-            Retour à l'accueil
+            Retour à l&apos;accueil
           </Link>
         </div>
       </div>

@@ -14,6 +14,8 @@ import {
 } from "react-simple-maps";
 import { shareSummary } from "@/lib/chartSummary";
 import { SkeletonRegion, SkeletonStat, SkeletonChart } from "../../components/ui/Skeleton";
+import AllocationBreakdown from "../../components/AllocationBreakdown";
+import DiversificationCard from "../../components/DiversificationCard";
 
 // URL de la carte du monde (TopoJSON)
 // Fond de carte servi par le site (world-atlas 2.0.2, Natural Earth) : pas de dépendance à un CDN externe
@@ -61,6 +63,7 @@ const CONTINENTS = {
 export default function GeographiePage() {
   const [loadError, setLoadError] = useState(null);
   const [stocks, setStocks] = useState([]);
+  const [cash, setCash] = useState({ amount: 0, currency: "EUR" });
   const [loading, setLoading] = useState(true);
   const [tooltipContent, setTooltipContent] = useState("");
 
@@ -70,6 +73,7 @@ export default function GeographiePage() {
   const base = useBaseCurrency();
   const [discreet] = useDiscreet();
   const inBase = (value, currency) => toCurrency(value, currency, base, rates) ?? ((currency || "EUR") === base ? value : 0);
+  const toBaseOrNull = (value, currency) => toCurrency(value, currency, base, rates);
 
   // Fetch portfolio
   useEffect(() => {
@@ -78,6 +82,7 @@ export default function GeographiePage() {
       try {
         const data = await apiFetch("/api/user/portfolio");
         setStocks(data.stocks || []);
+        setCash(data.cash || { amount: 0, currency: "EUR" });
       } catch (err) {
         console.error(err);
         setLoadError(`Impossible de charger vos données : ${err.message}`);
@@ -211,10 +216,10 @@ export default function GeographiePage() {
         {/* Title */}
         <div className="mb-8">
           <h1 className="text-3xl md:text-4xl font-bold text-ink mb-2">
-            Géographie
+            Répartition
           </h1>
           <p className="text-ink-muted">
-            Exposition de votre portefeuille par pays et par continent.
+            Où est investi votre portefeuille : zones et pays, types d&apos;actif, devises, secteurs, et score de diversification.
           </p>
         </div>
 
@@ -266,13 +271,13 @@ export default function GeographiePage() {
                   <svg className="w-5 h-5 text-accent" fill="currentColor" viewBox="0 0 20 20">
                     <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
                   </svg>
-                  <h3 className="text-sm font-semibold text-accent uppercase">Diversification</h3>
+                  <h3 className="text-sm font-semibold text-accent uppercase">Diversité géographique</h3>
                 </div>
                 <p className="text-2xl font-bold text-accent">
                   {geoData.countryList.length <= 2 ? "Faible" : geoData.countryList.length <= 4 ? "Moyenne" : "Élevée"}
                 </p>
                 <p className="text-xs text-accent">
-                  {geoData.countryList.length} zones distinctes
+                  {geoData.countryList.length} pays distincts
                 </p>
               </div>
             </div>
@@ -283,11 +288,11 @@ export default function GeographiePage() {
                 <svg className="w-5 h-5 text-accent" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
                 </svg>
-                <h3 className="text-lg font-bold text-ink">Carte de l'Exposition Géographique</h3>
+                <h3 className="text-lg font-bold text-ink">Carte de l&apos;Exposition Géographique</h3>
               </div>
 
               {/* Légende */}
-              <div className="mb-4 flex items-center gap-4 text-xs text-ink-muted">
+              <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-ink-muted">
                 <span>Exposition :</span>
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 rounded" style={{ backgroundColor: LAND }}></div>
@@ -445,6 +450,27 @@ export default function GeographiePage() {
                 </table>
               </div>
             </div>
+
+            {/* Types d'actif, devises, secteurs (ex-tableau de bord) */}
+            <section aria-labelledby="repartition-autres-title" className="space-y-4">
+              <h2 id="repartition-autres-title" className="text-xl font-bold text-ink">
+                Types d&apos;actif, devises et secteurs
+              </h2>
+              <AllocationBreakdown stocks={stocks} cash={cash} inBase={inBase} toBaseOrNull={toBaseOrNull} />
+            </section>
+
+            {/* Score de diversification (ex-tableau de bord) */}
+            <DiversificationCard
+              positions={stocks.map((s) => ({
+                ticker: s.ticker,
+                value: inBase((s.close || 0) * (s.quantity || 0), s.currency),
+                sector: s.sector,
+                country: s.country,
+                currency: s.currency,
+                type: s.type,
+                composition: s.composition,
+              }))}
+            />
 
             {/* Info */}
             <div className="p-4 bg-blue-50 dark:bg-sky-500/10 border border-blue-200 dark:border-sky-500/30 rounded-lg">

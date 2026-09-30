@@ -5,9 +5,20 @@
 const CURRENCIES = ["EUR", "USD", "GBP", "CHF"];
 const AVATAR_COLORS = ["emerald", "blue", "teal", "indigo", "amber", "rose", "slate"];
 const THEMES = ["system", "light", "dark"];
-const HOME_PAGES = ["/portfolio", "/analytics", "/analytics/performance", "/analytics/dividendes", "/analytics/geographie"];
+const HOME_PAGES = ["/tableau-de-bord", "/portfolio", "/analyses/performance", "/analyses/dividendes", "/analyses/repartition"];
+// Anciennes adresses (avant la navigation par onglets) : acceptées et converties
+const LEGACY_HOME_PAGES = Object.freeze({
+  "/analytics": "/tableau-de-bord",
+  "/analytics/performance": "/analyses/performance",
+  "/analytics/dividendes": "/analyses/dividendes",
+  "/analytics/geographie": "/analyses/repartition",
+});
+const homePage = (v) => oneOf(HOME_PAGES)(Object.hasOwn(LEGACY_HOME_PAGES, v) ? LEGACY_HOME_PAGES[v] : v);
 const HORIZONS = ["court", "moyen", "long"]; // < 3 ans, 3 à 8 ans, > 8 ans
 const RISK_PROFILES = ["prudent", "equilibre", "dynamique", "offensif"];
+// Page Stratégie : style d'investissement et poches de l'allocation cible (zones + or / matières premières, crypto)
+const STRATEGIES = ["dividendes", "croissance", "passive", "equilibree"];
+const ALLOCATION_KEYS = ["europe", "northAmerica", "asiaPacific", "emerging", "world", "commodities", "crypto"];
 
 const DEFAULT_PROFILE = Object.freeze({
   displayName: "",
@@ -21,6 +32,16 @@ const DEFAULT_PROFILE = Object.freeze({
   horizon: null,
   riskProfile: null,
   monthlyExpenses: null,
+  // Page Objectifs : rente de dividendes visée et hypothèses de projection (null = valeur proposée par la page)
+  incomeGoalMonthly: null, // rente de dividendes visée, en devise de référence par mois
+  monthlySavings: null, // épargne investie chaque mois
+  expectedReturn: null, // rendement annuel espéré, en % (6 = 6 %/an)
+  dividendYield: null, // rendement du dividende visé à l'arrivée, en %
+  inflationRate: null, // inflation annuelle supposée, en %
+  // Page Stratégie (null = valeurs proposées par la page selon la stratégie)
+  strategy: null, // dividendes | croissance | passive | equilibree
+  targetAllocation: null, // { europe: 40, northAmerica: 30, … } en %, total = 100
+  maxPositionWeight: null, // poids maximal d'une ligne, en % du portefeuille
 });
 
 const MAX_AMOUNT = 1e12;
@@ -30,10 +51,31 @@ const amount = (v) => {
   const n = typeof v === "string" ? Number(v.replace(",", ".")) : v;
   return typeof n === "number" && Number.isFinite(n) && n >= 0 && n < MAX_AMOUNT ? [true, Math.round(n * 100) / 100] : [false];
 };
+// Pourcentage borné (6 = 6 %), arrondi à 2 décimales ; accepte « 6,5 »
+const percent = (min, max) => (v) => {
+  const n = typeof v === "string" && v.trim() !== "" ? Number(v.replace(",", ".")) : v;
+  return typeof n === "number" && Number.isFinite(n) && n >= min && n <= max ? [true, Math.round(n * 100) / 100] : [false];
+};
 const isoDate = (v) => {
   if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return [false];
   const d = new Date(`${v}T00:00:00Z`);
   return Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== v ? [false] : [true, v];
+};
+
+// Allocation cible : poches connues, pourcentages de 0 à 100, total de 100 % (à 0,5 point près).
+// Les poches absentes valent 0 ; la valeur enregistrée contient toujours toutes les poches.
+const allocation = (v) => {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return [false];
+  const out = Object.fromEntries(ALLOCATION_KEYS.map((k) => [k, 0]));
+  const pct = percent(0, 100);
+  for (const [key, raw] of Object.entries(v)) {
+    if (!ALLOCATION_KEYS.includes(key)) return [false];
+    const [ok, n] = raw === "" || raw === null ? [true, 0] : pct(raw);
+    if (!ok) return [false];
+    out[key] = n;
+  }
+  const total = Object.values(out).reduce((a, b) => a + b, 0);
+  return Math.abs(total - 100) <= 0.5 ? [true, out] : [false];
 };
 
 // Règle de validation par champ : renvoie [ok, valeurNormalisée]
@@ -47,12 +89,20 @@ const RULES = {
   baseCurrency: (v) => oneOf(CURRENCIES)(typeof v === "string" ? v.toUpperCase() : v),
   theme: oneOf(THEMES),
   discreetMode: (v) => (typeof v === "boolean" ? [true, v] : [false]),
-  homePage: oneOf(HOME_PAGES),
+  homePage,
   goalAmount: nullable(amount),
   goalDate: nullable(isoDate),
   horizon: nullable(oneOf(HORIZONS)),
   riskProfile: nullable(oneOf(RISK_PROFILES)),
   monthlyExpenses: nullable(amount),
+  incomeGoalMonthly: nullable(amount),
+  monthlySavings: nullable(amount),
+  expectedReturn: nullable(percent(-10, 20)),
+  dividendYield: nullable(percent(0.1, 15)),
+  inflationRate: nullable(percent(0, 15)),
+  strategy: nullable(oneOf(STRATEGIES)),
+  targetAllocation: nullable(allocation),
+  maxPositionWeight: nullable(percent(1, 100)),
 };
 
 const MESSAGES = {
@@ -67,6 +117,14 @@ const MESSAGES = {
   horizon: "Horizon : court, moyen ou long.",
   riskProfile: "Profil de risque : prudent, équilibré, dynamique ou offensif.",
   monthlyExpenses: "Dépenses mensuelles invalides.",
+  incomeGoalMonthly: "Rente mensuelle visée invalide.",
+  monthlySavings: "Épargne mensuelle invalide.",
+  expectedReturn: "Rendement espéré : entre −10 et 20 % par an.",
+  dividendYield: "Rendement du dividende : entre 0,1 et 15 %.",
+  inflationRate: "Inflation : entre 0 et 15 % par an.",
+  strategy: "Stratégie : dividendes, croissance, indicielle passive ou équilibrée.",
+  targetAllocation: "Allocation cible : poches connues, de 0 à 100 % chacune, pour un total de 100 %.",
+  maxPositionWeight: "Poids maximal d'une ligne : entre 1 et 100 %.",
 };
 
 /** Valide une mise à jour partielle. Renvoie { value } ou { errors }. */
@@ -97,6 +155,7 @@ function readProfile(user) {
   for (const key of Object.keys(DEFAULT_PROFILE)) {
     if (stored[key] !== undefined) out[key] = stored[key];
   }
+  if (Object.hasOwn(LEGACY_HOME_PAGES, out.homePage)) out.homePage = LEGACY_HOME_PAGES[out.homePage];
   return out;
 }
 
@@ -106,8 +165,11 @@ module.exports = {
   AVATAR_COLORS,
   THEMES,
   HOME_PAGES,
+  LEGACY_HOME_PAGES,
   HORIZONS,
   RISK_PROFILES,
+  STRATEGIES,
+  ALLOCATION_KEYS,
   validateProfilePatch,
   readProfile,
 };

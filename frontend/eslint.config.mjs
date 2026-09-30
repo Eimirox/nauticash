@@ -9,6 +9,10 @@ const compat = new FlatCompat({
   baseDirectory: __dirname,
 });
 
-const eslintConfig = [...compat.extends("next/core-web-vitals")];
+const eslintConfig = [
+  // `next lint` n'existe plus depuis Next 16 : ESLint est lancé directement (`npm run lint`)
+  { ignores: [".next/**", "out/**", "build/**", "node_modules/**", "next-env.d.ts"] },
+  ...compat.extends("next/core-web-vitals"),
+];
 
 export default eslintConfig;
