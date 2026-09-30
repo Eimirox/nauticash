@@ -116,7 +116,7 @@ export default function TableauDeBord() {
             Tableau de bord
           </h1>
           <p className="text-ink-muted">
-            Votre patrimoine en un coup d'œil : synthèse, alertes, objectifs, évolution, dividendes et répartition en bref. Le détail est dans Analyses.
+            Votre patrimoine en un coup d&apos;œil : synthèse, alertes, objectifs, évolution, dividendes et répartition en bref. Le détail est dans Analyses.
           </p>
         </div>
 

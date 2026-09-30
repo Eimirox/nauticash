@@ -125,7 +125,7 @@ export default function ProfileForm({ onLoaded }) {
             <p id="displayName-hint" className="mt-1 text-xs text-ink-muted">Affiché dans l&apos;en-tête, 40 caractères maximum.</p>
           </div>
           <fieldset>
-            <legend className={labelClass}>Couleur de l'avatar</legend>
+            <legend className={labelClass}>Couleur de l&apos;avatar</legend>
             <div className="flex flex-wrap gap-3">
               {Object.entries(AVATAR_COLORS).map(([key, cls]) => (
                 <label key={key} className="cursor-pointer">
@@ -188,7 +188,7 @@ export default function ProfileForm({ onLoaded }) {
             />
           </label>
           <div>
-            <label htmlFor="homePage" className={labelClass}>Page d'accueil après connexion</label>
+            <label htmlFor="homePage" className={labelClass}>Page d&apos;accueil après connexion</label>
             <select id="homePage" className={inputClass} value={form.homePage} onChange={(e) => set("homePage")(e.target.value)}>
               {HOME_PAGES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>

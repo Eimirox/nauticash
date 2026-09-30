@@ -7,6 +7,7 @@ import { logout } from "@/lib/api";
 import { cx } from "./ui/cx";
 import { Avatar } from "./Avatar";
 import { useProfile, useDiscreet } from "@/lib/profile";
+import Logo from "./Logo";
 
 // Adresse qui reçoit les retours de la bêta (variable Vercel NEXT_PUBLIC_CONTACT_EMAIL) ;
 // sans elle, le lien « Donner mon avis » n'est pas affiché.
@@ -288,7 +289,7 @@ export default function AppHeader({ actions }) {
             aria-label="Nauticash (bêta), tableau de bord"
             className="flex shrink-0 items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
-            <img src="/logo_nauticash.webp?v=3" alt="" width={32} height={32} className="rounded-lg shadow-sm" />
+            <Logo size={32} className="rounded-lg shadow-sm" />
             <span className="hidden bg-gradient-to-r from-slate-900 via-emerald-600 to-blue-600 bg-clip-text text-xl font-bold text-transparent dark:from-white dark:via-emerald-300 dark:to-sky-300 sm:inline">
               Nauticash
             </span>

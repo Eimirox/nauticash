@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Compass from "./Compass";
 import DepthLines from "./DepthLines";
+import Logo from "./Logo";
 
 // Mise en page commune aux pages 404 et erreur
 export default function StatusPage({ code, title, message, children }) {
@@ -14,7 +15,7 @@ export default function StatusPage({ code, title, message, children }) {
         <p className="mb-8 text-ink-muted">{message}</p>
         <div className="flex flex-col justify-center gap-3 sm:flex-row">{children}</div>
         <Link href="/" className="mt-10 inline-flex items-center gap-2 text-sm text-ink-muted hover:text-ink">
-          <img src="/logo_nauticash.webp?v=3" alt="" width={20} height={20} className="rounded" />
+          <Logo size={20} className="rounded" />
           Nauticash
         </Link>
       </div>

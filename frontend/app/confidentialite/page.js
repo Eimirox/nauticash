@@ -8,7 +8,7 @@ export default function Confidentialite() {
     <LegalPage title="Politique de confidentialité" updated="26 septembre 2026">
       <h2>1. Responsable du traitement</h2>
       <p>
-        [Nom et prénom de l'éditeur] – contact : [adresse email de contact].
+        [Nom et prénom de l&apos;éditeur] – contact : [adresse email de contact].
       </p>
 
       <h2>2. Données collectées</h2>
@@ -17,7 +17,7 @@ export default function Confidentialite() {
         <li><strong>Portefeuille :</strong> tickers, quantités, prix de revient unitaire, montant et devise du cash, historique de valeur que vous saisissez.</li>
         <li><strong>Technique :</strong> adresse IP, conservée temporairement en mémoire pour limiter les tentatives de connexion abusives.</li>
       </ul>
-      <p>Aucune donnée bancaire, aucun identifiant de courtier et aucune pièce d'identité ne sont demandés.</p>
+      <p>Aucune donnée bancaire, aucun identifiant de courtier et aucune pièce d&apos;identité ne sont demandés.</p>
 
       <h2>3. Finalités et bases légales</h2>
       <ul>
@@ -29,13 +29,13 @@ export default function Confidentialite() {
       <h2>4. Destinataires et sous-traitants</h2>
       <ul>
         <li><strong>Hébergement du site :</strong> [ex. Vercel]</li>
-        <li><strong>Hébergement de l'API :</strong> [hébergeur du serveur]</li>
+        <li><strong>Hébergement de l&apos;API :</strong> [hébergeur du serveur]</li>
         <li><strong>Base de données :</strong> MongoDB Atlas [région du cluster]</li>
-        <li><strong>Envoi d'emails</strong> (réinitialisation du mot de passe) : Resend – reçoit uniquement votre adresse email.</li>
+        <li><strong>Envoi d&apos;emails</strong> (réinitialisation du mot de passe) : Resend – reçoit uniquement votre adresse email.</li>
       </ul>
       <p>
         Les fournisseurs de données de marché reçoivent uniquement les tickers à actualiser, jamais votre identité.
-        Certains prestataires étant situés hors de l'Union européenne, les transferts sont encadrés par les clauses
+        Certains prestataires étant situés hors de l&apos;Union européenne, les transferts sont encadrés par les clauses
         contractuelles types de la Commission européenne ou le Data Privacy Framework.
       </p>
 
@@ -48,21 +48,21 @@ export default function Confidentialite() {
 
       <h2>6. Cookies et stockage local</h2>
       <p>
-        Nauticash n'utilise ni cookie publicitaire ni outil de mesure d'audience. Le navigateur stocke localement votre jeton
+        Nauticash n&apos;utilise ni cookie publicitaire ni outil de mesure d&apos;audience. Le navigateur stocke localement votre jeton
         de connexion et votre choix de langue, strictement nécessaires au fonctionnement du site.
       </p>
 
       <h2>7. Vos droits</h2>
       <p>
-        Vous disposez d'un droit d'accès, de rectification, d'effacement, de limitation, d'opposition et de portabilité de vos
+        Vous disposez d&apos;un droit d&apos;accès, de rectification, d&apos;effacement, de limitation, d&apos;opposition et de portabilité de vos
         données. Pour les exercer, écrivez à [adresse email de contact]. Vous pouvez également introduire une réclamation auprès
         de la CNIL (<a href="https://www.cnil.fr" target="_blank" rel="noopener noreferrer">www.cnil.fr</a>).
       </p>
 
       <h2>8. Sécurité</h2>
       <p>
-        Les mots de passe sont hachés (bcrypt), les échanges sont chiffrés (HTTPS) et l'accès aux données est limité à votre
-        compte via un jeton d'authentification.
+        Les mots de passe sont hachés (bcrypt), les échanges sont chiffrés (HTTPS) et l&apos;accès aux données est limité à votre
+        compte via un jeton d&apos;authentification.
       </p>
     </LegalPage>
   );

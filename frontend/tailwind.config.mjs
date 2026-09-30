@@ -1,8 +1,8 @@
-/** @type {import('tailwindcss').Config} */
 // Couleurs de marque exposées en variables CSS (app/globals.css, voir docs/DESIGN.md)
 const token = (name) => `rgb(var(--${name}) / <alpha-value>)`;
 
-export default {
+/** @type {import('tailwindcss').Config} */
+const config = {
   darkMode: "class",
   content: [
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
@@ -35,3 +35,5 @@ export default {
   },
   plugins: [],
 };
+
+export default config;

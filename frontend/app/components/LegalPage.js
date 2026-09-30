@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Logo from "./Logo";
 
 // Mise en page commune aux pages légales
 export default function LegalPage({ title, updated, children }) {
@@ -7,7 +8,7 @@ export default function LegalPage({ title, updated, children }) {
       <header className="border-b border-line bg-surface/90">
         <div className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <img src="/logo_nauticash.webp?v=2" alt="Logo Nauticash" width={32} height={32} className="rounded-lg" />
+            <Logo size={32} alt="Logo Nauticash" className="rounded-lg" />
             <span className="text-xl font-bold bg-gradient-to-r from-slate-900 via-emerald-600 to-blue-600 dark:from-white dark:via-emerald-300 dark:to-sky-300 bg-clip-text text-transparent">
               Nauticash
             </span>
