@@ -560,7 +560,7 @@ export default function Portfolio() {
                     <TickerLogo ticker={stock.ticker} logo={stock.logo} size={36} />
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-base font-bold text-ink">{stock.ticker}</span>
+                        <Link href={`/portfolio/${encodeURIComponent(stock.ticker)}`} title={`Voir le détail de ${stock.ticker}`} className="text-base font-bold text-ink rounded underline-offset-2 hover:text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">{stock.ticker}</Link>
                         {typeBadge(stock.type)}
                       </div>
                       {stock.name && stock.name !== stock.ticker && (
@@ -717,7 +717,7 @@ export default function Portfolio() {
                     <div className="flex items-start gap-3">
                       <TickerLogo ticker={stock.ticker} logo={stock.logo} size={36} className="mt-0.5" />
                       <div className="min-w-0">
-                        <span className="block text-base font-bold text-ink">{stock.ticker}</span>
+                        <Link href={`/portfolio/${encodeURIComponent(stock.ticker)}`} title={`Voir le détail de ${stock.ticker}`} className="block w-fit text-base font-bold text-ink rounded underline-offset-2 hover:text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">{stock.ticker}</Link>
                         {stock.name && stock.name !== stock.ticker && (
                           <span className="block max-w-[14rem] truncate text-sm text-ink" title={stock.name}>{stock.name}</span>
                         )}
