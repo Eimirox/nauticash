@@ -23,6 +23,12 @@ export const metadata = {
   },
   description: SITE_DESCRIPTION,
   applicationName: SITE_NAME,
+  // Ajout à l'écran d'accueil sur iPhone (le manifeste app/manifest.js couvre Android et les navigateurs de bureau)
+  appleWebApp: {
+    capable: true,
+    title: SITE_NAME,
+    statusBarStyle: "default",
+  },
   openGraph: {
     type: "website",
     locale: "fr_FR",
