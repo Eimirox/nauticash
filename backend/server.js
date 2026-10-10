@@ -29,6 +29,7 @@ const priceService = require("./services/priceService");
 const priceUpdater = require("./jobs/updatePrices");
 const dailySnapshot = require("./jobs/dailySnapshot");
 const livePrices = require("./jobs/livePrices");
+const priceCheck = require("./jobs/priceCheck");
 const coverage = require("./services/coverage");
 
 const app = express();
@@ -111,6 +112,7 @@ app.get("/api/admin/stats", async (req, res) => {
       cronJob: cronStats,
       dailyHistory: historyStats,
       livePrices: livePrices.getStats(),
+      priceCheck: await priceCheck.getStats(),
       timestamp: new Date(),
     });
   } catch (error) {
@@ -335,6 +337,7 @@ const startServer = async () => {
     // 4 bis. Historique quotidien des portefeuilles + cours intraday
     dailySnapshot.start();
     livePrices.start();
+    priceCheck.start();
 
     // 5. Démarrer le serveur Express
     app.listen(PORT, () => {
