@@ -29,7 +29,7 @@ describe("GET /api/market/benchmarks", () => {
   test("liste les indices disponibles", async () => {
     const { token } = await h.registerUser();
     const res = await h.request("GET", "/api/market/benchmarks", { token });
-    assert.deepEqual(res.body.map((b) => b.key), ["CAC40", "SP500", "MSCIWORLD"]);
+    assert.deepEqual(res.body.map((b) => b.key), ["CAC40", "SP500"]);
   });
 
   test("renvoie l'historique trié, sans prix nuls", async () => {
@@ -73,5 +73,28 @@ describe("GET /api/market/benchmarks", () => {
     h.fmp.failWith = 500;
     assert.equal((await get(token, "SP500")).status, 503);
     assert.equal((await get(token, "NASDAQ")).status, 404);
+  });
+
+  test("indice refusé par FMP (402) : repli sur Yahoo", async () => {
+    const { token } = await h.registerUser();
+    h.fmp.notCovered["^FCHI"] = true;
+    const t0 = Date.UTC(2026, 8, 24, 15, 30) / 1000;
+    h.yahoo.charts["^FCHI"] = {
+      meta: { gmtoffset: 7200 },
+      timestamp: [t0, t0 + 86400, t0 + 2 * 86400],
+      indicators: { quote: [{ close: [7750, null, 7800.5] }] },
+    };
+    const res = await get(token, "CAC40");
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.points, [
+      { date: "2026-09-24", close: 7750 },
+      { date: "2026-09-26", close: 7800.5 },
+    ]);
+    assert.equal(res.body.stale, false);
+  });
+
+  test("MSCI World n'est plus proposé", async () => {
+    const { token } = await h.registerUser();
+    assert.equal((await get(token, "MSCIWORLD")).status, 404);
   });
 });

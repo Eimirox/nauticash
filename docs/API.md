@@ -46,6 +46,10 @@ Chaque soir à 21:45 UTC (`CRON_HISTORY_SCHEDULE`, désactivable avec `CRON_DAIL
 
 `GET /api/market/benchmarks/:key` (CAC40 = `^FCHI`, SP500 = `^GSPC`, MSCIWORLD = ETF `URTH`) renvoie ≈ 400 jours de clôtures via l'endpoint FMP `historical-price-eod/light`. Les points sont gardés en base (collection `benchmarks`) 12 h et partagés entre tous les utilisateurs : au plus 2 appels par indice et par jour, soit 6 appels/jour au maximum. En cas d'échec FMP, les dernières données connues sont renvoyées avec `stale: true`.
 
+## Historique d'un titre (depuis le 10/10/2026)
+
+`GET /api/market/history/:ticker` renvoie les clôtures quotidiennes sur 1 an (366 jours) d'un titre **détenu par l'utilisateur** (sinon 404, pour ne pas consommer d'appels sur n'importe quel symbole ; 30 requêtes/min). Source : Yahoo Finance (`v8/finance/chart`, sans clé ni quota) puis FMP `historical-price-eod/light` en repli seulement. Points gardés 12 h en base (collection `ticker_history`) et partagés entre utilisateurs ; en cas d'échec, dernières données connues avec `stale: true`, 503 si aucune.
+
 ## Couverture des symboles (28/09/2026)
 
 **Constat** : l'offre gratuite FMP ne couvre qu'environ 90 symboles (« Symbol limited to AAPL, TSLA, AMZN and 84 more » sur la grille tarifaire). Pour les autres (GOOG, la plupart des actions européennes…), FMP répond `402` : le titre ne pouvait pas être ajouté, ou le cours arrivait sans profil ni dividendes (secteur « Unknown », pays deviné, analyse faussée). V (Visa) fait partie des symboles couverts, d'où la différence.

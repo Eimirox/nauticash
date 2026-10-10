@@ -6,8 +6,9 @@ import Button from "./Button";
 /**
  * Fenêtre modale accessible : focus piégé, fermeture par Échap ou clic sur le fond.
  * <Modal open={open} onClose={...} title="Supprimer AAPL ?" footer={...}>texte</Modal>
+ * wide : fenêtre plus large (aperçu d'un import, tableaux).
  */
-export default function Modal({ open, onClose, title, children, footer }) {
+export default function Modal({ open, onClose, title, children, footer, wide = false }) {
   const panelRef = useRef(null);
   const previousFocus = useRef(null);
 
@@ -55,7 +56,7 @@ export default function Modal({ open, onClose, title, children, footer }) {
         aria-modal="true"
         aria-labelledby="modal-title"
         tabIndex={-1}
-        className="animate-scale-in relative w-full max-w-md rounded-2xl border border-line bg-surface p-6 text-ink shadow-xl focus:outline-none"
+        className={`animate-scale-in relative w-full ${wide ? "max-w-2xl" : "max-w-md"} rounded-2xl border border-line bg-surface p-6 text-ink max-h-[calc(100dvh-2rem)] overflow-y-auto shadow-xl focus:outline-none`}
       >
         <h2 id="modal-title" className="mb-2 text-lg font-semibold">{title}</h2>
         <div className="text-sm text-ink-muted">{children}</div>

@@ -1,10 +1,12 @@
 // backend/routes/market.js
-// Données de marché partagées : indices de référence (voir services/benchmarks.js)
+// Données de marché partagées : indices de référence (voir services/benchmarks.js),
+// historique d'un titre détenu (services/tickerHistory.js), recherche de tickers
 
 const express = require("express");
 const auth = require("../middleware/auth");
 const mongoose = require("mongoose");
 const benchmarks = require("../services/benchmarks");
+const { getTickerHistory } = require("../services/tickerHistory");
 const priceService = require("../services/priceService");
 const rateLimit = require("../middleware/rateLimit");
 const { searchLocal } = require("../services/popularTickers");
@@ -13,6 +15,9 @@ const { exchangeLabel, logoUrl } = require("../services/exchanges");
 const SEARCH_TTL = 7 * 24 * 60 * 60 * 1000;
 const searchCache = () => mongoose.connection.collection("symbol_search");
 const searchLimiter = rateLimit({ windowMs: 60 * 1000, max: 60, message: "Trop de recherches, patientez une minute." });
+
+const historyLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, message: "Trop de demandes de cours, patientez une minute." });
+const TICKER_RE = /^[A-Z0-9.\-^=]{1,20}$/;
 
 const router = express.Router();
 
@@ -31,6 +36,27 @@ router.get("/benchmarks/:key", auth, async (req, res) => {
   } catch (err) {
     console.error("❌ Error GET /market/benchmarks:", err.message);
     res.status(503).json({ error: "Données de l'indice momentanément indisponibles." });
+  }
+});
+
+// GET /api/market/history/:ticker → cours de clôture quotidiens sur 1 an (page détail d'un titre)
+// Réservé aux titres détenus par l'utilisateur, pour ne pas consommer de quota sur n'importe quel symbole.
+router.get("/history/:ticker", auth, historyLimiter, async (req, res) => {
+  const ticker = String(req.params.ticker || "").trim().toUpperCase();
+  if (!TICKER_RE.test(ticker)) return res.status(400).json({ error: "Ticker invalide." });
+  try {
+    const user = await mongoose.connection
+      .collection("users")
+      .findOne({ _id: new mongoose.Types.ObjectId(req.user.userId) }, { projection: { portfolio: 1 } });
+    const held = (user?.portfolio || []).some((p) => String(p.ticker).toUpperCase() === ticker);
+    if (!held) return res.status(404).json({ error: "Titre absent de votre portefeuille." });
+
+    const data = await getTickerHistory(ticker);
+    res.set("Cache-Control", "private, max-age=3600");
+    res.json(data);
+  } catch (err) {
+    console.error("❌ Error GET /market/history:", err.message);
+    res.status(503).json({ error: "Historique du cours momentanément indisponible." });
   }
 });
 

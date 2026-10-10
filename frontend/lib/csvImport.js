@@ -147,3 +147,34 @@ export function parsePositionsCsv(text, { existing = [] } = {}) {
 
   return { ok: true, separator, rows, errors };
 }
+
+// ---------------------------------------------------------------------------
+// Import 2/2 : modèle à télécharger et bilan de l'envoi ligne par ligne.
+
+/** Modèle proposé au téléchargement (séparateur ; et virgule décimale, comme Excel en français). */
+export const CSV_TEMPLATE =
+  "ticker;quantité;PRU;enveloppe\r\n" +
+  "AAPL;10;152,30;CTO\r\n" +
+  "MC.PA;2;610;PEA\r\n" +
+  "CW8.PA;5,5;420,15;PEA\r\n";
+
+/**
+ * Classe la réponse du POST /api/user/portfolio pour une ligne importée.
+ * error : null (succès) ou l'ApiError levée par apiFetch ({ message, status }).
+ * → { status: "added" | "notFound" | "error", message }
+ */
+export function importOutcome(error) {
+  if (!error) return { status: "added", message: "Ajouté" };
+  const message = String(error.message || "Erreur inconnue");
+  if (error.status === 404 && /introuvable/i.test(message)) {
+    return { status: "notFound", message: "Introuvable chez nos fournisseurs de cours" };
+  }
+  return { status: "error", message };
+}
+
+/** Compteurs du bilan : { added, notFound, error, total }. */
+export function summarizeImport(results = []) {
+  const counts = { added: 0, notFound: 0, error: 0, total: results.length };
+  for (const r of results) if (r && r.status in counts) counts[r.status] += 1;
+  return counts;
+}

@@ -31,3 +31,32 @@ export function compareToBenchmark(daily, index) {
   const last = series[series.length - 1];
   return { series, portfolioPct: last.portfolio - 100, indexPct: last.index - 100, from: rows[0].date };
 }
+
+export const BENCH_PERIODS = [
+  { key: "1m", label: "1 M", months: 1 },
+  { key: "3m", label: "3 M", months: 3 },
+  { key: "6m", label: "6 M", months: 6 },
+  { key: "ytd", label: "Cette année", ytd: true },
+  { key: "all", label: "Tout" },
+];
+
+/** Garde les jours de l'historique compris dans la période (jusqu'au dernier jour connu) ; « all » = tout */
+export function sliceDaily(daily, periodKey) {
+  const period = BENCH_PERIODS.find((p) => p.key === periodKey);
+  const pts = (daily || []).filter((p) => p?.date);
+  if (!period || period.key === "all" || !pts.length) return pts;
+  const last = pts.reduce((m, p) => (p.date > m ? p.date : m), pts[0].date);
+  const d = new Date(`${last}T12:00:00Z`);
+  let from;
+  if (period.ytd) from = `${d.getUTCFullYear()}-01-01`;
+  else {
+    d.setUTCMonth(d.getUTCMonth() - period.months);
+    from = d.toISOString().slice(0, 10);
+  }
+  return pts.filter((p) => p.date >= from);
+}
+
+/** Écart en points de % entre le portefeuille et l'indice (positif = le portefeuille fait mieux) */
+export function gapPoints(cmp) {
+  return cmp ? cmp.portfolioPct - cmp.indexPct : null;
+}
