@@ -1,15 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { apiFetch } from "@/lib/api";
 import { useFxRates, toEUR, fetchFxRates } from "@/lib/fx";
 import { useToast } from "../components/ui";
 import { usePersistedPreference, VIEW_PREF_CODECS } from "@/lib/viewPrefs";
 import {
   ComposedChart,
+  BarChart,
+  Area,
   Bar,
-  Line,
+  Cell,
   LabelList,
+  ReferenceLine,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -17,6 +20,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { slotColor } from "@/lib/chartPalette";
 import { trendSummary } from "@/lib/chartSummary";
 import {
   evolutionRows,
@@ -24,6 +28,11 @@ import {
   lastSnapshot as latestSnapshot,
   direction,
   formatVariation,
+  labelMode,
+  monthWindow,
+  valueDomain,
+  pctDomain,
+  axisTick,
 } from "@/lib/portfolioEvolution";
 import Skeleton, { SkeletonRegion } from "../components/ui/Skeleton";
 
@@ -35,25 +44,53 @@ const DIRECTION_COLOR = {
   none: "rgb(var(--text-muted))",
 };
 
-// Étiquette « ▲ +3,2 % » au-dessus d'une barre, couchée à la verticale pour ne jamais chevaucher la barre voisine
-function makePctLabel(year, rows) {
-  return function PctLabel({ x, y, width, index }) {
+// Une couleur de la palette par année (la plus récente en premier), jamais de couleur en dur (DESIGN.md)
+const YEAR_SLOTS = ["blue", "emerald", "amber", "violet", "cyan", "rose"];
+const AXIS_TICK = { fill: "rgb(var(--text-muted))", fontSize: 12 };
+const GRID_STROKE = "rgb(var(--border))";
+
+// Étiquette de variation au-dessus d'un point de la courbe (une seule année affichée)
+function makePointLabel(year, rows, mode) {
+  return function PointLabel({ x, y, index }) {
     const row = rows[index];
-    if (!row || row[`year${year}`] == null) return null; // mois sans relevé : ni barre ni %
+    if (mode === "none" || !row || row[`year${year}`] == null) return null;
     const pct = row[`pct${year}`];
-    const cx = Number(x) + Number(width) / 2;
+    if (pct == null) return null; // premier mois : rien à comparer
     return (
       <text
-        x={cx}
-        y={Number(y) - 6}
-        transform={`rotate(-90 ${cx} ${Number(y) - 6})`}
-        textAnchor="start"
+        x={Number(x)}
+        y={Number(y) - 14}
+        textAnchor="middle"
+        fontSize={12}
+        fontWeight={600}
+        style={{ fill: DIRECTION_COLOR[direction(pct)] }}
+        className="tabular-nums"
+      >
+        {formatVariation(pct, { short: mode === "short" })}
+      </text>
+    );
+  };
+}
+
+// Étiquette au-dessus d'une barre positive, sous une barre négative (graphique des variations)
+function makeBarLabel(year, rows, mode) {
+  return function BarLabel({ x, y, width, height, index }) {
+    const row = rows[index];
+    const pct = row?.[`pct${year}`];
+    if (mode === "none" || pct == null) return null;
+    const top = Math.min(Number(y), Number(y) + Number(height));
+    const bottom = Math.max(Number(y), Number(y) + Number(height));
+    return (
+      <text
+        x={Number(x) + Number(width) / 2}
+        y={pct >= 0 ? top - 5 : bottom + 13}
+        textAnchor="middle"
         fontSize={11}
         fontWeight={600}
         style={{ fill: DIRECTION_COLOR[direction(pct)] }}
         className="tabular-nums"
       >
-        {formatVariation(pct)}
+        {formatVariation(pct, { short: mode === "short" })}
       </text>
     );
   };
@@ -71,14 +108,16 @@ export default function PortfolioHistoryChart() {
   const [showManualEdit, setShowManualEdit] = useState(false);
   const [manualForm, setManualForm] = useState({ date: "", value: "" });
 
-  const yearColors = {
-    2023: "#6B7280",
-    2024: "#3B82F6",
-    2025: "#10B981",
-    2026: "#F59E0B",
-    2027: "#8B5CF6",
-    2028: "#EC4899",
-  };
+  // Largeur du graphique : décide de la taille des étiquettes (arrow + signe, signe seul, aucune)
+  const chartRef = useRef(null);
+  const [chartWidth, setChartWidth] = useState(0);
+  useEffect(() => {
+    const el = chartRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return undefined;
+    const observer = new ResizeObserver(([entry]) => setChartWidth(entry.contentRect.width));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [fetched]);
 
   // Taux BCE servis par le backend (toutes devises)
   const { stale: fxStale } = useFxRates();
@@ -186,33 +225,42 @@ export default function PortfolioHistoryChart() {
     setPickedYears(selectedYears.includes(year) ? selectedYears.filter((y) => y !== year) : [...selectedYears, year]);
   };
 
-  // 12 mois fixes : valeur, % et écart vs mois N-1 pour chaque année sélectionnée
-  const chartData = evolutionRows(history, selectedYears);
+  const colorOfYear = (year) => slotColor(YEAR_SLOTS[Math.max(0, availableYears.indexOf(year)) % YEAR_SLOTS.length]);
 
-  // Marge en haut du graphique pour les étiquettes de variation
-  const yMax = Math.max(0, ...chartData.flatMap((row) => selectedYears.map((y) => row[`year${y}`] || 0)));
-  const yDomain = [0, Math.ceil((yMax || 1) * 1.28)];
+  // Mois affichés : du premier au dernier relevé (6 mois au minimum), les mois vides autour sont masqués
+  const allRows = evolutionRows(history, selectedYears);
+  const win = monthWindow(allRows, selectedYears);
+  const chartData = allRows.slice(win.start - 1, win.end);
+
+  // Axe vertical ajusté aux valeurs (il ne part pas de 0) et axe des variations symétrique autour de 0
+  const vDomain = valueDomain(chartData.flatMap((row) => selectedYears.map((y) => row[`year${y}`])));
+  const pDomain = pctDomain(chartData, selectedYears);
+
+  // Étiquettes seulement avec une année affichée (plusieurs années : le survol donne le détail)
+  const singleYear = selectedYears.length === 1;
+  const mode = singleYear ? labelMode(chartWidth / Math.max(1, chartData.length)) : "none";
 
   const euro = (v) =>
     `${Number(v).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 
+  // Survol commun aux deux graphiques : valeur, variation en % et écart en € pour chaque année
   const CustomTooltip = ({ active, payload, label }) => {
     if (!active || !payload || !payload.length) return null;
     const row = payload[0]?.payload || {};
     const discreet = typeof document !== "undefined" && document.documentElement.classList.contains("discreet");
-    // Une seule ligne par année (la barre et l'escalier partagent la même valeur)
-    const years = [...new Set(payload.filter((e) => e.value != null).map((e) => String(e.dataKey).replace("year", "")))];
+    const years = selectedYears.filter((y) => row[`year${y}`] != null);
+    if (!years.length) return null;
     return (
       <div className="rounded-lg border border-slate-700 bg-slate-900 p-3 text-white shadow-xl">
         <p className="mb-2 font-semibold">{label}</p>
         {years.map((year) => {
-          const entry = payload.find((e) => e.dataKey === `year${year}`);
           const pct = row[`pct${year}`];
           const delta = row[`delta${year}`];
           const dir = direction(pct);
           return (
             <div key={year} className="mb-1 text-sm last:mb-0">
-              <p style={{ color: entry?.color }}>
+              <p>
+                <span aria-hidden="true" className="mr-1.5 inline-block h-2 w-2 rounded-full" style={{ background: colorOfYear(year) }} />
                 {year} : {discreet ? "••••" : euro(row[`year${year}`])}
               </p>
               <p className="tabular-nums text-xs text-slate-300">
@@ -259,7 +307,7 @@ export default function PortfolioHistoryChart() {
               }`}
               style={
                 selectedYears.includes(year)
-                  ? { borderColor: yearColors[year] || "#10B981" }
+                  ? { borderColor: colorOfYear(year) }
                   : {}
               }
             >
@@ -486,70 +534,108 @@ export default function PortfolioHistoryChart() {
           </p>
         </div>
       ) : (
-        <div
-          className="money-chart"
-          role="img"
-          aria-label={`Histogramme de la valeur du portefeuille par mois, avec une courbe en escalier et l'évolution en pourcentage par rapport au mois précédent. ${selectedYears
-            .map((year) => {
-              const last = [...chartData].reverse().find((m) => m[`pct${year}`] != null);
-              const tail = last ? `, dernière variation en ${last.month} : ${formatVariation(last[`pct${year}`])}` : "";
-              return `${year} : ${trendSummary(chartData.map((m) => ({ label: m.month, value: m[`year${year}`] })), formatEuro)}${tail}`;
-            })
-            .join(". ")}.`}
-        >
-        <ResponsiveContainer width="100%" height={400}>
-          <ComposedChart data={chartData} barGap={4} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#94A3B8" strokeOpacity={0.25} />
-            <XAxis
-              dataKey="month"
-              tick={{ fill: "#8A9AA9", fontSize: 12 }}
-            />
-            <YAxis
-              domain={yDomain}
-              allowDataOverflow
-              tick={{ fill: "#8A9AA9", fontSize: 12 }}
-              tickFormatter={(value) => {
-                if (value >= 1000000) return `${(value / 1000000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} M`;
-                if (value >= 1000) return `${Math.round(value / 1000)} k`;
-                return `${value}`;
-              }}
-            />
-            <Tooltip content={<CustomTooltip />} />
-            <Legend
-              wrapperStyle={{ paddingTop: "20px" }}
-              formatter={(value) => value.replace("year", "")}
-            />
-            {selectedYears.map((year) => (
-              <Bar
-                key={year}
-                dataKey={`year${year}`}
-                name={`${year}`}
-                fill={yearColors[year] || "#9CA3AF"}
-                radius={[4, 4, 0, 0]}
-                isAnimationActive={false}
-              >
-                <LabelList dataKey={`pct${year}`} content={makePctLabel(year, chartData)} />
-              </Bar>
-            ))}
-            {/* Escalier : relie les valeurs mois après mois (un palier par mois, sans pente trompeuse) */}
-            {selectedYears.map((year) => (
-              <Line
-                key={`step-${year}`}
-                dataKey={`year${year}`}
-                name={`${year} (escalier)`}
-                type="stepAfter"
-                stroke={yearColors[year] || "#9CA3AF"}
-                strokeWidth={2}
-                strokeOpacity={0.9}
-                dot={{ r: 3, strokeWidth: 0, fill: yearColors[year] || "#9CA3AF" }}
-                activeDot={false}
-                connectNulls
-                legendType="none"
-                isAnimationActive={false}
-              />
-            ))}
-          </ComposedChart>
-        </ResponsiveContainer>
+        <div ref={chartRef}>
+          <div
+            className="money-chart"
+            role="img"
+            aria-label={`Courbe de la valeur du portefeuille par mois, avec l'évolution en pourcentage par rapport au mois précédent. ${selectedYears
+              .map((year) => {
+                const last = [...chartData].reverse().find((m) => m[`pct${year}`] != null);
+                const tail = last ? `, dernière variation en ${last.month} : ${formatVariation(last[`pct${year}`])}` : "";
+                return `${year} : ${trendSummary(chartData.map((m) => ({ label: m.month, value: m[`year${year}`] })), formatEuro)}${tail}`;
+              })
+              .join(". ")}.`}
+          >
+            <ResponsiveContainer width="100%" height={320}>
+              <ComposedChart data={chartData} margin={{ top: 16, right: 12, left: 0, bottom: 0 }}>
+                <defs>
+                  {selectedYears.map((year) => (
+                    <linearGradient key={year} id={`evo-fill-${year}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" style={{ stopColor: colorOfYear(year), stopOpacity: 0.35 }} />
+                      <stop offset="100%" style={{ stopColor: colorOfYear(year), stopOpacity: 0.03 }} />
+                    </linearGradient>
+                  ))}
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
+                <XAxis dataKey="month" padding={{ left: 18, right: 34 }} tick={AXIS_TICK} tickLine={false} axisLine={{ stroke: GRID_STROKE }} />
+                <YAxis
+                  domain={vDomain.domain}
+                  ticks={vDomain.ticks}
+                  tickFormatter={axisTick}
+                  tick={AXIS_TICK}
+                  tickLine={false}
+                  axisLine={false}
+                  width={52}
+                />
+                <Tooltip content={<CustomTooltip />} cursor={{ stroke: GRID_STROKE, strokeWidth: 1 }} />
+                {selectedYears.length > 1 && <Legend wrapperStyle={{ paddingTop: "8px" }} />}
+                {selectedYears.map((year) => (
+                  <Area
+                    key={year}
+                    dataKey={`year${year}`}
+                    name={`${year}`}
+                    type="monotone"
+                    stroke={colorOfYear(year)}
+                    strokeWidth={2.5}
+                    fill={`url(#evo-fill-${year})`}
+                    baseValue={vDomain.domain[0]}
+                    connectNulls
+                    dot={{ r: 4, strokeWidth: 2, stroke: "rgb(var(--surface))", fill: colorOfYear(year) }}
+                    activeDot={{ r: 6, strokeWidth: 2, stroke: "rgb(var(--surface))" }}
+                    isAnimationActive={false}
+                  >
+                    {singleYear && <LabelList dataKey={`year${year}`} content={makePointLabel(year, chartData, mode)} />}
+                  </Area>
+                ))}
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+          <p className="mt-1 text-xs text-ink-muted">Échelle verticale ajustée aux valeurs (elle ne part pas de 0).</p>
+
+          {/* Variation mensuelle : hausses vers le haut (vert), baisses vers le bas (rouge) */}
+          <h4 className="mb-1 mt-5 text-sm font-semibold text-ink">Variation mensuelle</h4>
+          <div
+            role="img"
+            aria-label={`Variation mensuelle en pourcentage par rapport au mois précédent. ${selectedYears
+              .map((year) => {
+                const parts = chartData.filter((m) => m[`pct${year}`] != null).map((m) => `${m.month} ${formatVariation(m[`pct${year}`])}`);
+                return `${year} : ${parts.length ? parts.join(", ") : "aucune variation calculable"}`;
+              })
+              .join(". ")}.`}
+          >
+            <ResponsiveContainer width="100%" height={170}>
+              <BarChart data={chartData} margin={{ top: 22, right: 12, left: 0, bottom: 4 }} barGap={3}>
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
+                <XAxis dataKey="month" padding={{ left: 6, right: 6 }} tick={AXIS_TICK} tickLine={false} axisLine={false} />
+                <YAxis
+                  domain={pDomain}
+                  tickCount={3}
+                  tickFormatter={(v) => (v === 0 ? "0 %" : `${v > 0 ? "+" : "−"}${Math.abs(v)} %`)}
+                  tick={AXIS_TICK}
+                  tickLine={false}
+                  axisLine={false}
+                  width={52}
+                />
+                <ReferenceLine y={0} stroke="rgb(var(--text-muted))" strokeOpacity={0.6} />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: GRID_STROKE, fillOpacity: 0.35 }} />
+                {selectedYears.map((year) => (
+                  <Bar
+                    key={year}
+                    dataKey={`pct${year}`}
+                    name={`${year}`}
+                    fill={colorOfYear(year)}
+                    radius={3}
+                    maxBarSize={56}
+                    isAnimationActive={false}
+                  >
+                    {singleYear &&
+                      chartData.map((row, i) => <Cell key={i} fill={DIRECTION_COLOR[direction(row[`pct${year}`])]} />)}
+                    {singleYear && <LabelList dataKey={`pct${year}`} content={makeBarLabel(year, chartData, mode)} />}
+                  </Bar>
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       )}
 
