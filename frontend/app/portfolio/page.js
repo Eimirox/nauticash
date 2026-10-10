@@ -16,6 +16,8 @@ import { useBaseCurrency, useProfile } from "@/lib/profile";
 import { usePersistedPreference, VIEW_PREF_CODECS } from "@/lib/viewPrefs";
 import GoalGauge from "../components/GoalGauge";
 import TickerSearch from "../components/TickerSearch";
+import AddPositionModal from "../components/AddPositionModal";
+import EmptyPortfolioGuide from "../components/EmptyPortfolioGuide";
 import TickerLogo from "../components/TickerLogo";
 import EmergencyFund from "../components/EmergencyFund";
 import { wealthSummary } from "@/lib/wealth";
@@ -202,14 +204,33 @@ export default function Portfolio() {
   }, [sort]);
 
   const [adding, setAdding] = useState(false);
+  // Titre choisi dans la recherche, en attente de quantité / PRU / enveloppe (fenêtre d'ajout)
+  const [pendingAdd, setPendingAdd] = useState(null);
+  const addingRef = useRef(false);
+  addingRef.current = adding;
 
-  const addStock = async (symbol) => {
+  // Choix d'un titre (suggestion, Entrée ou bouton « Ajouter ») → fenêtre quantité + PRU + enveloppe
+  const startAdd = (symbol) => {
     const t = (typeof symbol === "string" ? symbol : ticker).trim().toUpperCase();
+    if (!t || adding) return;
+    setError(null);
+    if (stocks.some((s) => s.ticker === t)) {
+      setError(`${t} est déjà dans votre portefeuille : modifiez sa ligne dans le tableau.`);
+      return;
+    }
+    setPendingAdd(t);
+  };
+
+  const cancelAdd = useCallback(() => {
+    if (!addingRef.current) setPendingAdd(null);
+  }, []);
+
+  const addStock = async (t, position) => {
     if (!t || adding) return;
     setError(null);
     setAdding(true);
     try {
-      await apiFetch("/api/user/portfolio", { method: "POST", body: { ticker: t } });
+      await apiFetch("/api/user/portfolio", { method: "POST", body: { ticker: t, ...position } });
       await fetchPortfolio();
       setTicker("");
       toast.success(`${t} ajouté au portefeuille.`);
@@ -221,8 +242,20 @@ export default function Portfolio() {
       );
     } finally {
       setAdding(false);
+      setPendingAdd(null);
     }
   };
+
+  const addModal = (
+    <AddPositionModal
+      key={pendingAdd || "closed"}
+      ticker={pendingAdd}
+      accounts={ACCOUNT_LABELS}
+      loading={adding}
+      onConfirm={addStock}
+      onCancel={cancelAdd}
+    />
+  );
 
   // Suppression en deux temps : demande de confirmation, puis appel au backend
   const removeStock = (tickerToRemove) => setPendingRemoval(tickerToRemove);
@@ -498,10 +531,7 @@ export default function Portfolio() {
           <SkeletonList items={3} />
         </SkeletonRegion>
       ) : !stocks.length ? (
-        <div className="px-4 py-16 text-center">
-          <p className="mb-1 text-base font-medium text-ink">Aucune position</p>
-          <p className="text-sm text-ink-muted">Ajoutez votre première action pour commencer</p>
-        </div>
+        <EmptyPortfolioGuide className="px-4 py-10" />
       ) : (
         <ul className="divide-y divide-line">
           {visibleStocks.map((stock) => {
@@ -803,31 +833,9 @@ export default function Portfolio() {
             <tr>
               <td
                 colSpan="12"
-                className="px-6 py-20 text-center text-ink-muted"
+                className="px-6 py-12"
               >
-                <div className="flex flex-col items-center gap-3">
-                  <svg
-                    className="w-16 h-16 text-ink-muted/40"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                    />
-                  </svg>
-                  <div>
-                    <p className="text-lg font-medium text-ink mb-1">
-                      Aucune position
-                    </p>
-                    <p className="text-sm text-ink-muted">
-                      Ajoutez votre première action pour commencer
-                    </p>
-                  </div>
-                </div>
+                <EmptyPortfolioGuide />
               </td>
             </tr>
           )}
@@ -1076,17 +1084,17 @@ export default function Portfolio() {
         )}
 
         {/* Add Stock */}
-        <div role="group" aria-label="Ajouter une position" className="mb-6 flex flex-wrap items-center gap-3 p-4 bg-surface border border-line rounded-xl shadow">
+        <div id="add-position" role="group" aria-label="Ajouter une position" className="mb-6 flex flex-wrap items-center gap-3 p-4 bg-surface border border-line rounded-xl shadow">
           <TickerSearch
             value={ticker}
             onChange={setTicker}
-            onSelect={addStock}
+            onSelect={startAdd}
             disabled={adding}
             existing={stocks.map((s) => s.ticker)}
           />
           <button
             type="button"
-            onClick={() => addStock()}
+            onClick={() => startAdd()}
             disabled={adding}
             aria-busy={adding}
             className="disabled:opacity-50 disabled:cursor-wait px-5 py-2 bg-gradient-to-r from-emerald-700 to-blue-600 text-white text-sm font-semibold rounded-lg hover:shadow-lg hover:scale-105 transition-all"
@@ -1190,6 +1198,7 @@ export default function Portfolio() {
         </div>
       </div>
       {removalModal}
+      {addModal}
     </main>
   );
 }

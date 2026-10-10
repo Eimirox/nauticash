@@ -23,6 +23,7 @@ Aucune base ni clé API réelle n'est nécessaire, et aucune dépendance supplé
 | `portfolio.test.js` | ajout / lecture / modification / suppression, validation, isolation entre comptes, actualisation, cash |
 | `history.test.js` | historique mensuel (upsert, tri chronologique, validation), transactions |
 | `admin.test.js` | accès réservé à `ADMIN_EMAILS`, stats, health check, actualisation manuelle |
+| `priceCheck.test.js` | contrôle de cohérence des cours : second fournisseur (jamais FMP), quotas, résumé enregistré et exposé dans `/api/admin/stats` |
 | `quotas.test.js` | quotas journaliers / par minute des API, comportement des routes quand le quota est atteint |
 
 Si une route utilise une nouvelle opération MongoDB (ex. `deleteOne`, `$inc`), l'ajouter dans `helpers/fakeDb.js`.

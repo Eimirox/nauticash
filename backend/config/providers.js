@@ -185,6 +185,15 @@ module.exports = {
       enabled: process.env.CRON_DAILY_HISTORY !== "false",
       schedule: process.env.CRON_HISTORY_SCHEDULE || "45 21 * * *",
     },
+    // Contrôle de cohérence des cours (jobs/priceCheck.js), après l'actualisation du soir (UTC) :
+    // cours enregistré comparé à un second fournisseur (Yahoo ou Finnhub, jamais FMP)
+    priceCheck: {
+      enabled: process.env.CRON_PRICE_CHECK !== "false",
+      schedule: process.env.CRON_PRICE_CHECK_SCHEDULE || "35 21 * * *",
+      maxTickers: parseInt(process.env.PRICE_CHECK_MAX, 10) || 100,
+      delayMs: parseInt(process.env.PRICE_CHECK_DELAY_MS, 10) || 300,
+      threshold: Number(process.env.PRICE_CHECK_THRESHOLD) > 0 ? Number(process.env.PRICE_CHECK_THRESHOLD) : 5,
+    },
   },
 
   // Rate limiting (pour éviter de dépasser les quotas)

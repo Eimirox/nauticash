@@ -43,10 +43,11 @@ export function middleware(request) {
   });
 }
 
-// Protège toutes les routes sauf les fichiers statiques, les icônes, l'image de partage
-// et robots.txt (qui demande aux robots de ne rien indexer pendant la bêta privée)
+// Protège toutes les routes sauf les fichiers statiques, les icônes, l'image de partage,
+// robots.txt (qui demande aux robots de ne rien indexer pendant la bêta privée)
+// et le manifeste + ses icônes (le navigateur les charge sans identifiants : sinon 401 et appli non installable)
 export const config = {
   matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico|logo_nauticash.webp|robots.txt|icon.png|apple-icon.png|opengraph-image.png).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|logo_nauticash.webp|robots.txt|icon.png|apple-icon.png|opengraph-image.png|manifest.webmanifest|icons/).*)',
   ],
 };

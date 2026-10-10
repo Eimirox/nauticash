@@ -33,6 +33,7 @@ const TEST_ENV = {
   CRON_UPDATE_PRICES: "false",
   CRON_DAILY_HISTORY: "false",
   CRON_LIVE_PRICES: "false",
+  CRON_PRICE_CHECK: "false",
   HEALTHCHECK_ON_START: "false",
 };
 
