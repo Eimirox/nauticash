@@ -6,11 +6,13 @@
 const mongoose = require("mongoose");
 const config = require("../config/providers");
 const { trackedFetchJson } = require("./apiUsage");
+const YahooProvider = require("./providers/yahoo");
+
+const yahoo = new YahooProvider();
 
 const BENCHMARKS = {
   CAC40: { symbol: "^FCHI", label: "CAC 40", currency: "EUR" },
   SP500: { symbol: "^GSPC", label: "S&P 500", currency: "USD" },
-  MSCIWORLD: { symbol: "URTH", label: "MSCI World (ETF iShares URTH)", currency: "USD" },
 };
 
 const CACHE_TTL = 12 * 60 * 60 * 1000;
@@ -37,6 +39,40 @@ async function fetchHistory(symbol) {
   return points;
 }
 
+// Yahoo Finance (sans clé) : couvre les indices (^FCHI, ^GSPC) que l'offre gratuite FMP refuse parfois
+async function fetchHistoryYahoo(symbol) {
+  if (!yahoo.config.enabled) throw new Error("Yahoo désactivé");
+  const data = await yahoo.request(`v8/finance/chart/${encodeURIComponent(symbol)}`, { range: "2y", interval: "1d" });
+  const result = data?.chart?.result?.[0];
+  const stamps = result?.timestamp || [];
+  const closes = result?.indicators?.quote?.[0]?.close || [];
+  const offset = Number(result?.meta?.gmtoffset) || 0;
+  const cutoff = new Date(Date.now() - HISTORY_DAYS * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const byDate = new Map();
+  stamps.forEach((t, i) => {
+    const close = Number(closes[i]);
+    if (!(close > 0)) return;
+    const date = new Date((Number(t) + offset) * 1000).toISOString().slice(0, 10);
+    if (date >= cutoff) byDate.set(date, close);
+  });
+  const points = [...byDate].map(([date, close]) => ({ date, close })).sort((a, b) => (a.date < b.date ? -1 : 1));
+  if (!points.length) throw new Error(`Aucune donnée Yahoo pour ${symbol}`);
+  return points;
+}
+
+// FMP d'abord, Yahoo si FMP refuse ou ne renvoie rien
+async function fetchAny(symbol) {
+  try {
+    return await fetchHistory(symbol);
+  } catch (fmpError) {
+    try {
+      return await fetchHistoryYahoo(symbol);
+    } catch {
+      throw fmpError;
+    }
+  }
+}
+
 /**
  * { key, label, currency, points: [{ date, close }], updatedAt, stale }
  * Données en cache si elles ont moins de CACHE_TTL ; sinon nouvel appel FMP,
@@ -59,7 +95,7 @@ async function getBenchmark(key) {
   if (fresh) return payload(cached, false);
 
   try {
-    const points = await fetchHistory(def.symbol);
+    const points = await fetchAny(def.symbol);
     const doc = { key, symbol: def.symbol, points, updatedAt: new Date() };
     await collection().updateOne({ key }, { $set: doc }, { upsert: true });
     return payload(doc, false);
