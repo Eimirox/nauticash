@@ -12,11 +12,11 @@ const STEPS = [
   },
   {
     title: "Saisissez quantité et PRU",
-    text: "Dans la ligne ajoutée, indiquez le nombre de titres détenus et votre prix de revient unitaire (PRU).",
+    text: "Dans la fenêtre qui s'ouvre, indiquez le nombre de titres détenus et votre prix de revient unitaire (PRU).",
   },
   {
     title: "Choisissez l'enveloppe",
-    text: "Rangez la position dans son compte (PEA, CTO, assurance-vie, crypto) pour suivre les sous-totaux.",
+    text: "Dans la même fenêtre, rangez la position dans son compte (PEA, CTO, assurance-vie, crypto) pour suivre les sous-totaux.",
   },
 ];
 

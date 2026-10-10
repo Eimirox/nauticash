@@ -16,6 +16,7 @@ import { useBaseCurrency, useProfile } from "@/lib/profile";
 import { usePersistedPreference, VIEW_PREF_CODECS } from "@/lib/viewPrefs";
 import GoalGauge from "../components/GoalGauge";
 import TickerSearch from "../components/TickerSearch";
+import AddPositionModal from "../components/AddPositionModal";
 import EmptyPortfolioGuide from "../components/EmptyPortfolioGuide";
 import TickerLogo from "../components/TickerLogo";
 import EmergencyFund from "../components/EmergencyFund";
@@ -203,14 +204,33 @@ export default function Portfolio() {
   }, [sort]);
 
   const [adding, setAdding] = useState(false);
+  // Titre choisi dans la recherche, en attente de quantité / PRU / enveloppe (fenêtre d'ajout)
+  const [pendingAdd, setPendingAdd] = useState(null);
+  const addingRef = useRef(false);
+  addingRef.current = adding;
 
-  const addStock = async (symbol) => {
+  // Choix d'un titre (suggestion, Entrée ou bouton « Ajouter ») → fenêtre quantité + PRU + enveloppe
+  const startAdd = (symbol) => {
     const t = (typeof symbol === "string" ? symbol : ticker).trim().toUpperCase();
+    if (!t || adding) return;
+    setError(null);
+    if (stocks.some((s) => s.ticker === t)) {
+      setError(`${t} est déjà dans votre portefeuille : modifiez sa ligne dans le tableau.`);
+      return;
+    }
+    setPendingAdd(t);
+  };
+
+  const cancelAdd = useCallback(() => {
+    if (!addingRef.current) setPendingAdd(null);
+  }, []);
+
+  const addStock = async (t, position) => {
     if (!t || adding) return;
     setError(null);
     setAdding(true);
     try {
-      await apiFetch("/api/user/portfolio", { method: "POST", body: { ticker: t } });
+      await apiFetch("/api/user/portfolio", { method: "POST", body: { ticker: t, ...position } });
       await fetchPortfolio();
       setTicker("");
       toast.success(`${t} ajouté au portefeuille.`);
@@ -222,8 +242,20 @@ export default function Portfolio() {
       );
     } finally {
       setAdding(false);
+      setPendingAdd(null);
     }
   };
+
+  const addModal = (
+    <AddPositionModal
+      key={pendingAdd || "closed"}
+      ticker={pendingAdd}
+      accounts={ACCOUNT_LABELS}
+      loading={adding}
+      onConfirm={addStock}
+      onCancel={cancelAdd}
+    />
+  );
 
   // Suppression en deux temps : demande de confirmation, puis appel au backend
   const removeStock = (tickerToRemove) => setPendingRemoval(tickerToRemove);
@@ -1056,13 +1088,13 @@ export default function Portfolio() {
           <TickerSearch
             value={ticker}
             onChange={setTicker}
-            onSelect={addStock}
+            onSelect={startAdd}
             disabled={adding}
             existing={stocks.map((s) => s.ticker)}
           />
           <button
             type="button"
-            onClick={() => addStock()}
+            onClick={() => startAdd()}
             disabled={adding}
             aria-busy={adding}
             className="disabled:opacity-50 disabled:cursor-wait px-5 py-2 bg-gradient-to-r from-emerald-700 to-blue-600 text-white text-sm font-semibold rounded-lg hover:shadow-lg hover:scale-105 transition-all"
@@ -1166,6 +1198,7 @@ export default function Portfolio() {
         </div>
       </div>
       {removalModal}
+      {addModal}
     </main>
   );
 }
