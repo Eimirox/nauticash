@@ -213,3 +213,114 @@ describe("PATCH /api/user/profile", () => {
     assert.equal((await get(b.token)).body.profile.displayName, "");
   });
 });
+
+describe("Préférences d'affichage (profile.viewPrefs)", () => {
+  test("vides par défaut pour un nouveau compte", async () => {
+    const u = await h.registerUser();
+    assert.deepEqual((await get(u.token)).body.profile.viewPrefs, {});
+  });
+
+  test("enregistre le tri des dividendes et les années du graphique, relus à la connexion suivante", async () => {
+    const u = await h.registerUser();
+    const res = await patch(u.token, {
+      viewPrefs: { dividendSort: { key: "yieldOnCost", dir: "asc" }, historyYears: [2025, 2026, 2025] },
+    });
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.profile.viewPrefs, {
+      dividendSort: { key: "yieldOnCost", dir: "asc" },
+      historyYears: [2026, 2025],
+    });
+    // Nouvelle « session » : un nouveau login relit les mêmes préférences
+    const login = await h.request("POST", "/api/auth/login", { body: { email: u.email, password: u.password } });
+    const again = (await get(login.body.token || u.token)).body.profile.viewPrefs;
+    assert.deepEqual(again.dividendSort, { key: "yieldOnCost", dir: "asc" });
+  });
+
+  test("fusion clé par clé : une préférence n'écrase pas les autres, null efface seulement la sienne", async () => {
+    const u = await h.registerUser();
+    await patch(u.token, { viewPrefs: { dividendSort: { key: "totalAnnual", dir: "desc" } } });
+    await patch(u.token, { viewPrefs: { portfolioSort: { key: "performance", dir: "desc" }, portfolioAccount: "PEA" } });
+    let prefs = (await get(u.token)).body.profile.viewPrefs;
+    assert.equal(prefs.dividendSort.key, "totalAnnual");
+    assert.equal(prefs.portfolioSort.key, "performance");
+    assert.equal(prefs.portfolioAccount, "PEA");
+
+    const cleared = await patch(u.token, { viewPrefs: { dividendSort: null } });
+    assert.equal(cleared.status, 200);
+    prefs = cleared.body.profile.viewPrefs;
+    assert.equal(prefs.dividendSort, undefined, "préférence effacée");
+    assert.equal(prefs.portfolioAccount, "PEA", "les autres sont conservées");
+    const stored = await h.db.collection("users").findOne({ email: u.email });
+    assert.equal(stored.profile.viewPrefs.dividendSort, undefined, "supprimée en base, pas laissée à null");
+  });
+
+  test("n'écrase pas le reste du profil (et inversement)", async () => {
+    const u = await h.registerUser();
+    await patch(u.token, { displayName: "Alex", viewPrefs: { historyYears: [2026] } });
+    await patch(u.token, { theme: "dark" });
+    const p = (await get(u.token)).body.profile;
+    assert.equal(p.displayName, "Alex");
+    assert.equal(p.theme, "dark");
+    assert.deepEqual(p.viewPrefs.historyYears, [2026]);
+  });
+
+  test("liste blanche : clés inconnues et valeurs invalides refusées sans rien écrire", async () => {
+    const u = await h.registerUser();
+    const bad = [
+      { viewPrefs: {} },
+      { viewPrefs: [] },
+      { viewPrefs: "tri" },
+      { viewPrefs: null },
+      { viewPrefs: { monMotDePasse: "x" } },
+      { viewPrefs: { __proto__: { admin: true }, constructor: 1 } },
+      { viewPrefs: { "a.b": 1 } },
+      { viewPrefs: { dividendSort: { key: "ticker", dir: "asc" } } }, // colonne non triable
+      { viewPrefs: { dividendSort: { key: "yieldPercent", dir: "up" } } },
+      { viewPrefs: { dividendSort: { key: "yieldPercent", dir: "asc", extra: 1 } } },
+      { viewPrefs: { dividendSort: "yieldPercent" } },
+      { viewPrefs: { portfolioSort: { key: "$where", dir: "asc" } } },
+      { viewPrefs: { portfolioSort: { key: "total", dir: "none" } } },
+      { viewPrefs: { portfolioAccount: "" } },
+      { viewPrefs: { portfolioAccount: "<script>" } },
+      { viewPrefs: { portfolioAccount: "x".repeat(41) } },
+      { viewPrefs: { historyYears: [] } },
+      { viewPrefs: { historyYears: [1999] } },
+      { viewPrefs: { historyYears: ["2026"] } },
+      { viewPrefs: { historyYears: [2020, 2021, 2022, 2023, 2024, 2025, 2026] } },
+      { viewPrefs: { historyYears: 2026 } },
+      // une seule valeur invalide refuse toute la requête
+      { viewPrefs: { historyYears: [2026], dividendSort: { key: "x", dir: "asc" } } },
+    ];
+    for (const body of bad) {
+      const res = await patch(u.token, body);
+      assert.equal(res.status, 400, `refusé : ${JSON.stringify(body)}`);
+    }
+    const stored = await h.db.collection("users").findOne({ email: u.email });
+    assert.equal(stored.profile, undefined, "aucune écriture en base");
+  });
+
+  test("message précis sur la préférence refusée", async () => {
+    const u = await h.registerUser();
+    const unknown = await patch(u.token, { viewPrefs: { couleur: "rose" } });
+    assert.match(unknown.body.error, /inconnue : couleur/);
+    const badSort = await patch(u.token, { viewPrefs: { dividendSort: { key: "x", dir: "asc" } } });
+    assert.match(badSort.body.error, /Tri des dividendes/);
+  });
+
+  test("valeurs invalides déjà en base ignorées à la lecture", async () => {
+    const u = await h.registerUser();
+    await h.db.collection("users").updateOne(
+      { email: u.email },
+      { $set: { "profile.viewPrefs": { dividendSort: { key: "piratage", dir: "asc" }, historyYears: [2026], inconnue: 1 } } },
+    );
+    assert.deepEqual((await get(u.token)).body.profile.viewPrefs, { historyYears: [2026] });
+  });
+
+  test("exige d'être connecté et chaque utilisateur garde ses préférences", async () => {
+    assert.equal((await h.request("PATCH", "/api/user/profile", { body: { viewPrefs: { historyYears: [2026] } } })).status, 401);
+    const a = await h.registerUser();
+    const b = await h.registerUser();
+    await patch(a.token, { viewPrefs: { portfolioAccount: "CTO" } });
+    assert.deepEqual((await get(b.token)).body.profile.viewPrefs, {});
+  });
+});

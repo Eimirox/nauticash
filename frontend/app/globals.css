@@ -71,6 +71,19 @@
   --loss: 185 28 28;
   --warn: 180 83 9;
   --on-accent: 255 255 255;
+  /* Palette des graphiques (lib/chartPalette.js) : 3:1 minimum contre --surface */
+  --chart-1: 37 99 235;       /* blue-600 */
+  --chart-2: 4 120 87;        /* emerald-700 */
+  --chart-3: 161 98 7;        /* amber / yellow-700 */
+  --chart-4: 124 58 237;      /* violet-600 */
+  --chart-5: 14 116 144;      /* cyan-700 */
+  --chart-6: 190 24 93;       /* rose-700 */
+  --chart-7: 77 124 15;       /* lime-700 */
+  --chart-8: 234 88 12;       /* orange-600 */
+  --chart-9: 67 56 202;       /* indigo-700 */
+  --chart-10: 162 28 175;     /* fuchsia-700 */
+  --chart-11: 100 116 139;    /* slate-500 */
+  --chart-extra-l: 38%;
   color-scheme: light;
 }
 
@@ -89,6 +102,19 @@
   --on-accent: 11 27 43;
   --background: #0B1B2B;
   --foreground: #E8EEF2;
+  /* Palette des graphiques : versions claires pour le fond sombre */
+  --chart-1: 96 165 250;      /* blue-400 */
+  --chart-2: 52 211 153;      /* emerald-400 */
+  --chart-3: 250 204 21;      /* yellow-400 */
+  --chart-4: 167 139 250;     /* violet-400 */
+  --chart-5: 34 211 238;      /* cyan-400 */
+  --chart-6: 244 114 182;     /* pink-400 */
+  --chart-7: 163 230 53;      /* lime-400 */
+  --chart-8: 251 146 60;      /* orange-400 */
+  --chart-9: 99 102 241;      /* indigo-500 */
+  --chart-10: 232 121 249;    /* fuchsia-400 */
+  --chart-11: 148 163 184;    /* slate-400 */
+  --chart-extra-l: 62%;
   color-scheme: dark;
 }
 

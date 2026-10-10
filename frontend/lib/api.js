@@ -21,6 +21,10 @@ export function getToken() {
 export function logout() {
   try {
     localStorage.removeItem("token");
+    // Copies locales des préférences d'affichage (lib/viewPrefs.js) : l'appareil peut servir à un autre compte
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith("nauticash:vp:")) localStorage.removeItem(key);
+    }
   } catch {}
   window.location.href = "/login";
 }

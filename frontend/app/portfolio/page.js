@@ -13,6 +13,7 @@ import { SkeletonRegion, SkeletonRows, SkeletonList } from "../components/ui/Ske
 import { quoteFreshness } from "@/lib/quoteTime";
 import { useFxRates, toCurrency, currencySymbol } from "@/lib/fx";
 import { useBaseCurrency, useProfile } from "@/lib/profile";
+import { usePersistedPreference, VIEW_PREF_CODECS } from "@/lib/viewPrefs";
 import GoalGauge from "../components/GoalGauge";
 import TickerSearch from "../components/TickerSearch";
 import TickerLogo from "../components/TickerLogo";
@@ -90,7 +91,8 @@ export default function Portfolio() {
   const [showCashSection, setShowCashSection] = useState(false);
   const [fullscreenTable, setFullscreenTable] = useState(false);
 
-  const [sort, setSort] = useState({ key: null, dir: SORT_DIR.NONE });
+  // Tri et enveloppe filtrée : mémorisés dans le compte (retrouvés à la prochaine visite, sur tous les appareils)
+  const [sort, setSort, sortPref] = usePersistedPreference(VIEW_PREF_CODECS.portfolioSort);
 
   const nf2 = new Intl.NumberFormat("fr-FR", {
     minimumFractionDigits: 2,
@@ -326,7 +328,7 @@ export default function Portfolio() {
     ready: Boolean(rates) || (stocks.every((s) => (s.currency || "EUR") === base) && (!cash.amount || cash.currency === base)),
   };
   // Filtre et sous-totaux par enveloppe (dans la devise de référence)
-  const [accountFilter, setAccountFilter] = useState("all");
+  const [accountFilter, setAccountFilter, accountPref] = usePersistedPreference(VIEW_PREF_CODECS.portfolioAccount);
   const accountTotals = stocks.reduce((acc, s) => {
     const key = s.account || "NONE";
     const v = toBase((s.close || 0) * (Number(s.quantity) || 0), s.currency) ?? 0;
@@ -1108,6 +1110,21 @@ export default function Portfolio() {
             </span>
           </button>
         </div>
+
+        {(sortPref.customized || accountPref.customized) && (
+          <div className="mb-3 flex justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                sortPref.reset();
+                accountPref.reset();
+              }}
+              className="rounded-lg px-2 py-1 text-xs font-medium text-ink-muted underline-offset-2 hover:text-accent hover:underline"
+            >
+              Réinitialiser l&apos;affichage
+            </button>
+          </div>
+        )}
 
         {/* Enveloppes : filtre et sous-totaux */}
         {hasAccounts && (

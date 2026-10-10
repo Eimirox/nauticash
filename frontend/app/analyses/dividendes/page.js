@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { apiFetch } from "@/lib/api";
 import { useFxRates, toCurrency, ratePer, currencySymbol } from "@/lib/fx";
 import { useBaseCurrency } from "@/lib/profile";
+import { usePersistedPreference, VIEW_PREF_CODECS } from "@/lib/viewPrefs";
 import { estimateDividends, FREQUENCY_LABELS } from "@/lib/dividendCalendar";
 import { nextDividendSort, sortDividendRows, ariaSortFor } from "@/lib/dividendSort";
 import DividendCalendar from "../../components/DividendCalendar";
@@ -21,8 +22,9 @@ export default function DividendesPage() {
   const [loadError, setLoadError] = useState(null);
   const [stocks, setStocks] = useState([]);
   const [loading, setLoading] = useState(true);
-  // Tri du tableau par action (Total annuel, Rendement, Sur PRU) ; null = ordre par défaut (total décroissant)
-  const [divSort, setDivSort] = useState({ key: null, dir: null });
+  // Tri du tableau par action (Total annuel, Rendement, Sur PRU) ; null = ordre par défaut (total décroissant).
+  // Mémorisé dans le compte : retrouvé à la prochaine visite et sur les autres appareils.
+  const [divSort, setDivSort, divPref] = usePersistedPreference(VIEW_PREF_CODECS.dividendSort);
   const { rates, date: fxDate, stale: fxStale } = useFxRates();
   // Montants convertis dans la devise de référence du profil (EUR par défaut)
   const base = useBaseCurrency();
@@ -204,6 +206,15 @@ export default function DividendesPage() {
                   <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
                 </svg>
                 <h3 className="text-lg font-bold text-ink">Dividendes par Action</h3>
+                {divPref.customized && (
+                  <button
+                    type="button"
+                    onClick={divPref.reset}
+                    className="ml-auto rounded-lg px-2 py-1 text-xs font-medium text-ink-muted underline-offset-2 hover:text-accent hover:underline"
+                  >
+                    Réinitialiser l&apos;affichage
+                  </button>
+                )}
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full">

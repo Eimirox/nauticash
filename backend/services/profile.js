@@ -42,6 +42,8 @@ const DEFAULT_PROFILE = Object.freeze({
   strategy: null, // dividendes | croissance | passive | equilibree
   targetAllocation: null, // { europe: 40, northAmerica: 30, … } en %, total = 100
   maxPositionWeight: null, // poids maximal d'une ligne, en % du portefeuille
+  // Affichage mémorisé par écran (tris, filtres, années comparées) : { clé: valeur }, voir VIEW_PREFS_RULES
+  viewPrefs: {},
 });
 
 const MAX_AMOUNT = 1e12;
@@ -78,6 +80,59 @@ const allocation = (v) => {
   return Math.abs(total - 100) <= 0.5 ? [true, out] : [false];
 };
 
+// Affichage mémorisé par écran (viewPrefs) : liste blanche de clés, chacune avec sa propre validation.
+// Une valeur null efface la préférence (retour à l'affichage par défaut de l'écran).
+const DIVIDEND_SORT_KEYS = ["totalAnnual", "yieldPercent", "yieldOnCost"];
+const sortDir = (allowed) => (v) => (allowed.includes(v) ? [true, v] : [false]);
+const VIEW_PREFS_RULES = {
+  // Écran Dividendes : colonne triée et sens
+  dividendSort: (v) => {
+    if (!v || typeof v !== "object" || Array.isArray(v)) return [false];
+    if (Object.keys(v).some((k) => k !== "key" && k !== "dir")) return [false];
+    return DIVIDEND_SORT_KEYS.includes(v.key) && ["asc", "desc"].includes(v.dir) ? [true, { key: v.key, dir: v.dir }] : [false];
+  },
+  // Écran Portefeuille : colonne triée (clé courte lettres seulement) et sens
+  portfolioSort: (v) => {
+    if (!v || typeof v !== "object" || Array.isArray(v)) return [false];
+    if (Object.keys(v).some((k) => k !== "key" && k !== "dir")) return [false];
+    const okKey = typeof v.key === "string" && /^[A-Za-z]{2,24}$/.test(v.key);
+    return okKey && sortDir(["asc", "desc"])(v.dir)[0] ? [true, { key: v.key, dir: v.dir }] : [false];
+  },
+  // Écran Portefeuille : enveloppe filtrée (« all » ou nom d'enveloppe)
+  portfolioAccount: (v) => (typeof v === "string" && v.trim().length >= 1 && v.length <= 40 && !/[<>]/.test(v) ? [true, v.trim()] : [false]),
+  // Tableau de bord : années comparées dans le graphique d'évolution (de 1 à 6, triées de la plus récente)
+  historyYears: (v) => {
+    if (!Array.isArray(v) || v.length < 1 || v.length > 6) return [false];
+    if (!v.every((y) => Number.isInteger(y) && y >= 2000 && y <= 2100)) return [false];
+    return [true, [...new Set(v)].sort((a, b) => b - a)];
+  },
+};
+const VIEW_PREFS_KEYS = Object.keys(VIEW_PREFS_RULES);
+const VIEW_PREFS_MESSAGES = {
+  dividendSort: "Tri des dividendes invalide.",
+  portfolioSort: "Tri du portefeuille invalide.",
+  portfolioAccount: "Enveloppe invalide.",
+  historyYears: "Années du graphique invalides (de 1 à 6 années entre 2000 et 2100).",
+};
+
+// Mise à jour partielle : { dividendSort: {...}, historyYears: null } ; renvoie [ok, valeurNormalisée]
+// (null conservé tel quel : il efface la préférence)
+const viewPrefsPatch = (v) => {
+  if (!v || typeof v !== "object" || Array.isArray(v) || !Object.keys(v).length) return [false];
+  const out = {};
+  for (const [key, raw] of Object.entries(v)) {
+    if (!Object.hasOwn(VIEW_PREFS_RULES, key)) return [false];
+    if (raw === null) {
+      out[key] = null;
+      continue;
+    }
+    const [ok, normalized] = VIEW_PREFS_RULES[key](raw);
+    if (!ok) return [false];
+    out[key] = normalized;
+  }
+  return [true, out];
+};
+
 // Règle de validation par champ : renvoie [ok, valeurNormalisée]
 const RULES = {
   displayName: (v) => {
@@ -103,6 +158,7 @@ const RULES = {
   strategy: nullable(oneOf(STRATEGIES)),
   targetAllocation: nullable(allocation),
   maxPositionWeight: nullable(percent(1, 100)),
+  viewPrefs: viewPrefsPatch,
 };
 
 const MESSAGES = {
@@ -125,7 +181,18 @@ const MESSAGES = {
   strategy: "Stratégie : dividendes, croissance, indicielle passive ou équilibrée.",
   targetAllocation: "Allocation cible : poches connues, de 0 à 100 % chacune, pour un total de 100 %.",
   maxPositionWeight: "Poids maximal d'une ligne : entre 1 et 100 %.",
+  viewPrefs: "Préférences d'affichage invalides (clés autorisées : " + VIEW_PREFS_KEYS.join(", ") + ").",
 };
+
+// Message précis pour une préférence d'affichage refusée (clé inconnue ou valeur invalide)
+function viewPrefsMessage(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return MESSAGES.viewPrefs;
+  for (const [key, v] of Object.entries(raw)) {
+    if (!Object.hasOwn(VIEW_PREFS_RULES, key)) return `Préférence d'affichage inconnue : ${key}.`;
+    if (v !== null && !VIEW_PREFS_RULES[key](v)[0]) return VIEW_PREFS_MESSAGES[key];
+  }
+  return MESSAGES.viewPrefs;
+}
 
 /** Valide une mise à jour partielle. Renvoie { value } ou { errors }. */
 function validateProfilePatch(patch) {
@@ -142,10 +209,45 @@ function validateProfilePatch(patch) {
     }
     const [ok, normalized] = rule(raw);
     if (ok) value[key] = normalized;
-    else errors.push({ field: key, msg: MESSAGES[key] });
+    else errors.push({ field: key, msg: key === "viewPrefs" ? viewPrefsMessage(raw) : MESSAGES[key] });
   }
   if (!Object.keys(patch).length) errors.push({ field: null, msg: "Rien à mettre à jour." });
   return errors.length ? { errors } : { value };
+}
+
+/** Préférences d'affichage enregistrées : seules les clés connues et valides sont renvoyées. */
+function readViewPrefs(stored) {
+  const out = {};
+  if (!stored || typeof stored !== "object" || Array.isArray(stored)) return out;
+  for (const key of VIEW_PREFS_KEYS) {
+    if (stored[key] === undefined || stored[key] === null) continue;
+    const [ok, value] = VIEW_PREFS_RULES[key](stored[key]);
+    if (ok) out[key] = value;
+  }
+  return out;
+}
+
+/**
+ * Opérations MongoDB d'une mise à jour validée : champs du profil en `profile.<champ>`,
+ * préférences d'affichage fusionnées clé par clé (`profile.viewPrefs.<clé>`) ; null efface la clé.
+ */
+function profileUpdateOps(value) {
+  const $set = {};
+  const $unset = {};
+  for (const [key, v] of Object.entries(value)) {
+    if (key === "viewPrefs") {
+      for (const [prefKey, prefValue] of Object.entries(v)) {
+        if (prefValue === null) $unset[`profile.viewPrefs.${prefKey}`] = "";
+        else $set[`profile.viewPrefs.${prefKey}`] = prefValue;
+      }
+    } else {
+      $set[`profile.${key}`] = v;
+    }
+  }
+  const ops = {};
+  if (Object.keys($set).length) ops.$set = $set;
+  if (Object.keys($unset).length) ops.$unset = $unset;
+  return ops;
 }
 
 /** Profil complet (valeurs par défaut + valeurs enregistrées connues). */
@@ -156,6 +258,7 @@ function readProfile(user) {
     if (stored[key] !== undefined) out[key] = stored[key];
   }
   if (Object.hasOwn(LEGACY_HOME_PAGES, out.homePage)) out.homePage = LEGACY_HOME_PAGES[out.homePage];
+  out.viewPrefs = readViewPrefs(stored.viewPrefs);
   return out;
 }
 
@@ -170,6 +273,8 @@ module.exports = {
   RISK_PROFILES,
   STRATEGIES,
   ALLOCATION_KEYS,
+  VIEW_PREFS_KEYS,
   validateProfilePatch,
   readProfile,
+  profileUpdateOps,
 };
