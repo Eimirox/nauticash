@@ -89,3 +89,60 @@ test('affichage : flèche et signe, jamais la couleur seule', () => {
   assert.equal(formatVariation(0), '= 0,0 %');
   assert.equal(formatVariation(null), '—');
 });
+
+import { monthWindow, valueDomain, pctDomain, axisTick } from '../lib/portfolioEvolution.js';
+
+test('fenêtre de mois : du premier au dernier relevé, 6 mois au minimum', () => {
+  const rows = evolutionRows(history, [2026]);
+  // septembre et octobre seulement → étendu à 6 mois vers le passé (mai à octobre)
+  assert.deepEqual(monthWindow(rows, [2026]), { start: 5, end: 10 });
+  // début d'année : on ne peut pas reculer, on élargit vers l'avenir
+  const jan = evolutionRows([{ year: 2026, month: 1, value: 10 }, { year: 2026, month: 2, value: 11 }], [2026]);
+  assert.deepEqual(monthWindow(jan, [2026]), { start: 1, end: 6 });
+  const wide = evolutionRows(
+    [{ year: 2026, month: 2, value: 10 }, { year: 2026, month: 10, value: 12 }], [2026]);
+  assert.deepEqual(monthWindow(wide, [2026]), { start: 2, end: 10 });
+  assert.deepEqual(monthWindow(evolutionRows([], [2026]), [2026]), { start: 1, end: 12 });
+});
+
+test('fenêtre de mois : plusieurs années, la plus large l’emporte', () => {
+  const h = [{ year: 2026, month: 9, value: 10 }, { year: 2025, month: 3, value: 8 }, { year: 2025, month: 11, value: 9 }];
+  assert.deepEqual(monthWindow(evolutionRows(h, [2026, 2025]), [2026, 2025]), { start: 3, end: 11 });
+});
+
+test('axe vertical : ajusté aux valeurs, marge haute, graduations rondes, jamais négatif', () => {
+  const { domain, ticks } = valueDomain([55000, 57320]);
+  assert.ok(domain[0] > 0 && domain[0] < 55000, `bas ${domain[0]}`);
+  assert.ok(domain[1] > 57320, `haut ${domain[1]}`);
+  assert.ok(domain[1] - 57320 > (57320 - 55000) * 0.4, 'place pour les étiquettes au-dessus du point');
+  assert.equal(ticks[0], domain[0]);
+  assert.equal(ticks.at(-1), domain[1]);
+  const step = ticks[1] - ticks[0];
+  assert.ok(ticks.every((t, i) => i === 0 || Math.abs(t - ticks[i - 1] - step) < 1e-6), 'pas régulier');
+  assert.ok(valueDomain([100]).domain[0] >= 0);
+  assert.deepEqual(valueDomain([]).domain, [0, 1]);
+});
+
+test('axe des variations : symétrique autour de 0, au moins ±1 %', () => {
+  const rows = evolutionRows(history, [2026]);
+  assert.deepEqual(pctDomain(rows, [2026]), [-8, 8]); // +5 % × 1,5 arrondi au-dessus
+  assert.deepEqual(pctDomain(evolutionRows([], [2026]), [2026]), [-1, 1]);
+});
+
+test('graduations : k et M avec décimale utile, sans arrondir à tort', () => {
+  assert.equal(axisTick(57500), '57,5 k');
+  assert.equal(axisTick(60000), '60 k');
+  assert.equal(axisTick(1200000), '1,2 M');
+  assert.equal(axisTick(500), '500');
+});
+
+import { labelMode } from '../lib/portfolioEvolution.js';
+
+test('étiquettes : version courte sans flèche, taille selon la place par mois', () => {
+  assert.equal(formatVariation(3.34, { short: true }), '+3,3 %');
+  assert.equal(formatVariation(-1.46, { short: true }), '−1,5 %');
+  assert.equal(formatVariation(null, { short: true }), '—');
+  assert.equal(labelMode(120), 'full');
+  assert.equal(labelMode(50), 'short');
+  assert.equal(labelMode(30), 'none');
+});
