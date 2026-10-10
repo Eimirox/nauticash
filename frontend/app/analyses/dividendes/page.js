@@ -5,6 +5,7 @@ import { apiFetch } from "@/lib/api";
 import { useFxRates, toCurrency, ratePer, currencySymbol } from "@/lib/fx";
 import { useBaseCurrency } from "@/lib/profile";
 import { estimateDividends, FREQUENCY_LABELS } from "@/lib/dividendCalendar";
+import { nextDividendSort, sortDividendRows, ariaSortFor } from "@/lib/dividendSort";
 import DividendCalendar from "../../components/DividendCalendar";
 import TickerLogo from "../../components/TickerLogo";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
@@ -20,6 +21,8 @@ export default function DividendesPage() {
   const [loadError, setLoadError] = useState(null);
   const [stocks, setStocks] = useState([]);
   const [loading, setLoading] = useState(true);
+  // Tri du tableau par action (Total annuel, Rendement, Sur PRU) ; null = ordre par défaut (total décroissant)
+  const [divSort, setDivSort] = useState({ key: null, dir: null });
   const { rates, date: fxDate, stale: fxStale } = useFxRates();
   // Montants convertis dans la devise de référence du profil (EUR par défaut)
   const base = useBaseCurrency();
@@ -63,6 +66,32 @@ export default function DividendesPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stocks, rates, base]);
+
+  const sortedRows = useMemo(
+    () => sortDividendRows(dividendData.stocksWithDividends, divSort),
+    [dividendData.stocksWithDividends, divSort]
+  );
+
+  // En-tête triable : bouton focusable au clavier, flèche de sens visible et état annoncé via aria-sort
+  const sortableTh = (key, label) => {
+    const active = divSort.key === key;
+    const arrow = !active ? "↕" : divSort.dir === "asc" ? "▲" : "▼";
+    return (
+      <th scope="col" aria-sort={ariaSortFor(divSort, key)} className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">
+        <button
+          type="button"
+          onClick={() => setDivSort((s) => nextDividendSort(s, key))}
+          className={`relative inline-flex items-center gap-1 rounded font-semibold whitespace-nowrap transition hover:text-accent select-none ${active ? "text-accent" : ""}`}
+        >
+          {label}
+          <span aria-hidden="true" className={`text-xs ${active ? "" : "opacity-50"}`}>{arrow}</span>
+          <span className="sr-only">
+            {active ? (divSort.dir === "asc" ? " (tri croissant)" : " (tri décroissant)") : " (trier)"}
+          </span>
+        </button>
+      </th>
+    );
+  };
 
   const formatCurrency = (value, currency = "EUR") => {
     return value.toLocaleString("fr-FR", {
@@ -178,21 +207,21 @@ export default function DividendesPage() {
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <caption className="sr-only">Dividendes par action : quantité, dividende par action, total annuel, rendement, rendement sur PRU, fréquence et prochaine date de versement.</caption>
+                  <caption className="sr-only">Dividendes par action : quantité, dividende par action, total annuel, rendement, rendement sur PRU, fréquence et prochaine date de versement. Les colonnes Total annuel, Rendement et Sur PRU peuvent être triées.</caption>
                   <thead>
                     <tr className="border-b border-line">
                       <th scope="col" className="text-left py-3 px-4 text-sm font-semibold text-ink-muted">Action</th>
                       <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Quantité</th>
                       <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Div/Action</th>
-                      <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Total Annuel</th>
-                      <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Rendement</th>
-                      <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Sur PRU</th>
+                      {sortableTh("totalAnnual", "Total Annuel")}
+                      {sortableTh("yieldPercent", "Rendement")}
+                      {sortableTh("yieldOnCost", "Sur PRU")}
                       <th scope="col" className="text-left py-3 px-4 text-sm font-semibold text-ink-muted">Versement</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {dividendData.stocksWithDividends.map((stock, idx) => (
-                      <tr key={idx} className="border-b border-line hover:bg-surface-2 transition">
+                    {sortedRows.map((stock, idx) => (
+                      <tr key={`${stock.ticker}-${idx}`} className="border-b border-line hover:bg-surface-2 transition">
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-3">
                             <TickerLogo ticker={stock.ticker} logo={stock.logo} size={32} />
