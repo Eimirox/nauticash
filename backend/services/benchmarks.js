@@ -105,4 +105,4 @@ async function getBenchmark(key) {
   }
 }
 
-module.exports = { BENCHMARKS, list, getBenchmark, CACHE_TTL };
+module.exports = { BENCHMARKS, list, getBenchmark, CACHE_TTL, fetchHistory, fetchHistoryYahoo };
