@@ -19,13 +19,9 @@ import { formatCurrencySymbol } from "../portfolio/utils/formats";
 import PortfolioHistoryChart from "./PortfolioHistoryChart";
 import WealthHero from "../components/WealthHero";
 import { wealthSummary, allocationByType, allocationByCountry } from "@/lib/wealth";
-import { TYPE_COLORS } from "../components/AllocationBreakdown";
+import { typeColor, countryColors } from "@/lib/chartPalette";
 import { shareSummary } from "@/lib/chartSummary";
 import Skeleton, { SkeletonRegion, SkeletonStat } from "../components/ui/Skeleton";
-
-// Pays : séries de DESIGN.md dans l'ordre, « Autres » en ardoise
-const COUNTRY_COLORS = ["#059669", "#2563EB", "#14B8A6", "#0891B2", "#4F46E5"];
-const OTHER_COLOR = "#64748B";
 
 export default function TableauDeBord() {
   const [loadError, setLoadError] = useState(null);
@@ -80,6 +76,7 @@ export default function TableauDeBord() {
   const totalsPerType = allocationByType(stocks, cash, toBaseOrNull);
   const typeLabels = Object.keys(totalsPerType);
   const countryRows = allocationByCountry(stocks, toBaseOrNull, 5);
+  const countryColorOf = countryColors(countryRows.map((r) => r.label));
   const dividendEstimate = summaryReady ? estimateDividends(stocks, inBase) : null;
   // Cash dans la devise de référence (null tant que le taux est inconnu)
   const cashInBase = toBaseOrNull(Number(cash.amount) || 0, cash.currency || "EUR");
@@ -90,7 +87,7 @@ export default function TableauDeBord() {
   const pieType = typeLabels.map((t) => ({
     label: t,
     value: totalsPerType[t],
-    color: TYPE_COLORS[t] || TYPE_COLORS.Autres,
+    color: typeColor(t),
   }));
 
   const numberFormatter = new Intl.NumberFormat("fr-FR", {
@@ -302,8 +299,8 @@ export default function TableauDeBord() {
                 </div>
                 {countryRows.length > 0 ? (
                   <ul className="space-y-4">
-                    {countryRows.map((row, i) => {
-                      const color = row.label === "Autres" ? OTHER_COLOR : COUNTRY_COLORS[i % COUNTRY_COLORS.length];
+                    {countryRows.map((row) => {
+                      const color = countryColorOf[row.label];
                       const pct = (row.share * 100).toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
                       return (
                         <li key={row.label}>

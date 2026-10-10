@@ -5,7 +5,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const auth = require("../middleware/auth");
 const priceStore = require("../services/priceStore");
-const { validateProfilePatch, readProfile } = require("../services/profile");
+const { validateProfilePatch, readProfile, profileUpdateOps } = require("../services/profile");
 const { resolveCountry } = require("../services/countries");
 const { exchangeLabel, logoUrl } = require("../services/exchanges");
 const { zoneOf, etfExposure } = require("../services/zones");
@@ -391,8 +391,8 @@ router.patch("/profile", auth, async (req, res) => {
       return res.status(400).json({ error: errors[0].msg, details: errors });
     }
 
-    const $set = Object.fromEntries(Object.entries(value).map(([k, v]) => [`profile.${k}`, v]));
-    const result = await users().updateOne(userFilter(req), { $set });
+    // Préférences d'affichage fusionnées clé par clé (deux onglets ne s'écrasent pas), null = effacer
+    const result = await users().updateOne(userFilter(req), profileUpdateOps(value));
     if (result.matchedCount === 0) return res.status(404).json({ error: "User not found" });
 
     const user = await users().findOne(userFilter(req), { projection: { email: 1, profile: 1 } });

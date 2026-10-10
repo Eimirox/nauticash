@@ -4,6 +4,7 @@ import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recha
 
 const numberFormatter = new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const pctFormatter = new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const pctShort = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 });
 
 /**
  * Camembert de répartition (recharts, seule librairie de graphiques du site).
@@ -11,6 +12,7 @@ const pctFormatter = new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2, 
  * et porte le résumé texte (role="img" + aria-label).
  */
 export default function AllocationPie({ slices }) {
+  // Aucune part ne partage sa couleur avec une autre : le tableau de données porte la couleur de chaque part
   const data = slices.filter((s) => Number(s.value) > 0);
   const total = data.reduce((sum, s) => sum + Number(s.value), 0);
 
@@ -48,8 +50,18 @@ export default function AllocationPie({ slices }) {
           verticalAlign="bottom"
           iconType="circle"
           iconSize={10}
-          wrapperStyle={{ fontSize: 12, color: "#8A9AA9", paddingTop: 8 }}
-          formatter={(value) => <span style={{ color: "#8A9AA9" }}>{value}</span>}
+          wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
+          formatter={(value, entry) => {
+            // Part en % dans la légende : on lit la valeur sans repasser par la couleur
+            const v = Number(entry?.payload?.value ?? entry?.payload?.payload?.value);
+            const pct = total && Number.isFinite(v) ? ` ${pctShort.format((v / total) * 100)} %` : "";
+            return (
+              <span style={{ color: "rgb(var(--text-muted))" }}>
+                {value}
+                <span className="tabular-nums">{pct}</span>
+              </span>
+            );
+          }}
         />
       </PieChart>
     </ResponsiveContainer>

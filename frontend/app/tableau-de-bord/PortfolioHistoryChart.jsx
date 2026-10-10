@@ -4,9 +4,12 @@ import { useState, useEffect } from "react";
 import { apiFetch } from "@/lib/api";
 import { useFxRates, toEUR, fetchFxRates } from "@/lib/fx";
 import { useToast } from "../components/ui";
+import { usePersistedPreference, VIEW_PREF_CODECS } from "@/lib/viewPrefs";
 import {
-  BarChart,
+  ComposedChart,
   Bar,
+  Line,
+  LabelList,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -15,28 +18,52 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { trendSummary } from "@/lib/chartSummary";
+import {
+  evolutionRows,
+  availableYears as yearsOf,
+  lastSnapshot as latestSnapshot,
+  direction,
+  formatVariation,
+} from "@/lib/portfolioEvolution";
 import Skeleton, { SkeletonRegion } from "../components/ui/Skeleton";
 
-// Mapping mois anglais -> numéro
-const MONTH_MAP = {
-  January: 1,
-  February: 2,
-  March: 3,
-  April: 4,
-  May: 5,
-  June: 6,
-  July: 7,
-  August: 8,
-  September: 9,
-  October: 10,
-  November: 11,
-  December: 12,
+// Couleur et sens d'une variation (la flèche et le signe portent aussi l'information, jamais la couleur seule)
+const DIRECTION_COLOR = {
+  up: "rgb(var(--gain))",
+  down: "rgb(var(--loss))",
+  flat: "rgb(var(--text-muted))",
+  none: "rgb(var(--text-muted))",
 };
+
+// Étiquette « ▲ +3,2 % » au-dessus d'une barre, couchée à la verticale pour ne jamais chevaucher la barre voisine
+function makePctLabel(year, rows) {
+  return function PctLabel({ x, y, width, index }) {
+    const row = rows[index];
+    if (!row || row[`year${year}`] == null) return null; // mois sans relevé : ni barre ni %
+    const pct = row[`pct${year}`];
+    const cx = Number(x) + Number(width) / 2;
+    return (
+      <text
+        x={cx}
+        y={Number(y) - 6}
+        transform={`rotate(-90 ${cx} ${Number(y) - 6})`}
+        textAnchor="start"
+        fontSize={11}
+        fontWeight={600}
+        style={{ fill: DIRECTION_COLOR[direction(pct)] }}
+        className="tabular-nums"
+      >
+        {formatVariation(pct)}
+      </text>
+    );
+  };
+}
 
 export default function PortfolioHistoryChart() {
   const toast = useToast();
   const [history, setHistory] = useState([]);
-  const [selectedYears, setSelectedYears] = useState([]);
+  // Années comparées : choix mémorisé dans le compte ; sans choix, les deux années les plus récentes
+  const [pickedYears, setPickedYears, yearsPref] = usePersistedPreference(VIEW_PREF_CODECS.historyYears);
   const [availableYears, setAvailableYears] = useState([]);
   const [loading, setLoading] = useState(false);
   const [fetched, setFetched] = useState(false); // premier chargement terminé
@@ -53,19 +80,6 @@ export default function PortfolioHistoryChart() {
     2028: "#EC4899",
   };
 
-  // Convertir mois (string ou number) en numéro
-  const getMonthNumber = (month) => {
-    // Si c'est déjà un nombre
-    if (typeof month === "number") return month;
-
-    // Si c'est un string numérique "04"
-    const parsed = parseInt(month);
-    if (!isNaN(parsed) && parsed >= 1 && parsed <= 12) return parsed;
-
-    // Si c'est un nom en anglais "April"
-    return MONTH_MAP[month] || null;
-  };
-
   // Taux BCE servis par le backend (toutes devises)
   const { stale: fxStale } = useFxRates();
 
@@ -79,31 +93,12 @@ export default function PortfolioHistoryChart() {
 
       setHistory(data);
 
-      // Extraire années
-      const years = [...new Set(data.map((item) => parseInt(item.year)))].sort(
-        (a, b) => b - a
-      );
+      // Années disponibles : seuls les relevés valides (valeur > 0) comptent
+      const years = yearsOf(data);
       setAvailableYears(years);
 
-      // Auto-sélection
-      if (years.length > 0 && selectedYears.length === 0) {
-        const toSelect = years.slice(0, Math.min(2, years.length));
-        setSelectedYears(toSelect);
-      }
-
-      // Dernier snapshot
-      if (data.length > 0) {
-        const sorted = [...data].sort((a, b) => {
-          const yearDiff = b.year - a.year;
-          if (yearDiff !== 0) return yearDiff;
-          return getMonthNumber(b.month) - getMonthNumber(a.month);
-        });
-        setLastSnapshot({
-          year: sorted[0].year,
-          month: sorted[0].month,
-          value: sorted[0].value,
-        });
-      }
+      // Dernier relevé valide (jamais un mois créé à 0 €)
+      setLastSnapshot(latestSnapshot(data));
     } catch (err) {
       console.error("❌ Erreur:", err);
     } finally {
@@ -184,78 +179,60 @@ export default function PortfolioHistoryChart() {
     }
   };
 
+  // Années affichées : le choix enregistré (limité aux années qui ont des relevés), sinon les deux plus récentes
+  const selectedYears = (pickedYears ?? availableYears.slice(0, 2)).filter((y) => availableYears.includes(y));
+
   const toggleYear = (year) => {
-    setSelectedYears((prev) =>
-      prev.includes(year) ? prev.filter((y) => y !== year) : [...prev, year]
-    );
+    setPickedYears(selectedYears.includes(year) ? selectedYears.filter((y) => y !== year) : [...selectedYears, year]);
   };
 
-  // Transformer données - 12 MOIS FIXES
-  const transformData = () => {
-    const months = [
-      { monthNum: 1, month: "Jan" },
-      { monthNum: 2, month: "Fév" },
-      { monthNum: 3, month: "Mar" },
-      { monthNum: 4, month: "Avr" },
-      { monthNum: 5, month: "Mai" },
-      { monthNum: 6, month: "Juin" },
-      { monthNum: 7, month: "Juil" },
-      { monthNum: 8, month: "Août" },
-      { monthNum: 9, month: "Sep" },
-      { monthNum: 10, month: "Oct" },
-      { monthNum: 11, month: "Nov" },
-      { monthNum: 12, month: "Déc" },
-    ];
+  // 12 mois fixes : valeur, % et écart vs mois N-1 pour chaque année sélectionnée
+  const chartData = evolutionRows(history, selectedYears);
 
-    return months.map((monthData) => {
-      const result = { ...monthData };
+  // Marge en haut du graphique pour les étiquettes de variation
+  const yMax = Math.max(0, ...chartData.flatMap((row) => selectedYears.map((y) => row[`year${y}`] || 0)));
+  const yDomain = [0, Math.ceil((yMax || 1) * 1.28)];
 
-      selectedYears.forEach((year) => {
-        const found = history.find((item) => {
-          const itemYear = parseInt(item.year);
-          const itemMonth = getMonthNumber(item.month);
-          return itemYear === year && itemMonth === monthData.monthNum;
-        });
-
-        if (found) {
-          result[`year${year}`] = found.value;
-        }
-      });
-
-      return result;
-    });
-  };
-
-  const chartData = transformData();
+  const euro = (v) =>
+    `${Number(v).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 
   const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-slate-900 text-white p-3 rounded-lg shadow-xl border border-slate-700">
-          <p className="font-semibold mb-2">{label}</p>
-          {payload.map((entry, index) => {
-            if (entry.value != null) {
-              return (
-                <p
-                  key={index}
-                  className="text-sm"
-                  style={{ color: entry.color }}
-                >
-                  {entry.name}:{" "}
-                  {entry.value.toLocaleString("fr-FR", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                  €
-                </p>
-              );
-            }
-            return null;
-          })}
-        </div>
-      );
-    }
-    return null;
+    if (!active || !payload || !payload.length) return null;
+    const row = payload[0]?.payload || {};
+    const discreet = typeof document !== "undefined" && document.documentElement.classList.contains("discreet");
+    // Une seule ligne par année (la barre et l'escalier partagent la même valeur)
+    const years = [...new Set(payload.filter((e) => e.value != null).map((e) => String(e.dataKey).replace("year", "")))];
+    return (
+      <div className="rounded-lg border border-slate-700 bg-slate-900 p-3 text-white shadow-xl">
+        <p className="mb-2 font-semibold">{label}</p>
+        {years.map((year) => {
+          const entry = payload.find((e) => e.dataKey === `year${year}`);
+          const pct = row[`pct${year}`];
+          const delta = row[`delta${year}`];
+          const dir = direction(pct);
+          return (
+            <div key={year} className="mb-1 text-sm last:mb-0">
+              <p style={{ color: entry?.color }}>
+                {year} : {discreet ? "••••" : euro(row[`year${year}`])}
+              </p>
+              <p className="tabular-nums text-xs text-slate-300">
+                vs mois précédent :{" "}
+                <span className="font-semibold" style={{ color: dir === "up" ? "#4ADE80" : dir === "down" ? "#F87171" : "#CBD5E1" }}>
+                  {formatVariation(pct)}
+                </span>
+                {!discreet && delta != null && (
+                  <span>
+                    {" "}
+                    ({delta > 0 ? "+" : delta < 0 ? "−" : ""}
+                    {euro(Math.abs(delta))})
+                  </span>
+                )}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    );
   };
 
   const hasData = history.length > 0 && selectedYears.length > 0;
@@ -291,6 +268,15 @@ export default function PortfolioHistoryChart() {
           ))}
           {fetched && availableYears.length === 0 && (
             <span className="text-sm text-ink-muted italic">Aucune donnée</span>
+          )}
+          {yearsPref.customized && (
+            <button
+              type="button"
+              onClick={yearsPref.reset}
+              className="rounded-lg px-2 py-1 text-xs font-medium text-ink-muted underline-offset-2 hover:text-accent hover:underline"
+            >
+              Réinitialiser l&apos;affichage
+            </button>
           )}
         </div>
 
@@ -437,11 +423,11 @@ export default function PortfolioHistoryChart() {
         </div>
       )}
 
-      {/* Dernier snapshot */}
+      {/* Dernier relevé valide */}
       {lastSnapshot && (
-        <div className="mb-6 p-3 bg-surface-2 border border-line rounded-lg flex items-center justify-between text-sm">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-surface-2 p-3 text-sm">
           <div className="flex items-center gap-2 text-ink-muted">
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <svg aria-hidden="true" className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
               <path
                 fillRule="evenodd"
                 d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
@@ -450,18 +436,21 @@ export default function PortfolioHistoryChart() {
             </svg>
             <span>
               Dernier relevé :{" "}
-              {MONTH_MAP[lastSnapshot.month]
-                ? new Date(lastSnapshot.year, MONTH_MAP[lastSnapshot.month] - 1, 1).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })
-                : `${lastSnapshot.month} ${lastSnapshot.year}`}
+              {new Date(lastSnapshot.year, lastSnapshot.month - 1, 1).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}
             </span>
           </div>
-          <span className="font-semibold text-ink">
-            {lastSnapshot.value.toLocaleString("fr-FR", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}
-            €
-          </span>
+          <div className="flex items-center gap-3">
+            {lastSnapshot.pct != null && (
+              <span
+                className="text-xs font-semibold tabular-nums"
+                style={{ color: DIRECTION_COLOR[direction(lastSnapshot.pct)] }}
+                title="Évolution par rapport au mois précédent"
+              >
+                {formatVariation(lastSnapshot.pct)} <span className="font-normal text-ink-muted">vs mois précédent</span>
+              </span>
+            )}
+            <span className="money font-semibold tabular-nums text-ink">{euro(lastSnapshot.value)}</span>
+          </div>
         </div>
       )}
 
@@ -498,19 +487,26 @@ export default function PortfolioHistoryChart() {
         </div>
       ) : (
         <div
+          className="money-chart"
           role="img"
-          aria-label={`Histogramme de la valeur du portefeuille par mois. ${selectedYears
-            .map((year) => `${year} : ${trendSummary(chartData.map((m) => ({ label: m.month, value: m[`year${year}`] })), formatEuro)}`)
+          aria-label={`Histogramme de la valeur du portefeuille par mois, avec une courbe en escalier et l'évolution en pourcentage par rapport au mois précédent. ${selectedYears
+            .map((year) => {
+              const last = [...chartData].reverse().find((m) => m[`pct${year}`] != null);
+              const tail = last ? `, dernière variation en ${last.month} : ${formatVariation(last[`pct${year}`])}` : "";
+              return `${year} : ${trendSummary(chartData.map((m) => ({ label: m.month, value: m[`year${year}`] })), formatEuro)}${tail}`;
+            })
             .join(". ")}.`}
         >
         <ResponsiveContainer width="100%" height={400}>
-          <BarChart data={chartData} barGap={4}>
+          <ComposedChart data={chartData} barGap={4} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#94A3B8" strokeOpacity={0.25} />
             <XAxis
               dataKey="month"
               tick={{ fill: "#8A9AA9", fontSize: 12 }}
             />
             <YAxis
+              domain={yDomain}
+              allowDataOverflow
               tick={{ fill: "#8A9AA9", fontSize: 12 }}
               tickFormatter={(value) => {
                 if (value >= 1000000) return `${(value / 1000000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} M`;
@@ -530,9 +526,29 @@ export default function PortfolioHistoryChart() {
                 name={`${year}`}
                 fill={yearColors[year] || "#9CA3AF"}
                 radius={[4, 4, 0, 0]}
+                isAnimationActive={false}
+              >
+                <LabelList dataKey={`pct${year}`} content={makePctLabel(year, chartData)} />
+              </Bar>
+            ))}
+            {/* Escalier : relie les valeurs mois après mois (un palier par mois, sans pente trompeuse) */}
+            {selectedYears.map((year) => (
+              <Line
+                key={`step-${year}`}
+                dataKey={`year${year}`}
+                name={`${year} (escalier)`}
+                type="stepAfter"
+                stroke={yearColors[year] || "#9CA3AF"}
+                strokeWidth={2}
+                strokeOpacity={0.9}
+                dot={{ r: 3, strokeWidth: 0, fill: yearColors[year] || "#9CA3AF" }}
+                activeDot={false}
+                connectNulls
+                legendType="none"
+                isAnimationActive={false}
               />
             ))}
-          </BarChart>
+          </ComposedChart>
         </ResponsiveContainer>
         </div>
       )}

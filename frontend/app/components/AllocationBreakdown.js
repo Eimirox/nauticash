@@ -3,50 +3,7 @@
 import AllocationPie from "./AllocationPie";
 import { allocationByType } from "@/lib/wealth";
 import { shareSummary } from "@/lib/chartSummary";
-
-// Types d'actif : ordre des séries de DESIGN.md (accent, accent-2, teintes intermédiaires)
-export const TYPE_COLORS = {
-  "Actions": "#2563EB",
-  "ETF et fonds": "#059669",
-  "Crypto": "#0891B2",
-  "Cash": "#14B8A6",
-  "Autres": "#64748B",
-};
-
-// Couleurs sectorielles fixes (une famille de teintes par grand secteur)
-const SECTOR_COLORS = {
-  "Technology": "#10B981",
-  "Information Technology": "#10B981",
-  "Communication Services": "#8B5CF6",
-  "Cryptocurrency": "#F59E0B",
-  "Crypto": "#F59E0B",
-  "Financial Services": "#4F46E5",
-  "Financial": "#4F46E5",
-  "Financials": "#4F46E5",
-  "Banks": "#6366F1",
-  "Insurance": "#818CF8",
-  "Healthcare": "#3B82F6",
-  "Health Care": "#3B82F6",
-  "Biotechnology": "#60A5FA",
-  "Energy": "#EAB308",
-  "Oil & Gas": "#FBBF24",
-  "Consumer Cyclical": "#F97316",
-  "Consumer Defensive": "#FB923C",
-  "Consumer Discretionary": "#F97316",
-  "Consumer Staples": "#FB923C",
-  "Industrials": "#6B7280",
-  "Industrial": "#6B7280",
-  "Basic Materials": "#78716C",
-  "Materials": "#78716C",
-  "Utilities": "#06B6D4",
-  "Real Estate": "#EC4899",
-  "Cash": "#22C55E",
-  "Dette": "#EF4444",
-  "Unknown": "#9CA3AF",
-  "Other": "#9CA3AF",
-};
-
-const CURRENCY_COLORS = { USD: "#10B981", EUR: "#3B82F6" };
+import { typeColor, sectorColors, currencyColors, mergeSectorRows } from "@/lib/chartPalette";
 
 /** Totaux par secteur dans la devise de référence (ETF répartis selon leur composition, cash / dette à part) */
 export function totalsBySector(stocks, cash, inBase) {
@@ -129,7 +86,10 @@ const ICON_SECTOR = (
 export default function AllocationBreakdown({ stocks, cash, inBase, toBaseOrNull }) {
   const byType = Object.entries(allocationByType(stocks, cash, toBaseOrNull));
   const byCurrency = Object.entries(totalsByCurrency(stocks, inBase));
-  const bySector = Object.entries(totalsBySector(stocks, cash, inBase));
+  // Variantes de nom fusionnées (Financials / Financial Services…) pour éviter deux parts jumelles
+  const bySector = mergeSectorRows(Object.entries(totalsBySector(stocks, cash, inBase)));
+  const currencyColorOf = currencyColors(byCurrency.map(([c]) => c));
+  const sectorColorOf = sectorColors(bySector.map(([sector]) => sector));
 
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
@@ -138,21 +98,21 @@ export default function AllocationBreakdown({ stocks, cash, inBase, toBaseOrNull
         kind="répartition par type d'actif"
         icon={ICON_TYPE}
         rows={byType}
-        colorOf={(t) => TYPE_COLORS[t] || TYPE_COLORS.Autres}
+        colorOf={typeColor}
       />
       <PieCard
         title="Par devise"
         kind="répartition par devise"
         icon={ICON_CURRENCY}
         rows={byCurrency}
-        colorOf={(c) => CURRENCY_COLORS[c] || "#9CA3AF"}
+        colorOf={(c) => currencyColorOf[c]}
       />
       <PieCard
         title="Par secteur"
         kind="répartition par secteur"
         icon={ICON_SECTOR}
         rows={bySector}
-        colorOf={(s) => SECTOR_COLORS[s] || SECTOR_COLORS.Unknown}
+        colorOf={(s) => sectorColorOf[s]}
       />
     </div>
   );
