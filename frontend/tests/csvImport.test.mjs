@@ -1,7 +1,15 @@
 // Tests unitaires de lib/csvImport.js (node:test) : `cd frontend && npm test`
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { detectSeparator, splitCsvLine, parsePositionsCsv, CSV_MAX_ROWS } from '../lib/csvImport.js';
+import {
+  detectSeparator,
+  splitCsvLine,
+  parsePositionsCsv,
+  CSV_MAX_ROWS,
+  CSV_TEMPLATE,
+  importOutcome,
+  summarizeImport,
+} from '../lib/csvImport.js';
 
 test('detectSeparator : point-virgule, virgule, tabulation, ignore les guillemets', () => {
   assert.equal(detectSeparator('ticker;quantité;PRU'), ';');
@@ -82,4 +90,31 @@ test('parsePositionsCsv : fichier inutilisable → ok false avec un message clai
   assert.equal(parsePositionsCsv('ticker;quantité\n\n').error, "Aucune position après la ligne d'en-tête.");
   const big = 'ticker;quantité\n' + Array.from({ length: CSV_MAX_ROWS + 1 }, (_, i) => `T${i};1`).join('\n');
   assert.match(parsePositionsCsv(big).error, /Trop de lignes \(501\)/);
+});
+
+test('CSV_TEMPLATE : relu sans erreur par parsePositionsCsv', () => {
+  const r = parsePositionsCsv(CSV_TEMPLATE);
+  assert.equal(r.ok, true);
+  assert.equal(r.errors.length, 0);
+  assert.deepEqual(r.rows.map((x) => x.ticker), ['AAPL', 'MC.PA', 'CW8.PA']);
+  assert.equal(r.rows[2].quantity, 5.5);
+});
+
+test('importOutcome : ajouté, introuvable, autre erreur', () => {
+  assert.equal(importOutcome(null).status, 'added');
+  assert.equal(importOutcome({ status: 404, message: 'Ticker introuvable : ZZZ' }).status, 'notFound');
+  assert.deepEqual(importOutcome({ status: 409, message: 'AAPL est déjà dans votre portefeuille.' }), {
+    status: 'error',
+    message: 'AAPL est déjà dans votre portefeuille.',
+  });
+  assert.equal(importOutcome({ status: 404, message: 'User not found' }).status, 'error');
+  assert.equal(importOutcome({ status: 0 }).message, 'Erreur inconnue');
+});
+
+test('summarizeImport : compteurs par statut', () => {
+  assert.deepEqual(
+    summarizeImport([{ status: 'added' }, { status: 'added' }, { status: 'notFound' }, { status: 'error' }]),
+    { added: 2, notFound: 1, error: 1, total: 4 }
+  );
+  assert.deepEqual(summarizeImport(), { added: 0, notFound: 0, error: 0, total: 0 });
 });

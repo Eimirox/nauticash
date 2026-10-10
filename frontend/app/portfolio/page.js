@@ -17,6 +17,7 @@ import { usePersistedPreference, VIEW_PREF_CODECS } from "@/lib/viewPrefs";
 import GoalGauge from "../components/GoalGauge";
 import TickerSearch from "../components/TickerSearch";
 import AddPositionModal from "../components/AddPositionModal";
+import ImportCsvModal from "../components/ImportCsvModal";
 import EmptyPortfolioGuide from "../components/EmptyPortfolioGuide";
 import TickerLogo from "../components/TickerLogo";
 import EmergencyFund from "../components/EmergencyFund";
@@ -255,6 +256,19 @@ export default function Portfolio() {
       onConfirm={addStock}
       onCancel={cancelAdd}
     />
+  );
+
+  // Import CSV : la fenêtre ajoute les lignes une à une, puis on recharge si au moins une a été ajoutée
+  const [importOpen, setImportOpen] = useState(false);
+  const closeImport = useCallback(
+    (added) => {
+      setImportOpen(false);
+      if (added > 0) {
+        fetchPortfolio();
+        toast.success(`${added} position${added > 1 ? "s" : ""} importée${added > 1 ? "s" : ""}.`);
+      }
+    },
+    [fetchPortfolio, toast]
   );
 
   // Suppression en deux temps : demande de confirmation, puis appel au backend
@@ -1117,6 +1131,14 @@ export default function Portfolio() {
               Ajouter
             </span>
           </button>
+          <button
+            type="button"
+            onClick={() => setImportOpen(true)}
+            disabled={adding}
+            className="px-4 py-2 text-sm font-semibold text-ink bg-surface border border-line rounded-lg hover:bg-surface-2 transition disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            Importer un CSV
+          </button>
         </div>
 
         {(sortPref.customized || accountPref.customized) && (
@@ -1199,6 +1221,9 @@ export default function Portfolio() {
       </div>
       {removalModal}
       {addModal}
+      {importOpen && (
+        <ImportCsvModal open existing={stocks.map((s) => s.ticker)} accounts={ACCOUNT_LABELS} onClose={closeImport} />
+      )}
     </main>
   );
 }
