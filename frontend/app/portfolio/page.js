@@ -258,7 +258,9 @@ export default function Portfolio() {
     />
   );
 
-  // Import CSV : la fenêtre ajoute les lignes une à une, puis on recharge si au moins une a été ajoutée
+  // Import CSV : bouton masqué pour le moment (passer SHOW_CSV_IMPORT à true pour le réafficher, tout le reste est en place)
+  const SHOW_CSV_IMPORT = false;
+  // la fenêtre ajoute les lignes une à une, puis on recharge si au moins une a été ajoutée
   const [importOpen, setImportOpen] = useState(false);
   const closeImport = useCallback(
     (added) => {
@@ -1131,6 +1133,7 @@ export default function Portfolio() {
               Ajouter
             </span>
           </button>
+          {SHOW_CSV_IMPORT && (
           <button
             type="button"
             onClick={() => setImportOpen(true)}
@@ -1139,6 +1142,7 @@ export default function Portfolio() {
           >
             Importer un CSV
           </button>
+          )}
         </div>
 
         {(sortPref.customized || accountPref.customized) && (
@@ -1221,7 +1225,7 @@ export default function Portfolio() {
       </div>
       {removalModal}
       {addModal}
-      {importOpen && (
+      {SHOW_CSV_IMPORT && importOpen && (
         <ImportCsvModal open existing={stocks.map((s) => s.ticker)} accounts={ACCOUNT_LABELS} onClose={closeImport} />
       )}
     </main>

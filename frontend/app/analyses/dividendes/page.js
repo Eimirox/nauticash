@@ -303,9 +303,9 @@ export default function DividendesPage() {
                 >
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={dividendData.months} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#94A3B8" strokeOpacity={0.25} vertical={false} />
-                      <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#8A9AA9" }} interval="preserveStartEnd" minTickGap={6} />
-                      <YAxis tick={{ fontSize: 11, fill: "#8A9AA9" }} width={44} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--border))" vertical={false} />
+                      <XAxis dataKey="label" tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }} interval="preserveStartEnd" minTickGap={6} />
+                      <YAxis tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }} width={44} />
                       <Tooltip
                         cursor={{ fill: "rgba(148,163,184,0.12)" }}
                         formatter={(v) => [
@@ -317,7 +317,7 @@ export default function DividendesPage() {
                           return `${l}${items.length ? " — " + items.map((x) => x.ticker).join(", ") : ""}`;
                         }}
                       />
-                      <Bar dataKey="total" fill="#10B981" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="total" fill="rgb(var(--chart-2))" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>

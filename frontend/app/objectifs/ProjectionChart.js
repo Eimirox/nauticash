@@ -15,7 +15,7 @@ const money = (v, symbol) => `${nf0.format(Math.round(Number(v) || 0))} ${symbol
 const COLORS = {
   median: "rgb(var(--accent))",
   optimiste: "rgb(var(--accent-2))",
-  prudent: "#64748b",
+  prudent: "rgb(var(--text-muted))",
 };
 
 const inputClass =
@@ -64,9 +64,9 @@ export default function ProjectionChart({ current, goalAmount, monthlySavings, e
       <div className="h-72" role="img" aria-label={summary}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#94A3B8" strokeOpacity={0.25} />
-            <XAxis dataKey="year" tick={{ fontSize: 11, fill: "#8A9AA9" }} minTickGap={24} />
-            <YAxis tickFormatter={axisTick} tick={{ fontSize: 11, fill: "#8A9AA9" }} width={discreet ? 8 : 52} domain={[0, "auto"]} />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--border))" />
+            <XAxis dataKey="year" tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }} minTickGap={24} />
+            <YAxis tickFormatter={axisTick} tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }} width={discreet ? 8 : 52} domain={[0, "auto"]} />
             <Tooltip
               labelFormatter={(y) => `En ${y}`}
               formatter={(v, name) => [discreet ? "••••" : money(v, symbol), name]}

@@ -63,7 +63,7 @@ export default function Register() {
 
   const getStrengthColor = () => {
     if (strength < 40) return "bg-loss/100";
-    if (strength < 80) return "bg-yellow-500";
+    if (strength < 80) return "bg-warn";
     return "bg-accent/100";
   };
 
@@ -203,7 +203,7 @@ export default function Register() {
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-medium text-ink-muted">Force du mot de passe</span>
                     <span className={`text-xs font-semibold ${
-                      strength < 40 ? "text-loss" : strength < 80 ? "text-yellow-600" : "text-accent"
+                      strength < 40 ? "text-loss" : strength < 80 ? "text-warn" : "text-accent"
                     }`}>
                       {getStrengthText()}
                     </span>
