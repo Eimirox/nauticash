@@ -3,9 +3,9 @@
 import { diversification } from "@/lib/diversification";
 
 const TONE = {
-  "Bien diversifié": { ring: "text-emerald-500", badge: "bg-accent/10 text-accent border-accent/40" },
+  "Bien diversifié": { ring: "text-accent", badge: "bg-accent/10 text-accent border-accent/40" },
   Équilibré: { ring: "text-sky-500", badge: "bg-sky-500/10 text-sky-600 dark:text-sky-300 border-sky-500/30" },
-  Concentré: { ring: "text-amber-500", badge: "bg-warn/10 text-warn border-warn/30" },
+  Concentré: { ring: "text-warn", badge: "bg-warn/10 text-warn border-warn/30" },
 };
 
 /** Score de diversification (lignes, secteurs, pays, devises) avec conseils sobres */
