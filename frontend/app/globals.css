@@ -619,3 +619,15 @@ summary:focus-visible,
     padding-bottom: var(--tabbar-h);
   }
 }
+
+/* Infobulles des graphiques (recharts) : fond, bordure et texte du thème, lisibles en clair comme en sombre */
+.recharts-default-tooltip {
+  background-color: rgb(var(--surface)) !important;
+  border: 1px solid rgb(var(--border)) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 24px -8px rgb(0 0 0 / 0.35);
+}
+.recharts-default-tooltip .recharts-tooltip-label {
+  color: rgb(var(--text)) !important;
+  font-weight: 600;
+}
