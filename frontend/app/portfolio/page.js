@@ -635,7 +635,7 @@ export default function Portfolio() {
       <th
         scope="col"
         aria-sort={ariaSort}
-        className="px-6 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider"
+        className="whitespace-nowrap px-3 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider"
       >
         <button
           type="button"
@@ -662,21 +662,21 @@ export default function Portfolio() {
         </caption>
         <thead className="bg-surface-2 border-b-2 border-line">
           <tr>
-            <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-ink uppercase tracking-wider">
+            <th scope="col" className="whitespace-nowrap px-3 py-4 text-left text-xs font-semibold text-ink uppercase tracking-wider">
               Titre
             </th>
-            <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-ink uppercase tracking-wider">
+            <th scope="col" className="whitespace-nowrap px-3 py-4 text-left text-xs font-semibold text-ink uppercase tracking-wider">
               Zone
             </th>
-            <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-ink uppercase tracking-wider">
+            <th scope="col" className="whitespace-nowrap px-3 py-4 text-left text-xs font-semibold text-ink uppercase tracking-wider">
               Type
             </th>
             {sortableTh("price", "Prix")}
             {sortableTh("day", "Jour")}
-            <th scope="col" className="px-6 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider">
+            <th scope="col" className="whitespace-nowrap px-3 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider">
               Quantité
             </th>
-            <th scope="col" className="px-6 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider">
+            <th scope="col" className="whitespace-nowrap px-3 py-4 text-right text-xs font-semibold text-ink uppercase tracking-wider">
               PRU
             </th>
             {sortableTh("performance", "Performance")}
@@ -718,7 +718,7 @@ export default function Portfolio() {
                   key={stock.ticker}
                   className="group border-b border-line hover:bg-surface-2 transition-colors"
                 >
-                  <td className="px-6 py-4">
+                  <td className="px-3 py-4">
                     <div className="flex items-start gap-3">
                       <TickerLogo ticker={stock.ticker} logo={stock.logo} size={36} className="mt-0.5" />
                       <div className="min-w-0">
@@ -733,7 +733,7 @@ export default function Portfolio() {
                       </div>
                     </div>
                   </td>
-                  <td className="min-w-[10rem] px-6 py-4 text-sm text-ink-muted">
+                  <td className="min-w-[10rem] px-3 py-4 text-sm text-ink-muted">
                     <span className="block font-medium text-ink">{stock.zone || exchangeToCountry[stock.country] || stock.country || "—"}</span>
                     <span className="block text-xs text-ink-muted" title={stock.exposure ? `Exposition déduite de l'indice suivi (${stock.exposure}), cotation : ${stock.listingCountry}` : undefined}>
                       {stock.exposure
@@ -745,19 +745,19 @@ export default function Portfolio() {
                           : ""}
                     </span>
                   </td>
-                  <td className="px-6 py-4">{typeBadge(stock.type)}</td>
-                  <td className="px-6 py-4 text-right text-ink font-medium">
+                  <td className="px-3 py-4">{typeBadge(stock.type)}</td>
+                  <td className="px-3 py-4 text-right text-ink font-medium">
                     <span className="whitespace-nowrap">
                       {nf2.format(stock.close)} {formatCurrencySymbol(stock.currency)}
                     </span>
                     <QuoteTime stock={stock} />
                   </td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-3 py-4 text-right">
                     <DayChange stock={stock} cur={formatCurrencySymbol(stock.currency)} />
                   </td>
                   
                   {/* QUANTITÉ - VERSION SIMPLE AVEC defaultValue */}
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-3 py-4 text-right">
                     <input
                       type="number"
                       inputMode="decimal"
@@ -777,12 +777,12 @@ export default function Portfolio() {
                           e.target.blur();
                         }
                       }}
-                      className="money w-24 px-3 py-2 text-right text-sm border border-line rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
+                      className="money w-20 px-3 py-2 text-right text-sm border border-line rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
                     />
                   </td>
                   
                   {/* PRU - VERSION SIMPLE AVEC defaultValue */}
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-3 py-4 text-right">
                     <input
                       type="number"
                       inputMode="decimal"
@@ -802,12 +802,12 @@ export default function Portfolio() {
                           e.target.blur();
                         }
                       }}
-                      className="w-24 px-3 py-2 text-right text-sm border border-line rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
+                      className="w-20 px-3 py-2 text-right text-sm border border-line rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
                     />
                   </td>
                   
                   <td
-                    className={`px-6 py-4 text-right font-bold text-base ${getPerformanceClass(
+                    className={`px-3 py-4 text-right font-bold text-base ${getPerformanceClass(
                       perf
                     )}`}
                   >
@@ -820,19 +820,19 @@ export default function Portfolio() {
                       <span className="text-ink-muted/70">--</span>
                     )}
                   </td>
-                  <td className="px-6 py-4 text-right text-sm text-ink">
+                  <td className="px-3 py-4 text-right text-sm text-ink">
                     {stock.dividend != null
                       ? `${nf2.format(stock.dividend)} ${formatCurrencySymbol(
                           stock.currency
                         )}`
                       : "--"}
                   </td>
-                  <td className="px-6 py-4 text-right text-sm text-ink">
+                  <td className="px-3 py-4 text-right text-sm text-ink">
                     {stock.myDividendYield != null
                       ? `${nf2.format(stock.myDividendYield)} %`
                       : "--"}
                   </td>
-                  <td className="px-6 py-4 text-right font-semibold text-ink">
+                  <td className="px-3 py-4 text-right font-semibold text-ink">
                     <span className="money">{total != null ? nf2.format(total) : "--"}</span>
                   </td>
                   <td className="sticky right-0 z-10 bg-surface px-3 py-4 text-center shadow-[-8px_0_8px_-8px_rgb(0_0_0/0.2)] group-hover:bg-surface-2">
@@ -855,7 +855,7 @@ export default function Portfolio() {
             <tr>
               <td
                 colSpan="12"
-                className="px-6 py-12"
+                className="px-3 py-12"
               >
                 <EmptyPortfolioGuide />
               </td>
@@ -915,7 +915,7 @@ export default function Portfolio() {
         }
       />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {error && (
           <div role="alert" className="mb-6 p-4 bg-loss/10 border border-loss/30 rounded-lg flex items-start gap-3">
             <svg
