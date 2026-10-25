@@ -97,7 +97,11 @@ export default function TickerDetailPage() {
   const dividend = useMemo(() => (stock ? dividendPositions([stock], (v) => v)[0] || null : null), [stock]);
 
   const marker = useMemo(() => purchaseMarker(summary?.series, stock?.boughtAt), [summary, stock?.boughtAt]);
-  const domain = useMemo(() => priceDomain(summary?.series, stock?.pru), [summary, stock?.pru]);
+  // Échelle : adaptée au cours par défaut (un PRU très éloigné aplatirait la courbe) ; le PRU peut être ajouté à l'échelle
+  const [pruInScale, setPruInScale] = useState(false);
+  const domain = useMemo(() => priceDomain(summary?.series, pruInScale ? stock?.pru : 0), [summary, stock?.pru, pruInScale]);
+  const pruVisible = stock?.pru > 0 && Array.isArray(domain) && typeof domain[0] === "number" && stock.pru >= domain[0] && stock.pru <= domain[1];
+  const pruSide = stock?.pru > 0 && !pruVisible && typeof domain[0] === "number" ? (stock.pru < domain[0] ? "sous" : "au-dessus de") : null;
 
   // Date d'achat : enregistrée dès le choix (facultative ; vide = retirée)
   const [dateError, setDateError] = useState(null);
@@ -191,6 +195,31 @@ export default function TickerDetailPage() {
                 <p className="text-sm text-ink-muted">L&apos;historique du cours est momentanément indisponible.</p>
               ) : (
                 <>
+                  {pruSide && (
+                    <p className="mb-2 flex flex-wrap items-center gap-2 text-sm text-ink-muted">
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-warn/40 bg-warn/10 px-3 py-1 font-medium text-warn">
+                        PRU {nf(stock.pru)} {cur} · {pruSide} l&apos;échelle {pruSide === "sous" ? "▼" : "▲"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setPruInScale(true)}
+                        className="rounded text-accent underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                      >
+                        Afficher le PRU sur le graphique
+                      </button>
+                    </p>
+                  )}
+                  {pruInScale && stock.pru > 0 && (
+                    <p className="mb-2 text-sm">
+                      <button
+                        type="button"
+                        onClick={() => setPruInScale(false)}
+                        className="rounded text-accent underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                      >
+                        Adapter l&apos;échelle au cours
+                      </button>
+                    </p>
+                  )}
                   <div
                     className="h-64"
                     role="img"
@@ -205,7 +234,7 @@ export default function TickerDetailPage() {
                           labelFormatter={(d) => longDate(d)}
                           formatter={(v) => [formatMoney(v, cur), "Clôture"]}
                         />
-                        {stock.pru > 0 && (
+                        {pruVisible && (
                           <ReferenceLine
                             y={stock.pru}
                             stroke="rgb(var(--chart-3))"
@@ -247,7 +276,7 @@ export default function TickerDetailPage() {
                   </dl>
                   <p className="mt-2 text-[11px] text-ink-muted/70">
                     Cours de clôture quotidiens dans la devise de cotation ({cur}), hors dividendes
-                    {stock.pru > 0 && " ; ligne ambre : votre PRU"}
+                    {pruVisible && " ; ligne ambre : votre PRU"}
                     {marker?.date && " ; repère bleu : votre achat"}.
                     {marker?.before && " Votre achat est antérieur à la période affichée."}
                     {history?.stale && " Données non actualisées (service momentanément indisponible)."}
