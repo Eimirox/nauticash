@@ -88,6 +88,7 @@ function enrich(position, priceInfo) {
       pru: position.pru,
       account: position.account || null,
       fees: position.fees ?? null,
+      boughtAt: position.boughtAt ?? null,
       exchange: exchangeLabel(position.ticker, null),
       logo: logoUrl(position.ticker),
       close: 0,
@@ -111,6 +112,7 @@ function enrich(position, priceInfo) {
     pru: position.pru,
     account: position.account || null,
     fees: position.fees ?? null,
+    boughtAt: position.boughtAt ?? null,
     close,
     currency: priceInfo.currency || "USD",
     performance: position.pru > 0 ? ((close - position.pru) / position.pru) * 100 : 0,
@@ -165,6 +167,17 @@ function readFees(value) {
   return Number.isFinite(n) && n >= 0 && n <= 10 ? Math.round(n * 1000) / 1000 : false;
 }
 
+/** Date d'achat « AAAA-MM-JJ » : undefined = absente ; null = retirée ; false = invalide (date inexistante ou future) */
+function readBoughtAt(value) {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const d = new Date(`${value}T12:00:00Z`);
+  if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== value) return false;
+  if (value > new Date().toISOString().slice(0, 10) || value < "1970-01-01") return false;
+  return value;
+}
+
 // =============================================================================
 // GET /api/user/portfolio
 // =============================================================================
@@ -200,6 +213,8 @@ router.post("/portfolio", auth, async (req, res) => {
     if (account === false) return res.status(400).json({ error: "Enveloppe invalide." });
     const fees = readFees(req.body.fees);
     if (fees === false) return res.status(400).json({ error: "Frais annuels invalides (entre 0 et 10 %)." });
+    const boughtAt = readBoughtAt(req.body.boughtAt);
+    if (boughtAt === false) return res.status(400).json({ error: "Date d'achat invalide (AAAA-MM-JJ, pas dans le futur)." });
     if (!TICKER_RE.test(ticker)) return res.status(400).json({ error: "Ticker invalide." });
     if (!isValidAmount(quantity) || !isValidAmount(pru)) {
       return res.status(400).json({ error: "Quantité ou PRU invalide." });
@@ -219,12 +234,12 @@ router.post("/portfolio", auth, async (req, res) => {
     }
 
     await users().updateOne(userFilter(req), {
-      $push: { portfolio: { _id: new mongoose.Types.ObjectId(), ticker, quantity, pru, account: account ?? null, fees: fees ?? null } },
+      $push: { portfolio: { _id: new mongoose.Types.ObjectId(), ticker, quantity, pru, account: account ?? null, fees: fees ?? null, boughtAt: boughtAt ?? null } },
     });
 
     res.status(201).json({
       message: "Stock added successfully",
-      stock: enrich({ ticker, quantity, pru, account: account ?? null, fees: fees ?? null }, doc),
+      stock: enrich({ ticker, quantity, pru, account: account ?? null, fees: fees ?? null, boughtAt: boughtAt ?? null }, doc),
     });
   } catch (err) {
     console.error("❌ Error POST /portfolio:", err);
@@ -233,7 +248,7 @@ router.post("/portfolio", auth, async (req, res) => {
 });
 
 // =============================================================================
-// PATCH /api/user/portfolio/:ticker  { quantity?, pru?, account?, fees? }
+// PATCH /api/user/portfolio/:ticker  { quantity?, pru?, account?, fees?, boughtAt? }
 // =============================================================================
 router.patch("/portfolio/:ticker", auth, async (req, res) => {
   try {
@@ -252,6 +267,9 @@ router.patch("/portfolio/:ticker", auth, async (req, res) => {
     const fees = readFees(req.body.fees);
     if (fees === false) return res.status(400).json({ error: "Frais annuels invalides (entre 0 et 10 %)." });
     if (fees !== undefined) $set["portfolio.$.fees"] = fees;
+    const boughtAt = readBoughtAt(req.body.boughtAt);
+    if (boughtAt === false) return res.status(400).json({ error: "Date d'achat invalide (AAAA-MM-JJ, pas dans le futur)." });
+    if (boughtAt !== undefined) $set["portfolio.$.boughtAt"] = boughtAt;
     if (!Object.keys($set).length) return res.status(400).json({ error: "Rien à mettre à jour." });
 
     const result = await users().updateOne({ ...userFilter(req), "portfolio.ticker": ticker }, { $set });

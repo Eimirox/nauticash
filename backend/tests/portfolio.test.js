@@ -366,3 +366,29 @@ describe("Frais annuels (TER)", () => {
     assert.equal((await addStock(token, { ticker: "MSFT", quantity: 1, fees: 50 })).status, 400);
   });
 });
+
+describe("Date d'achat", () => {
+  test("saisie à l'ajout ou par PATCH, retirée avec une valeur vide", async () => {
+    const { token } = await h.registerUser();
+    assert.equal((await addStock(token, { ticker: "AAPL", quantity: 1, boughtAt: "2026-03-15" })).status, 201);
+    assert.equal((await getPortfolio(token)).stocks[0].boughtAt, "2026-03-15");
+
+    const patch = (body) => h.request("PATCH", "/api/user/portfolio/AAPL", { token, body });
+    assert.equal((await patch({ boughtAt: "2026-04-01" })).status, 200);
+    assert.equal((await getPortfolio(token)).stocks[0].boughtAt, "2026-04-01");
+    assert.equal((await patch({ boughtAt: "" })).status, 200);
+    assert.equal((await getPortfolio(token)).stocks[0].boughtAt, null);
+  });
+
+  test("absente par défaut ; refuse les dates invalides, inexistantes ou futures", async () => {
+    const { token } = await h.registerUser();
+    await addStock(token, { ticker: "AAPL", quantity: 1 });
+    assert.equal((await getPortfolio(token)).stocks[0].boughtAt, null);
+    const future = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
+    for (const boughtAt of ["15/03/2026", "2026-02-30", "n'importe quoi", future, 20260315]) {
+      const res = await h.request("PATCH", "/api/user/portfolio/AAPL", { token, body: { boughtAt } });
+      assert.equal(res.status, 400, String(boughtAt));
+    }
+    assert.equal((await addStock(token, { ticker: "MSFT", quantity: 1, boughtAt: "demain" })).status, 400);
+  });
+});
