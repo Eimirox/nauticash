@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import VipLockedPage from "../components/VipLockedPage";
 import { useProfile, setCachedProfile, useBaseCurrency } from "@/lib/profile";
 import { useFxRates, toCurrency, currencySymbol } from "@/lib/fx";
 import { strategyReview } from "@/lib/strategyReview";
@@ -92,7 +93,7 @@ function AllocationRow({ bucket, value, onChange }) {
 
 export default function Strategie() {
   const toast = useToast();
-  const { email, profile, loading } = useProfile();
+  const { email, profile, access, loading } = useProfile();
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
   const { rates } = useFxRates();
@@ -158,6 +159,10 @@ export default function Strategie() {
       setSaving(false);
     }
   };
+
+  if (!loading && access.strategie === false) {
+    return <VipLockedPage title="Stratégie" intro="Allocation cible, écarts avec votre portefeuille et règles de poids maximal." benefits={['Allocation cible par zone et écarts à corriger', 'Poids maximal par ligne et alertes', 'Stratégies types : dividendes, croissance, passive, équilibrée']} />;
+  }
 
   return (
     <main className="min-h-screen bg-bg">

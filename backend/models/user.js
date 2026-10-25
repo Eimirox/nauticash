@@ -18,6 +18,9 @@ const UserSchema = new mongoose.Schema({
     }
   ],
 
+  // Formule : « free » (par défaut) ou « vip » ; modifiée uniquement par l'admin (voir services/plans.js)
+  plan:         { type: String, enum: ["free", "vip"], default: "free" },
+
   cashAmount:   { type: Number, default: 0 },       
   cashCurrency: { type: String, default: "EUR" },
 
