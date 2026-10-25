@@ -48,3 +48,25 @@ export function priceSummary(points) {
     series: valid,
   };
 }
+
+/**
+ * Repère d'achat sur la courbe : première séance à partir de la date d'achat.
+ * → { date, close } | { before: true } (achat antérieur à la période affichée) | null (pas de date, ou date hors courbe)
+ */
+export function purchaseMarker(series, boughtAt) {
+  if (!Array.isArray(series) || !series.length || !/^\d{4}-\d{2}-\d{2}$/.test(String(boughtAt || ""))) return null;
+  if (boughtAt < series[0].date) return { before: true };
+  const point = series.find((p) => p.date >= boughtAt);
+  return point ? { date: point.date, close: point.close } : null;
+}
+
+/** Axe vertical du cours : s'ajuste aux clôtures et inclut toujours le PRU (sinon sa ligne sortirait du graphique) */
+export function priceDomain(series, pru) {
+  const values = (series || []).map((p) => Number(p.close)).filter((v) => Number.isFinite(v) && v > 0);
+  if (Number(pru) > 0) values.push(Number(pru));
+  if (!values.length) return ["auto", "auto"];
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const pad = (max - min) * 0.08 || max * 0.02;
+  return [Math.max(0, min - pad), max + pad];
+}

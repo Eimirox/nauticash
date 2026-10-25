@@ -6,11 +6,11 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer } from "recharts";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceDot, ResponsiveContainer } from "recharts";
 import { apiFetch } from "@/lib/api";
 import { useFxRates, toCurrency } from "@/lib/fx";
 import { useBaseCurrency } from "@/lib/profile";
-import { positionWeight, priceSummary } from "@/lib/tickerDetail";
+import { positionWeight, priceSummary, purchaseMarker, priceDomain } from "@/lib/tickerDetail";
 import { dividendPositions, FREQUENCY_LABELS } from "@/lib/dividendCalendar";
 import { signedPct } from "@/lib/chartSummary";
 import AppHeader from "../../components/AppHeader";
@@ -95,6 +95,24 @@ export default function TickerDetailPage() {
     [stocks, ticker, base, rates]
   );
   const dividend = useMemo(() => (stock ? dividendPositions([stock], (v) => v)[0] || null : null), [stock]);
+
+  const marker = useMemo(() => purchaseMarker(summary?.series, stock?.boughtAt), [summary, stock?.boughtAt]);
+  const domain = useMemo(() => priceDomain(summary?.series, stock?.pru), [summary, stock?.pru]);
+
+  // Date d'achat : enregistrée dès le choix (facultative ; vide = retirée)
+  const [dateError, setDateError] = useState(null);
+  const saveBoughtAt = async (value) => {
+    const previous = stock?.boughtAt ?? null;
+    setDateError(null);
+    setStocks((list) => list.map((x) => (x.ticker === stock.ticker ? { ...x, boughtAt: value || null } : x)));
+    try {
+      await apiFetch(`/api/user/portfolio/${encodeURIComponent(stock.ticker)}`, { method: "PATCH", body: { boughtAt: value || null } });
+    } catch (err) {
+      setStocks((list) => list.map((x) => (x.ticker === stock.ticker ? { ...x, boughtAt: previous } : x)));
+      setDateError(err.message || "Enregistrement impossible.");
+    }
+  };
+  const today = new Date().toISOString().slice(0, 10);
 
   const cur = stock?.currency || "EUR";
   const qty = Number(stock?.quantity) || 0;
@@ -182,7 +200,7 @@ export default function TickerDetailPage() {
                       <LineChart data={summary.series} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--border))" />
                         <XAxis dataKey="date" tickFormatter={monthTick} tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }} minTickGap={28} />
-                        <YAxis domain={["auto", "auto"]} tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }} width={56} tickFormatter={(v) => nf(v, v >= 1000 ? 0 : 2)} />
+                        <YAxis domain={domain} tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }} width={56} tickFormatter={(v) => nf(v, v >= 1000 ? 0 : 2)} />
                         <Tooltip
                           labelFormatter={(d) => longDate(d)}
                           formatter={(v) => [formatMoney(v, cur), "Clôture"]}
@@ -190,10 +208,24 @@ export default function TickerDetailPage() {
                         {stock.pru > 0 && (
                           <ReferenceLine
                             y={stock.pru}
-                            stroke="rgb(var(--text-muted))"
-                            strokeDasharray="5 4"
-                            label={{ value: "PRU", position: "insideTopLeft", fontSize: 11, fill: "rgb(var(--text-muted))" }}
+                            stroke="rgb(var(--chart-3))"
+                            strokeWidth={2}
+                            strokeDasharray="6 4"
+                            ifOverflow="extendDomain"
+                            label={{ value: `PRU ${nf(stock.pru)}`, position: "insideTopLeft", fontSize: 12, fontWeight: 600, fill: "rgb(var(--chart-3))" }}
                           />
+                        )}
+                        {marker?.date && (
+                          <ReferenceLine
+                            x={marker.date}
+                            stroke="rgb(var(--chart-1))"
+                            strokeWidth={2}
+                            strokeDasharray="2 3"
+                            label={{ value: "Achat", position: "insideTopRight", fontSize: 12, fontWeight: 600, fill: "rgb(var(--chart-1))" }}
+                          />
+                        )}
+                        {marker?.date && (
+                          <ReferenceDot x={marker.date} y={marker.close} r={5} fill="rgb(var(--chart-1))" stroke="rgb(var(--surface))" strokeWidth={2} />
                         )}
                         <Line type="monotone" dataKey="close" name="Clôture" stroke="rgb(var(--accent))" strokeWidth={2} dot={false} />
                       </LineChart>
@@ -215,7 +247,9 @@ export default function TickerDetailPage() {
                   </dl>
                   <p className="mt-2 text-[11px] text-ink-muted/70">
                     Cours de clôture quotidiens dans la devise de cotation ({cur}), hors dividendes
-                    {stock.pru > 0 && " ; pointillés : votre PRU"}.
+                    {stock.pru > 0 && " ; ligne ambre : votre PRU"}
+                    {marker?.date && " ; repère bleu : votre achat"}.
+                    {marker?.before && " Votre achat est antérieur à la période affichée."}
                     {history?.stale && " Données non actualisées (service momentanément indisponible)."}
                   </p>
                 </>
@@ -230,6 +264,17 @@ export default function TickerDetailPage() {
                 <dl>
                   <Row label="Quantité">{nf(qty, Number.isInteger(qty) ? 0 : 4)}</Row>
                   <Row label="PRU">{stock.pru > 0 ? formatMoney(stock.pru, cur) : "—"}</Row>
+                  <Row label="Date d'achat">
+                    <input
+                      type="date"
+                      value={stock.boughtAt || ""}
+                      max={today}
+                      onChange={(e) => saveBoughtAt(e.target.value)}
+                      aria-label="Date d'achat"
+                      className="rounded-lg border border-line bg-surface px-2 py-1 text-sm text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    />
+                    {dateError && <span role="alert" className="mt-1 block text-xs text-loss">{dateError}</span>}
+                  </Row>
                   <Row label="Valeur">
                     <span className="money">{formatMoney(value, cur)}</span>
                   </Row>

@@ -13,6 +13,8 @@ const UserSchema = new mongoose.Schema({
       account:  { type: String, default: null },
       // Frais annuels (TER) en %, saisis par l'utilisateur pour ses ETF / fonds
       fees:     { type: Number, default: null },
+      // Date d'achat (AAAA-MM-JJ), facultative : sert au repère « Achat » sur la courbe du titre
+      boughtAt: { type: String, default: null },
     }
   ],
 

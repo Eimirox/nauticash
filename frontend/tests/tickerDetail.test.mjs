@@ -58,3 +58,24 @@ test('priceSummary : cours invalides ignorés, moins de 2 points → null', () =
   assert.equal(s.series.length, 2);
   assert.equal(s.last, 12);
 });
+
+import { purchaseMarker, priceDomain } from '../lib/tickerDetail.js';
+
+test('repère d’achat : première séance à partir de la date, ou hors courbe', () => {
+  const s = [{ date: '2026-03-02', close: 10 }, { date: '2026-03-05', close: 12 }, { date: '2026-03-06', close: 11 }];
+  assert.deepEqual(purchaseMarker(s, '2026-03-04'), { date: '2026-03-05', close: 12 });
+  assert.deepEqual(purchaseMarker(s, '2026-03-02'), { date: '2026-03-02', close: 10 });
+  assert.deepEqual(purchaseMarker(s, '2025-01-01'), { before: true });
+  assert.equal(purchaseMarker(s, '2026-04-01'), null);
+  assert.equal(purchaseMarker(s, null), null);
+  assert.equal(purchaseMarker([], '2026-03-04'), null);
+});
+
+test('axe du cours : inclut toujours le PRU', () => {
+  const s = [{ date: 'a', close: 100 }, { date: 'b', close: 120 }];
+  const [lo, hi] = priceDomain(s, 60);
+  assert.ok(lo < 60 && hi > 120);
+  const [lo2, hi2] = priceDomain(s, 0);
+  assert.ok(lo2 < 100 && hi2 > 120 && lo2 > 80);
+  assert.deepEqual(priceDomain([], 0), ['auto', 'auto']);
+});

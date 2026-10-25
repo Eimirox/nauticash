@@ -683,8 +683,11 @@ export default function Portfolio() {
             {sortableTh("dividend", "Dividende")}
             {sortableTh("yield", "Rendement")}
             {sortableTh("total", "Total")}
-            <th scope="col" className="px-6 py-4 text-xs font-semibold text-ink uppercase tracking-wider">
-              Actions
+            <th
+              scope="col"
+              className="sticky right-0 z-10 bg-surface-2 px-3 py-4 text-center text-xs font-semibold text-ink uppercase tracking-wider shadow-[-8px_0_8px_-8px_rgb(0_0_0/0.2)]"
+            >
+              <span className="sr-only">Actions</span>
             </th>
           </tr>
         </thead>
@@ -713,7 +716,7 @@ export default function Portfolio() {
               return (
                 <tr
                   key={stock.ticker}
-                  className="border-b border-line hover:bg-surface-2 transition-colors"
+                  className="group border-b border-line hover:bg-surface-2 transition-colors"
                 >
                   <td className="px-6 py-4">
                     <div className="flex items-start gap-3">
@@ -832,14 +835,17 @@ export default function Portfolio() {
                   <td className="px-6 py-4 text-right font-semibold text-ink">
                     <span className="money">{total != null ? nf2.format(total) : "--"}</span>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="sticky right-0 z-10 bg-surface px-3 py-4 text-center shadow-[-8px_0_8px_-8px_rgb(0_0_0/0.2)] group-hover:bg-surface-2">
                     <button
                       type="button"
                       onClick={() => removeStock(stock.ticker)}
                       aria-label={`Supprimer ${stock.ticker}`}
-                      className="px-3 py-2 bg-loss/10 text-loss border border-loss/30 rounded-lg hover:bg-loss hover:text-white transition-all text-sm font-medium"
+                      title={`Supprimer ${stock.ticker}`}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-loss/30 bg-loss/10 text-loss transition hover:bg-loss hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                     >
-                      Supprimer
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
                     </button>
                   </td>
                 </tr>
