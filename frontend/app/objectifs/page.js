@@ -14,6 +14,7 @@ import {
   etaLabel,
   assumptionsPatch,
 } from "@/lib/objectives";
+import VipLockedPage from "../components/VipLockedPage";
 import AppHeader from "../components/AppHeader";
 import { Card, Button, useToast } from "../components/ui";
 import Skeleton, { SkeletonRegion } from "../components/ui/Skeleton";
@@ -84,7 +85,7 @@ export default function Objectifs() {
   const { rates } = useFxRates();
   const base = useBaseCurrency();
   const symbol = currencySymbol(base);
-  const { email, profile, loading: profileLoading } = useProfile();
+  const { email, profile, access, loading: profileLoading } = useProfile();
 
   const [stocks, setStocks] = useState([]);
   const [cash, setCash] = useState({ amount: 0, currency: "EUR" });
@@ -156,6 +157,10 @@ export default function Objectifs() {
       setSaving(false);
     }
   };
+
+  if (!profileLoading && access.objectifs === false) {
+    return <VipLockedPage title="Objectifs" intro="Projection de votre patrimoine, rente de dividendes visée et date d'atteinte." benefits={['Projection prudente, médiane et optimiste', "Rente de dividendes visée et date d'atteinte", 'Épargne mensuelle, inflation et rendement ajustables']} />;
+  }
 
   return (
     <main className="min-h-screen bg-bg">

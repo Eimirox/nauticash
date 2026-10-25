@@ -26,6 +26,7 @@ function nextExDate(lastExDate, frequency) {
 
 const router = express.Router();
 
+const plans = require("../services/plans");
 const users = () => mongoose.connection.collection("users");
 const userFilter = (req) => ({ _id: new mongoose.Types.ObjectId(req.user.userId) });
 
@@ -375,9 +376,9 @@ router.get("/portfolio/stats", auth, async (req, res) => {
 // =============================================================================
 router.get("/profile", auth, async (req, res) => {
   try {
-    const user = await users().findOne(userFilter(req), { projection: { email: 1, profile: 1 } });
+    const user = await users().findOne(userFilter(req), { projection: { email: 1, profile: 1, plan: 1 } });
     if (!user) return res.status(404).json({ error: "User not found" });
-    res.json({ email: user.email, profile: readProfile(user) });
+    res.json({ email: user.email, profile: readProfile(user), ...plans.describe(user) });
   } catch (err) {
     console.error("❌ Error GET /profile:", err);
     res.status(500).json({ error: "Server error" });
@@ -389,6 +390,17 @@ router.patch("/profile", auth, async (req, res) => {
     const { value, errors } = validateProfilePatch(req.body);
     if (errors) {
       return res.status(400).json({ error: errors[0].msg, details: errors });
+    }
+
+    // Champs des pages Objectifs / Stratégie : réservés au VIP quand le verrouillage est actif
+    const vipFields = plans.vipFieldsIn(value);
+    if (vipFields.length) {
+      const account = await users().findOne(userFilter(req), { projection: { email: 1, plan: 1 } });
+      if (!account) return res.status(404).json({ error: "User not found" });
+      const feature = vipFields.includes("strategy") || vipFields.includes("targetAllocation") || vipFields.includes("maxPositionWeight") ? "strategie" : "objectifs";
+      if (!plans.hasAccess(account, feature)) {
+        return res.status(403).json({ error: "Fonctionnalité réservée à la formule VIP.", code: "VIP_REQUIRED", fields: vipFields });
+      }
     }
 
     // Préférences d'affichage fusionnées clé par clé (deux onglets ne s'écrasent pas), null = effacer

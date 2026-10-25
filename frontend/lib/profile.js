@@ -16,6 +16,8 @@ export const DEFAULT_PROFILE = {
   homePage: "/portfolio",
 };
 
+export const DEFAULT_ACCESS = { objectifs: true, strategie: true };
+
 let shared = null; // promesse partagée { email, profile }
 let current = null; // dernière valeur connue
 const listeners = new Set();
@@ -39,7 +41,12 @@ export function fetchProfile({ force = false } = {}) {
   if (!shared || force) {
     shared = apiFetch("/api/user/profile")
       .then((d) => {
-        const data = { email: d?.email || "", profile: { ...DEFAULT_PROFILE, ...(d?.profile || {}) } };
+        const data = {
+          email: d?.email || "",
+          profile: { ...DEFAULT_PROFILE, ...(d?.profile || {}) },
+          plan: d?.plan || "free",
+          access: { ...DEFAULT_ACCESS, ...(d?.access || {}) },
+        };
         publish(data);
         return data;
       })
@@ -53,7 +60,12 @@ export function fetchProfile({ force = false } = {}) {
 
 /** À appeler après un PATCH réussi pour mettre à jour l'en-tête et les pages sans recharger */
 export function setCachedProfile(data) {
-  const next = { email: data?.email ?? current?.email ?? "", profile: { ...DEFAULT_PROFILE, ...(data?.profile || {}) } };
+  const next = {
+    email: data?.email ?? current?.email ?? "",
+    profile: { ...DEFAULT_PROFILE, ...(data?.profile || {}) },
+    plan: data?.plan ?? current?.plan ?? "free",
+    access: data?.access ?? current?.access ?? DEFAULT_ACCESS,
+  };
   shared = Promise.resolve(next);
   publish(next);
 }
@@ -64,17 +76,19 @@ export function clearProfileCache() {
   current = null;
 }
 
-/** { email, profile, loading } — profile vaut les valeurs par défaut tant que rien n'est chargé */
+/** { email, profile, plan, access, loading } — profile vaut les valeurs par défaut tant que rien n'est chargé */
 export function useProfile() {
   const [state, setState] = useState(() => ({
     email: current?.email || "",
     profile: current?.profile || DEFAULT_PROFILE,
+    plan: current?.plan || "free",
+    access: current?.access || DEFAULT_ACCESS,
     loading: !current,
   }));
 
   useEffect(() => {
     let alive = true;
-    const onChange = (d) => alive && setState({ email: d.email, profile: d.profile, loading: false });
+    const onChange = (d) => alive && setState({ email: d.email, profile: d.profile, plan: d.plan, access: d.access, loading: false });
     listeners.add(onChange);
     if (typeof window !== "undefined" && localStorage.getItem("token")) {
       fetchProfile().catch(() => alive && setState((s) => ({ ...s, loading: false })));

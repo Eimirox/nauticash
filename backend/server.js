@@ -7,6 +7,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const auth = require("./middleware/auth");
 const requireAdmin = require("./middleware/requireAdmin");
+const plans = require("./services/plans");
 
 // Refuse de démarrer sans secret JWT : sinon les tokens seraient signés avec "undefined"
 if (!process.env.JWT_SECRET) {
@@ -99,6 +100,22 @@ app.get("/health", (req, res) => {
 
 // Toutes les routes /api/admin exigent un compte listé dans ADMIN_EMAILS
 app.use("/api/admin", auth, requireAdmin);
+
+// Changer la formule d'un compte : POST /api/admin/users/plan { email, plan: "free" | "vip" }
+app.post("/api/admin/users/plan", async (req, res) => {
+  try {
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const plan = req.body?.plan;
+    if (!email || !plans.PLANS.includes(plan)) {
+      return res.status(400).json({ error: `email et plan (${plans.PLANS.join(" | ")}) requis.` });
+    }
+    const result = await mongoose.connection.collection("users").updateOne({ email }, { $set: { plan } });
+    if (result.matchedCount === 0) return res.status(404).json({ error: "Compte introuvable." });
+    res.json({ email, plan });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Stats d'utilisation des APIs
 app.get("/api/admin/stats", async (req, res) => {
