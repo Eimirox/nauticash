@@ -392,6 +392,16 @@ router.get("/portfolio/stats", auth, async (req, res) => {
 // =============================================================================
 // PROFIL : GET /api/user/profile, PATCH /api/user/profile (mise à jour partielle)
 // =============================================================================
+// Fréquentation : appelé par le site à chaque changement d'écran (voir services/usage.js)
+router.post("/usage/ping", auth, async (req, res) => {
+  try {
+    await require("../services/usage").record(req.user.userId, req.body?.path);
+    res.json({ ok: true });
+  } catch (err) {
+    res.json({ ok: false }); // jamais bloquant pour l'utilisateur
+  }
+});
+
 router.get("/profile", auth, async (req, res) => {
   try {
     const user = await users().findOne(userFilter(req), { projection: { email: 1, profile: 1, plan: 1 } });

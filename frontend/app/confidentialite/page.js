@@ -16,6 +16,7 @@ export default function Confidentialite() {
         <li><strong>Compte :</strong> adresse email et mot de passe (stocké uniquement sous forme chiffrée, jamais en clair).</li>
         <li><strong>Portefeuille :</strong> tickers, quantités, prix de revient unitaire, montant et devise du cash, historique de valeur que vous saisissez.</li>
         <li><strong>Technique :</strong> adresse IP, conservée temporairement en mémoire pour limiter les tentatives de connexion abusives.</li>
+        <li><strong>Fréquentation :</strong> pour savoir quels écrans sont utiles, le service note la date de votre dernière visite et les écrans consultés (sans cookie ni outil publicitaire tiers). Ces données sont conservées 120 jours au plus et ne servent qu&apos;à des statistiques internes.</li>
       </ul>
       <p>Aucune donnée bancaire, aucun identifiant de courtier et aucune pièce d&apos;identité ne sont demandés.</p>
 

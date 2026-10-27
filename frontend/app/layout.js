@@ -2,6 +2,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "./components/ui/Toast";
 import { themeInitScript } from "./components/ui/ThemeToggle";
+import UsageTracker from "./components/UsageTracker";
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from "@/lib/site";
 
 const geistSans = Geist({
@@ -63,6 +64,7 @@ export default function RootLayout({ children }) {
           Aller au contenu
         </a>
         <ToastProvider>{children}</ToastProvider>
+        <UsageTracker />
       </body>
     </html>
   );
