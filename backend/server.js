@@ -8,6 +8,7 @@ const cors = require("cors");
 const auth = require("./middleware/auth");
 const requireAdmin = require("./middleware/requireAdmin");
 const plans = require("./services/plans");
+const usage = require("./services/usage");
 
 // Refuse de démarrer sans secret JWT : sinon les tokens seraient signés avec "undefined"
 if (!process.env.JWT_SECRET) {
@@ -112,6 +113,15 @@ app.post("/api/admin/users/plan", async (req, res) => {
     const result = await mongoose.connection.collection("users").updateOne({ email }, { $set: { plan } });
     if (result.matchedCount === 0) return res.status(404).json({ error: "Compte introuvable." });
     res.json({ email, plan });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Fréquentation : actifs, écrans consultés, activité par jour (GET /api/admin/usage?days=7)
+app.get("/api/admin/usage", async (req, res) => {
+  try {
+    res.json(await usage.summary({ days: req.query.days }));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -270,6 +280,7 @@ app.use((err, req, res, next) => {
 const connectDB = async () => {
   try {
     await mongoose.connect(process.env.MONGO_URI);
+    usage.ensureIndexes().catch((e) => console.warn("⚠️ Index fréquentation :", e.message));
     console.log("✅ MongoDB connected");
     
     // Afficher les infos de la BDD
@@ -384,6 +395,7 @@ const startServer = async () => {
       console.log("   GET    /api/user/history/daily");
       console.log("   GET    /api/market/benchmarks/:key");
       console.log("   GET    /api/admin/stats");
+      console.log("   GET    /api/admin/usage");
       console.log("   GET    /api/admin/health");
       console.log("   GET    /api/admin/coverage");
       console.log("   POST   /api/admin/update-prices");
