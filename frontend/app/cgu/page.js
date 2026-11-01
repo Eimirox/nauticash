@@ -3,17 +3,16 @@ import LegalPage from "../components/LegalPage";
 
 export const metadata = { title: "Conditions d'utilisation et mentions légales" };
 
-// ⚠️ À compléter : les éléments entre [crochets] (éditeur, contact, hébergeurs).
 export default function CGU() {
   return (
-    <LegalPage title="Conditions d'utilisation et mentions légales" updated="26 septembre 2026">
+    <LegalPage title="Conditions d'utilisation et mentions légales" updated="1er novembre 2026">
       <h2>1. Mentions légales</h2>
       <ul>
-        <li><strong>Éditeur du site :</strong> [Nom et prénom de l&apos;éditeur], [adresse postale ou « adresse communiquée sur demande » si particulier non professionnel]</li>
-        <li><strong>Contact :</strong> [adresse email de contact]</li>
-        <li><strong>Directeur de la publication :</strong> [Nom et prénom]</li>
-        <li><strong>Hébergement du site :</strong> [ex. Vercel Inc., 440 N Barranca Ave #4133, Covina, CA 91723, États-Unis]</li>
-        <li><strong>Hébergement de l&apos;API et des données :</strong> [ex. hébergeur du serveur] et [MongoDB Atlas – région du cluster]</li>
+        <li><strong>Éditeur du site :</strong> Alexandre Gicquel, adresse communiquée sur demande</li>
+        <li><strong>Contact :</strong> alexgicquel8@gmail.com</li>
+        <li><strong>Directeur de la publication :</strong> Alexandre Gicquel</li>
+        <li><strong>Hébergement du site :</strong> Vercel Inc., 440 N Barranca Ave #4133, Covina, CA 91723, États-Unis</li>
+        <li><strong>Hébergement de l&apos;API et des données :</strong> Railway Corp. (serveur de l&apos;API, région US West – Californie, États-Unis) et MongoDB Inc. (base de données MongoDB Atlas, AWS Paris – eu-west-3, France)</li>
       </ul>
 
       <h2>2. Objet</h2>
