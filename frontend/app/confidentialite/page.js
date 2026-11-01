@@ -2,13 +2,12 @@ import LegalPage from "../components/LegalPage";
 
 export const metadata = { title: "Politique de confidentialité" };
 
-// ⚠️ À compléter : les éléments entre [crochets] (responsable, contact, hébergeurs).
 export default function Confidentialite() {
   return (
-    <LegalPage title="Politique de confidentialité" updated="26 septembre 2026">
+    <LegalPage title="Politique de confidentialité" updated="1er novembre 2026">
       <h2>1. Responsable du traitement</h2>
       <p>
-        [Nom et prénom de l&apos;éditeur] – contact : [adresse email de contact].
+        Alexandre Gicquel, éditeur de Nauticash – contact : alexgicquel8@gmail.com.
       </p>
 
       <h2>2. Données collectées</h2>
@@ -29,9 +28,9 @@ export default function Confidentialite() {
 
       <h2>4. Destinataires et sous-traitants</h2>
       <ul>
-        <li><strong>Hébergement du site :</strong> [ex. Vercel]</li>
-        <li><strong>Hébergement de l&apos;API :</strong> [hébergeur du serveur]</li>
-        <li><strong>Base de données :</strong> MongoDB Atlas [région du cluster]</li>
+        <li><strong>Hébergement du site :</strong> Vercel Inc. (États-Unis)</li>
+        <li><strong>Hébergement de l&apos;API :</strong> Railway Corp. (États-Unis, région US West – Californie)</li>
+        <li><strong>Base de données :</strong> MongoDB Atlas, hébergé par AWS à Paris (eu-west-3, France)</li>
         <li><strong>Envoi d&apos;emails</strong> (réinitialisation du mot de passe) : Resend – reçoit uniquement votre adresse email.</li>
       </ul>
       <p>
@@ -44,19 +43,20 @@ export default function Confidentialite() {
       <ul>
         <li>Données du compte et du portefeuille : tant que le compte existe, puis suppression sur demande.</li>
         <li>Lien de réinitialisation du mot de passe : 1 heure.</li>
+        <li>Écrans consultés (statistiques internes) : 120 jours au maximum.</li>
         <li>Adresses IP pour la limitation des tentatives : 1 heure au maximum, en mémoire uniquement.</li>
       </ul>
 
       <h2>6. Cookies et stockage local</h2>
       <p>
-        Nauticash n&apos;utilise ni cookie publicitaire ni outil de mesure d&apos;audience. Le navigateur stocke localement votre jeton
+        Nauticash n&apos;utilise ni cookie publicitaire ni outil de mesure d&apos;audience tiers. Le navigateur stocke localement votre jeton
         de connexion et votre choix de langue, strictement nécessaires au fonctionnement du site.
       </p>
 
       <h2>7. Vos droits</h2>
       <p>
         Vous disposez d&apos;un droit d&apos;accès, de rectification, d&apos;effacement, de limitation, d&apos;opposition et de portabilité de vos
-        données. Pour les exercer, écrivez à [adresse email de contact]. Vous pouvez également introduire une réclamation auprès
+        données. Pour les exercer, écrivez à alexgicquel8@gmail.com. Vous pouvez également introduire une réclamation auprès
         de la CNIL (<a href="https://www.cnil.fr" target="_blank" rel="noopener noreferrer">www.cnil.fr</a>).
       </p>
 
