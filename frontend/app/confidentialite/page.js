@@ -7,7 +7,7 @@ export default function Confidentialite() {
     <LegalPage title="Politique de confidentialité" updated="1er novembre 2026">
       <h2>1. Responsable du traitement</h2>
       <p>
-        Alexandre Gicquel, éditeur de Nauticash – contact : alexgicquel8@gmail.com.
+        Alexandre Gicquel, éditeur de Nauticash – contact : contact@nauticash.fr.
       </p>
 
       <h2>2. Données collectées</h2>
@@ -56,7 +56,7 @@ export default function Confidentialite() {
       <h2>7. Vos droits</h2>
       <p>
         Vous disposez d&apos;un droit d&apos;accès, de rectification, d&apos;effacement, de limitation, d&apos;opposition et de portabilité de vos
-        données. Pour les exercer, écrivez à alexgicquel8@gmail.com. Vous pouvez également introduire une réclamation auprès
+        données. Pour les exercer, écrivez à contact@nauticash.fr. Vous pouvez également introduire une réclamation auprès
         de la CNIL (<a href="https://www.cnil.fr" target="_blank" rel="noopener noreferrer">www.cnil.fr</a>).
       </p>
 
