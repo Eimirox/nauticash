@@ -1,0 +1,36 @@
+# Sauvegarde hebdomadaire chiffrée de la base (voir docs/SAUVEGARDE.md).
+# Secrets à créer dans GitHub (Settings > Secrets and variables > Actions) : MONGO_URI et BACKUP_KEY.
+name: Sauvegarde base de données
+
+on:
+  schedule:
+    - cron: "17 3 * * 0" # chaque dimanche à 03h17 UTC
+  workflow_dispatch: {} # lancement manuel possible depuis l'onglet Actions
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Installer les dépendances
+        working-directory: backend
+        run: npm ci
+      - name: Exporter et chiffrer
+        working-directory: backend
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          BACKUP_KEY: ${{ secrets.BACKUP_KEY }}
+        run: node scripts/backup.js backups
+      - name: Conserver le fichier chiffré (90 jours)
+        uses: actions/upload-artifact@v4
+        with:
+          name: sauvegarde-nauticash
+          path: backend/backups/*.ncbak
+          retention-days: 90
+          if-no-files-found: error
