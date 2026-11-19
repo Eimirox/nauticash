@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { apiFetch } from "@/lib/api";
-import { compareToBenchmark, sliceDaily, gapPoints, BENCH_PERIODS } from "@/lib/benchmark";
+import { compareToBenchmark, sliceDaily, gapPoints, estimatePastDividends, BENCH_PERIODS } from "@/lib/benchmark";
 import { Delta } from "./ui";
 import { signedPct } from "@/lib/chartSummary";
 
@@ -14,8 +14,12 @@ const OPTIONS = [
 
 const shortDate = (d) => new Date(`${d}T12:00:00Z`).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
 
-/** Évolution du portefeuille comparée à un indice (base 100 au premier jour commun) */
-export default function BenchmarkChart({ daily }) {
+/**
+ * Évolution du portefeuille comparée à un indice (base 100 au premier jour commun).
+ * dividendPositions (optionnel) : lignes à dividendes en euros (dividendPositions de lib/dividendCalendar)
+ * → courbe jaune estimée « dividendes réinvestis » ; l'indice n'est pas modifié.
+ */
+export default function BenchmarkChart({ daily, dividendPositions = [] }) {
   const [key, setKey] = useState("CAC40");
   const [period, setPeriod] = useState("all");
   const [bench, setBench] = useState(null);
@@ -37,7 +41,14 @@ export default function BenchmarkChart({ daily }) {
     };
   }, [key, daily]);
 
-  const cmp = useMemo(() => (bench ? compareToBenchmark(sliceDaily(daily, period), bench.points) : null), [daily, bench, period]);
+  const cmp = useMemo(() => {
+    if (!bench) return null;
+    const days = sliceDaily(daily, period);
+    const dates = days.map((p) => p.date).sort();
+    const payments = dates.length ? estimatePastDividends(dividendPositions, dates[0], dates[dates.length - 1]) : [];
+    return compareToBenchmark(days, bench.points, payments);
+  }, [daily, bench, period, dividendPositions]);
+  const withDivs = cmp?.dividendsPct != null;
   const gap = gapPoints(cmp);
   const label = OPTIONS.find((o) => o.key === key)?.label;
 
@@ -95,6 +106,11 @@ export default function BenchmarkChart({ daily }) {
             <span className="text-ink-muted">
               Portefeuille <Delta value={cmp.portfolioPct} className="ml-1" />
             </span>
+            {withDivs && (
+              <span className="text-ink-muted">
+                Avec dividendes (estim.) <Delta value={cmp.dividendsPct} className="ml-1" />
+              </span>
+            )}
             <span className="text-ink-muted">
               {label} <Delta value={cmp.indexPct} className="ml-1" />
             </span>
@@ -109,7 +125,7 @@ export default function BenchmarkChart({ daily }) {
           <div
             className="h-64"
             role="img"
-            aria-label={`Courbes base 100 depuis le ${new Date(`${cmp.from}T12:00:00Z`).toLocaleDateString("fr-FR")} : portefeuille ${signedPct(cmp.portfolioPct)}, ${label} ${signedPct(cmp.indexPct)}. ${
+            aria-label={`Courbes base 100 depuis le ${new Date(`${cmp.from}T12:00:00Z`).toLocaleDateString("fr-FR")} : portefeuille ${signedPct(cmp.portfolioPct)}, ${withDivs ? `avec dividendes réinvestis (estimation) ${signedPct(cmp.dividendsPct)}, ` : ""}${label} ${signedPct(cmp.indexPct)}. ${
               cmp.portfolioPct > cmp.indexPct ? "Le portefeuille fait mieux que l'indice." : cmp.portfolioPct < cmp.indexPct ? "L'indice fait mieux que le portefeuille." : "Performances égales."
             }`}
           >
@@ -124,6 +140,17 @@ export default function BenchmarkChart({ daily }) {
                 />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 <Line type="monotone" dataKey="portfolio" name="Portefeuille" stroke="rgb(var(--accent))" strokeWidth={2.5} dot={false} />
+                {withDivs && (
+                  <Line
+                    type="monotone"
+                    dataKey="withDividends"
+                    name="Avec dividendes réinvestis (estim.)"
+                    stroke="rgb(var(--chart-div))"
+                    strokeWidth={2.5}
+                    dot={false}
+                    style={{ filter: "drop-shadow(0 0 4px rgb(var(--chart-div) / 0.6))" }}
+                  />
+                )}
                 <Line type="monotone" dataKey="index" name={label} stroke="rgb(var(--chart-1))" strokeWidth={2} strokeDasharray="5 4" dot={false} />
               </LineChart>
             </ResponsiveContainer>
@@ -131,6 +158,8 @@ export default function BenchmarkChart({ daily }) {
           <p className="mt-2 text-[11px] text-ink-muted/70">
             Base 100 au premier jour commun. L&apos;indice est suivi dans sa devise ({bench.currency}), hors dividendes ; la
             courbe du portefeuille inclut vos achats et ventes.
+            {withDivs &&
+              " Courbe jaune : estimation avec dividendes bruts réinvestis, dates déduites du dernier détachement et de la fréquence, quantités et dividende actuels appliqués à toute la période."}
             {bench.stale && " Données de l'indice non actualisées (service momentanément indisponible)."}
           </p>
         </>

@@ -83,6 +83,7 @@
   --chart-9: 67 56 202;       /* indigo-700 */
   --chart-10: 162 28 175;     /* fuchsia-700 */
   --chart-11: 100 116 139;    /* slate-500 */
+  --chart-div: 202 138 4;     /* yellow-600 : courbe « dividendes réinvestis » */
   --chart-extra-l: 38%;
   color-scheme: light;
 }
@@ -114,6 +115,7 @@
   --chart-9: 99 102 241;      /* indigo-500 */
   --chart-10: 232 121 249;    /* fuchsia-400 */
   --chart-11: 148 163 184;    /* slate-400 */
+  --chart-div: 255 234 0;     /* jaune néon */
   --chart-extra-l: 62%;
   color-scheme: dark;
 }

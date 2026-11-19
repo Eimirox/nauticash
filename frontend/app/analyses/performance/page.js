@@ -9,6 +9,7 @@ import { Delta } from "../../components/ui";
 import { periodPerformance } from "@/lib/periodPerf";
 import BenchmarkChart from "../../components/BenchmarkChart";
 import { fetchFxRates, toEUR } from "@/lib/fx";
+import { dividendPositions } from "@/lib/dividendCalendar";
 import { SkeletonRegion, SkeletonStat, SkeletonChart } from "../../components/ui/Skeleton";
 
 export default function PerformancePage() {
@@ -18,6 +19,8 @@ export default function PerformancePage() {
   const [loading, setLoading] = useState(true);
   const [daily, setDaily] = useState([]);
   const [sincePurchase, setSincePurchase] = useState(null);
+  // Lignes à dividendes (montants annuels en euros, comme l'historique quotidien)
+  const [divPositions, setDivPositions] = useState([]);
 
   // Fetch historique
   useEffect(() => {
@@ -44,6 +47,7 @@ export default function PerformancePage() {
     const loadSincePurchase = async () => {
       try {
         const [portfolio, fx] = await Promise.all([apiFetch("/api/user/portfolio"), fetchFxRates()]);
+        setDivPositions(dividendPositions(portfolio.stocks, (amount, cur) => toEUR(amount, cur, fx.rates)));
         let cost = 0;
         let value = 0;
         for (const s of portfolio.stocks || []) {
@@ -300,7 +304,7 @@ export default function PerformancePage() {
             </p>
           </section>
 
-          <BenchmarkChart daily={daily} />
+          <BenchmarkChart daily={daily} dividendPositions={divPositions} />
 
           {!history || history.length < 2 ? (
           <div className="flex flex-col items-center justify-center py-20 text-ink-muted">
