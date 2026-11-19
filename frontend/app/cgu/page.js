@@ -9,7 +9,7 @@ export default function CGU() {
       <h2>1. Mentions légales</h2>
       <ul>
         <li><strong>Éditeur du site :</strong> Alexandre Gicquel, adresse communiquée sur demande</li>
-        <li><strong>Contact :</strong> alexgicquel8@gmail.com</li>
+        <li><strong>Contact :</strong> contact@nauticash.fr</li>
         <li><strong>Directeur de la publication :</strong> Alexandre Gicquel</li>
         <li><strong>Hébergement du site :</strong> Vercel Inc., 440 N Barranca Ave #4133, Covina, CA 91723, États-Unis</li>
         <li><strong>Hébergement de l&apos;API et des données :</strong> Railway Corp. (serveur de l&apos;API, région US West – Californie, États-Unis) et MongoDB Inc. (base de données MongoDB Atlas, AWS Paris – eu-west-3, France)</li>
