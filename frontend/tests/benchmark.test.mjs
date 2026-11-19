@@ -26,3 +26,34 @@ test('écart en points entre portefeuille et indice', () => {
   assert.ok(Math.abs(gapPoints(cmp) - (cmp.portfolioPct - 5)) < 1e-9);
   assert.equal(gapPoints(null), null);
 });
+
+import { estimatePastDividends } from '../lib/benchmark.js';
+
+test('versements estimés : dates reculées depuis le dernier détachement, selon la fréquence', () => {
+  const pos = [{ totalAnnualBase: 120, frequency: 4, lastExDate: '2026-09-15T12:00:00.000Z' }];
+  const pays = estimatePastDividends(pos, '2026-01-01', '2026-10-31');
+  assert.deepEqual(pays.map((p) => p.date), ['2026-03-15', '2026-06-15', '2026-09-15']);
+  assert.ok(pays.every((p) => p.amount === 30));
+  assert.deepEqual(estimatePastDividends([{ totalAnnualBase: null, frequency: 4, lastExDate: '2026-09-15' }], '2026-01-01', '2026-12-31'), []);
+  assert.deepEqual(estimatePastDividends([{ totalAnnualBase: 10, frequency: 1, lastExDate: null }], '2026-01-01', '2026-12-31'), []);
+});
+
+test('courbe dividendes réinvestis : au-dessus du portefeuille après un versement, indice inchangé', () => {
+  const d = [
+    { date: '2026-09-01', value: 1000 },
+    { date: '2026-09-10', value: 1000 },
+    { date: '2026-09-20', value: 1000 },
+  ];
+  const idx = [{ date: '2026-09-01', close: 100 }, { date: '2026-09-20', close: 100 }];
+  const base = compareToBenchmark(d, idx);
+  const withDiv = compareToBenchmark(d, idx, [{ date: '2026-09-15', amount: 50 }]);
+  assert.deepEqual(withDiv.series.map((p) => p.index), base.series.map((p) => p.index));
+  assert.equal(withDiv.series[1].withDividends, 100); // avant le versement
+  assert.equal(withDiv.series[2].withDividends, 105); // +50 € sur 1 000 €
+  assert.equal(withDiv.dividendsPct, 5);
+  assert.equal(base.dividendsPct, undefined);
+  // versement hors période : pas de courbe
+  const none = compareToBenchmark(d, idx, [{ date: '2025-01-01', amount: 50 }]);
+  assert.equal(none.dividendsPct, undefined);
+  assert.equal(none.series[0].withDividends, undefined);
+});
