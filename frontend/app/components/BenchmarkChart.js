@@ -23,6 +23,8 @@ export default function BenchmarkChart({ daily, dividendPositions = [] }) {
   const [key, setKey] = useState("CAC40");
   const [period, setPeriod] = useState("all");
   const [bench, setBench] = useState(null);
+  // Courbe « dividendes réinvestis » : masquée par défaut, à la demande de l'utilisateur
+  const [showDivs, setShowDivs] = useState(false);
   const [status, setStatus] = useState("loading");
 
   useEffect(() => {
@@ -45,10 +47,11 @@ export default function BenchmarkChart({ daily, dividendPositions = [] }) {
     if (!bench) return null;
     const days = sliceDaily(daily, period);
     const dates = days.map((p) => p.date).sort();
-    const payments = dates.length ? estimatePastDividends(dividendPositions, dates[0], dates[dates.length - 1]) : [];
+    const payments = showDivs && dates.length ? estimatePastDividends(dividendPositions, dates[0], dates[dates.length - 1]) : [];
     return compareToBenchmark(days, bench.points, payments);
-  }, [daily, bench, period, dividendPositions]);
+  }, [daily, bench, period, dividendPositions, showDivs]);
   const withDivs = cmp?.dividendsPct != null;
+  const canShowDivs = (dividendPositions || []).length > 0;
   const gap = gapPoints(cmp);
   const label = OPTIONS.find((o) => o.key === key)?.label;
 
@@ -88,6 +91,19 @@ export default function BenchmarkChart({ daily, dividendPositions = [] }) {
             {p.label}
           </button>
         ))}
+        {canShowDivs && (
+          <button
+            type="button"
+            aria-pressed={showDivs}
+            onClick={() => setShowDivs((v) => !v)}
+            className={`ml-auto rounded-full border px-3 py-1 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+              showDivs ? "border-[rgb(var(--chart-div))] text-ink" : "border-line text-ink-muted hover:text-ink"
+            }`}
+          >
+            <span aria-hidden="true" className="mr-1.5 inline-block h-2 w-2 rounded-full" style={{ background: "rgb(var(--chart-div))", opacity: showDivs ? 1 : 0.5 }} />
+            Avec dividendes (estim.)
+          </button>
+        )}
       </div>
 
       {!daily || daily.length < 2 ? (
@@ -146,9 +162,9 @@ export default function BenchmarkChart({ daily, dividendPositions = [] }) {
                     dataKey="withDividends"
                     name="Avec dividendes réinvestis (estim.)"
                     stroke="rgb(var(--chart-div))"
-                    strokeWidth={2.5}
+                    strokeWidth={1.5}
+                    strokeOpacity={0.75}
                     dot={false}
-                    style={{ filter: "drop-shadow(0 0 4px rgb(var(--chart-div) / 0.6))" }}
                   />
                 )}
                 <Line type="monotone" dataKey="index" name={label} stroke="rgb(var(--chart-1))" strokeWidth={2} strokeDasharray="5 4" dot={false} />
@@ -158,6 +174,7 @@ export default function BenchmarkChart({ daily, dividendPositions = [] }) {
           <p className="mt-2 text-[11px] text-ink-muted/70">
             Base 100 au premier jour commun. L&apos;indice est suivi dans sa devise ({bench.currency}), hors dividendes ; la
             courbe du portefeuille inclut vos achats et ventes.
+            {showDivs && !withDivs && " Aucun versement de dividende estimé sur cette période."}
             {withDivs &&
               " Courbe jaune : estimation avec dividendes bruts réinvestis, dates déduites du dernier détachement et de la fréquence, quantités et dividende actuels appliqués à toute la période."}
             {bench.stale && " Données de l'indice non actualisées (service momentanément indisponible)."}
