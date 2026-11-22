@@ -21,6 +21,7 @@ function computeStrength(pw) {
 
 export default function Register() {
   const router = useRouter();
+  const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -50,7 +51,7 @@ export default function Register() {
 
     try {
       setLoading(true);
-      const data = await apiFetch("/api/auth/register", { method: "POST", body: { email, password }, auth: false });
+      const data = await apiFetch("/api/auth/register", { method: "POST", body: { email, password, ...(displayName.trim() ? { displayName: displayName.trim() } : {}) }, auth: false });
 
       localStorage.setItem("token", data.token);
       router.push("/portfolio");
@@ -107,6 +108,27 @@ export default function Register() {
         {/* Card */}
         <div className="bg-surface rounded-2xl shadow-xl border border-line p-8">
           <form onSubmit={handleRegister} className="space-y-5" noValidate>
+            {/* Prénom ou pseudo (facultatif) */}
+            <div>
+              <label htmlFor="displayName" className="block text-sm font-semibold text-ink mb-2">
+                Prénom ou pseudo <span className="font-normal text-ink-muted">(facultatif)</span>
+              </label>
+              <input
+                id="displayName"
+                type="text"
+                placeholder="Comment vous appeler ?"
+                className="w-full px-4 py-3 border border-line rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                maxLength={40}
+                autoComplete="nickname"
+                aria-describedby="displayName-hint"
+              />
+              <p id="displayName-hint" className="mt-1 text-xs text-ink-muted">
+                Affiché uniquement dans votre espace, modifiable plus tard dans le profil.
+              </p>
+            </div>
+
             {/* Email */}
             <div>
               <label htmlFor="email" className="block text-sm font-semibold text-ink mb-2">

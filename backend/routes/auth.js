@@ -9,6 +9,7 @@ const { sendPasswordResetEmail } = require("../services/emailService");
 const rateLimit = require("../middleware/rateLimit");
 const auth = require("../middleware/auth");
 const mongoose = require("mongoose");
+const { validateProfilePatch } = require("../services/profile");
 
 const router = express.Router();
 
@@ -50,6 +51,14 @@ router.post("/register", registerLimiter, [...emailValidators, ...pwValidators],
 
     const { email, password } = req.body;
 
+    // Prénom ou pseudo facultatif : mêmes règles que dans le profil (40 caractères, sans < ni >)
+    let displayName = "";
+    if (req.body.displayName !== undefined && req.body.displayName !== null && req.body.displayName !== "") {
+      const checked = validateProfilePatch({ displayName: req.body.displayName });
+      if (checked.errors) return res.status(400).json(formatErrors({ array: () => checked.errors.map((e) => ({ path: "displayName", msg: e.msg })) }));
+      displayName = checked.value.displayName;
+    }
+
     const exists = await User.findOne({ email });
     if (exists) return res.status(409).json({ message: "Email déjà utilisé." });
 
@@ -61,6 +70,7 @@ router.post("/register", registerLimiter, [...emailValidators, ...pwValidators],
       cashAmount: 0,
       cashCurrency: "EUR",
       portfolio: [],
+      ...(displayName ? { profile: { displayName } } : {}),
     });
 
     const token = jwt.sign(

@@ -9,6 +9,32 @@ before(h.start);
 after(h.stop);
 beforeEach(h.resetState);
 
+describe("POST /api/auth/register : prénom ou pseudo facultatif", () => {
+  test("l'enregistre dans le profil (nettoyé)", async () => {
+    const res = await h.request("POST", "/api/auth/register", {
+      body: { email: "pseudo@nauticash.test", password: h.STRONG_PASSWORD, displayName: "  Capitaine   Alex " },
+    });
+    assert.equal(res.status, 201);
+    const profile = await h.request("GET", "/api/user/profile", { token: res.body.token });
+    assert.equal(profile.body.profile.displayName, "Capitaine Alex");
+  });
+
+  test("refuse un pseudo invalide (trop long ou avec < >)", async () => {
+    for (const displayName of ["x".repeat(41), "<script>"]) {
+      const res = await h.request("POST", "/api/auth/register", {
+        body: { email: "mauvais@nauticash.test", password: h.STRONG_PASSWORD, displayName },
+      });
+      assert.equal(res.status, 400);
+    }
+  });
+
+  test("reste facultatif", async () => {
+    const u = await h.registerUser();
+    const profile = await h.request("GET", "/api/user/profile", { token: u.token });
+    assert.equal(profile.body.profile.displayName, "");
+  });
+});
+
 describe("POST /api/auth/register", () => {
   test("crée un compte et renvoie un token JWT valable", async () => {
     const res = await h.request("POST", "/api/auth/register", {
