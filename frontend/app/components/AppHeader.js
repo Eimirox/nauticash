@@ -36,6 +36,13 @@ const NAV = [
   { href: "/strategie", label: "Stratégie" },
 ];
 
+/** Onglets réservés à la formule VIP, verrouillés pour un compte gratuit (access.<page> === false) */
+function isLocked(href, access) {
+  if (href === "/objectifs") return access?.objectifs === false;
+  if (href === "/strategie") return access?.strategie === false;
+  return false;
+}
+
 function isActive(pathname, { href, exact }) {
   return exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 }
@@ -47,11 +54,32 @@ const tabClass = (active) =>
     active ? "bg-accent/10 text-accent" : "text-ink-muted hover:bg-surface-2 hover:text-ink"
   );
 
-function NavLink({ item, pathname, className }) {
+/** Petit cadenas affiché à côté d'un onglet réservé à la formule VIP */
+function LockIcon({ className = "h-3.5 w-3.5" }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="5" y="11" width="14" height="9" rx="2" />
+      <path strokeLinecap="round" d="M8 11V8a4 4 0 018 0v3" />
+    </svg>
+  );
+}
+
+function NavLink({ item, pathname, className, locked }) {
   const active = isActive(pathname, item);
   return (
-    <Link href={item.href} aria-current={active ? "page" : undefined} className={className ?? tabClass(active)}>
+    <Link
+      href={item.href}
+      aria-current={active ? "page" : undefined}
+      title={locked ? "Réservé à la formule VIP" : undefined}
+      className={className ?? tabClass(active)}
+    >
       {item.label}
+      {locked && (
+        <>
+          <LockIcon className="ml-1 inline h-3.5 w-3.5 align-[-2px] opacity-70" />
+          <span className="sr-only"> (formule VIP)</span>
+        </>
+      )}
     </Link>
   );
 }
@@ -223,7 +251,7 @@ const TABS = [
   },
 ];
 
-function MobileTabBar({ pathname }) {
+function MobileTabBar({ pathname, access }) {
   return (
     <nav
       id="barre-onglets"
@@ -234,6 +262,7 @@ function MobileTabBar({ pathname }) {
         {TABS.map((tab) => {
           const root = tab.base || tab.href;
           const active = pathname === root || pathname.startsWith(`${root}/`);
+          const locked = isLocked(tab.href, access);
           return (
             <li key={tab.href} className="flex">
               <Link
@@ -248,8 +277,14 @@ function MobileTabBar({ pathname }) {
                 {active && <span aria-hidden="true" className="absolute inset-x-5 top-0 h-0.5 rounded-full bg-accent" />}
                 <span className={cx("flex h-7 w-12 items-center justify-center rounded-full transition", active && "bg-accent/10")}>
                   <span className="h-5 w-5 [&>svg]:h-5 [&>svg]:w-5">{tab.icon}</span>
+                  {locked && (
+                    <span aria-hidden="true" className="absolute right-2 top-1.5 rounded-full bg-surface p-0.5 text-warn">
+                      <LockIcon className="h-3 w-3" />
+                    </span>
+                  )}
                 </span>
                 {tab.label}
+                {locked && <span className="sr-only"> (formule VIP)</span>}
               </Link>
             </li>
           );
@@ -265,7 +300,7 @@ function MobileTabBar({ pathname }) {
  */
 export default function AppHeader({ actions }) {
   const pathname = usePathname() || "";
-  const { email, profile, loading: profileLoading } = useProfile();
+  const { email, profile, access, loading: profileLoading } = useProfile();
   const [discreet, toggleDiscreet] = useDiscreet();
   const firstName = (profile.displayName || "").trim().split(/\s+/)[0];
 
@@ -274,7 +309,7 @@ export default function AppHeader({ actions }) {
     item.menu ? (
       <NavMenu key={item.menu} item={item} pathname={pathname} />
     ) : (
-      <NavLink key={item.href} item={item} pathname={pathname} />
+      <NavLink key={item.href} item={item} pathname={pathname} locked={isLocked(item.href, access)} />
     )
   );
   // Mobile / tablette : sous-onglets d'Analyses sous l'en-tête (la barre du bas n'a qu'un onglet « Analyses »)
@@ -383,7 +418,7 @@ export default function AppHeader({ actions }) {
     </header>
     {/* Cible du lien d'évitement « Aller au contenu » (app/layout.js) */}
     <div id="contenu" tabIndex={-1} className="scroll-mt-28 outline-none" />
-    <MobileTabBar pathname={pathname} />
+    <MobileTabBar pathname={pathname} access={access} />
     </>
   );
 }
