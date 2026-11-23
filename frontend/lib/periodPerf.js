@@ -1,7 +1,8 @@
 // frontend/lib/periodPerf.js
 // Performance par période à partir de l'historique quotidien (GET /api/user/history/daily).
-// Il s'agit de la variation de la valeur du portefeuille : les achats et ventes de la
-// période sont inclus (ce n'est pas une performance « pondérée dans le temps »).
+// Quand l'historique contient l'indice « perf » (base 100, calculé sur les cours des lignes détenues la veille),
+// la performance est pondérée dans le temps : apports, retraits et changements de lignes n'ont aucun effet.
+// Sinon (photos d'avant ce suivi), repli sur la variation de la valeur totale, achats et ventes inclus (approx = true).
 
 export const PERIODS = [
   { key: "1d", label: "1 J", days: 1 },
@@ -29,13 +30,20 @@ function startOf(period, end) {
  * - pct/amount null s'il n'y a pas au moins deux points distincts.
  */
 export function periodPerformance(points, periods = PERIODS) {
-  const pts = (points || [])
-    .filter((p) => p && p.date && Number.isFinite(Number(p.value)))
-    .map((p) => ({ date: p.date, value: Number(p.value) }))
-    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  const byDate = (a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+  const clean = (points || []).filter((p) => p && p.date && Number.isFinite(Number(p.value)));
+  // Indice hors apports : seules les photos qui en ont un, si au moins deux
+  const withPerf = clean
+    .filter((p) => Number.isFinite(Number(p.perf)) && Number(p.perf) > 0)
+    .map((p) => ({ date: p.date, value: Number(p.value), perf: Number(p.perf), dayGain: Number(p.dayGain) || 0 }))
+    .sort(byDate);
+  const useIndex = withPerf.length >= 2;
+  const pts = useIndex
+    ? withPerf
+    : clean.map((p) => ({ date: p.date, value: Number(p.value) })).sort(byDate);
 
   if (pts.length < 2) {
-    return periods.map((p) => ({ key: p.key, label: p.label, pct: null, amount: null, from: null, partial: false }));
+    return periods.map((p) => ({ key: p.key, label: p.label, pct: null, amount: null, from: null, partial: false, approx: !useIndex }));
   }
 
   const last = pts[pts.length - 1];
@@ -51,7 +59,20 @@ export function periodPerformance(points, periods = PERIODS) {
     const partial = !ref;
     if (!ref) ref = pts[0];
     if (ref.date === last.date) {
-      return { key: period.key, label: period.label, pct: null, amount: null, from: ref.date, partial };
+      return { key: period.key, label: period.label, pct: null, amount: null, from: ref.date, partial, approx: !useIndex };
+    }
+    if (useIndex) {
+      // Gain en euros = somme des gains journaliers (cours seuls) après la date de référence ; % = variation de l'indice
+      const amount = pts.filter((p) => p.date > ref.date && p.date <= last.date).reduce((sum, p) => sum + p.dayGain, 0);
+      return {
+        key: period.key,
+        label: period.label,
+        amount,
+        pct: (last.perf / ref.perf - 1) * 100,
+        from: ref.date,
+        partial,
+        approx: false,
+      };
     }
     const amount = last.value - ref.value;
     return {
@@ -61,6 +82,7 @@ export function periodPerformance(points, periods = PERIODS) {
       pct: ref.value > 0 ? (amount / ref.value) * 100 : null,
       from: ref.date,
       partial,
+      approx: true,
     };
   });
 }

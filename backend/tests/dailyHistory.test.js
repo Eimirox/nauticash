@@ -118,6 +118,67 @@ describe("snapshotAll", () => {
   });
 });
 
+describe("performance hors apports (perf, dayGain)", () => {
+  const D1 = new Date("2026-09-28T21:45:00Z");
+  const D2 = new Date("2026-09-29T21:45:00Z");
+  const D3 = new Date("2026-09-30T21:45:00Z");
+  const rows = (u) => h.db.collection("history_daily").find({ userId: u.id }).toArray().then((r) => r.sort((a, b) => (a.date < b.date ? -1 : 1)));
+
+  test("le premier jour part de 100 ; ensuite l'indice suit les cours des lignes de la veille", async () => {
+    await seedPrices();
+    const u = await userWith({ portfolio: [{ ticker: "AIR.PA", quantity: 10 }] });
+    await dailyHistory.snapshotAll({ date: D1 });
+    await prices().updateOne({ symbol: "AIR.PA" }, { $set: { close: 165 } }); // +10 %
+    await dailyHistory.snapshotAll({ date: D2 });
+
+    const [r1, r2] = await rows(u);
+    assert.equal(r1.perf, 100);
+    assert.equal(r2.perf, 110);
+    assert.equal(r2.dayGain, 150);
+  });
+
+  test("un changement de lignes ou un apport ne crée ni gain ni perte", async () => {
+    await seedPrices();
+    const u = await userWith({ portfolio: [{ ticker: "AIR.PA", quantity: 10 }, { ticker: "AAPL", quantity: 5 }], cashAmount: 0 });
+    await dailyHistory.snapshotAll({ date: D1 }); // 1 500 + 1 000 = 2 500 €
+
+    // L'utilisateur supprime tout, rachète un seul titre et ajoute du cash : la valeur totale change fortement
+    await users().updateOne({ _id: (await users().findOne({ email: u.email }))._id }, { $set: { portfolio: [{ ticker: "AIR.PA", quantity: 5 }], cashAmount: 3000 } });
+    await dailyHistory.snapshotAll({ date: D2 });
+    const [, r2] = await rows(u);
+    assert.notEqual(r2.value, 2500, "la valeur totale a bien bougé");
+    assert.equal(r2.perf, 100, "mais la performance, non : les cours n'ont pas changé");
+    assert.equal(r2.dayGain, 0);
+
+    // Le lendemain, seule la ligne de la veille (AIR.PA × 5) compte : +10 % sur 750 € = 75 € sur 5 750 €
+    await prices().updateOne({ symbol: "AIR.PA" }, { $set: { close: 165 } });
+    await dailyHistory.snapshotAll({ date: D3 });
+    const [, , r3] = await rows(u);
+    assert.equal(r3.dayGain, 75);
+    assert.equal(r3.perf, Math.round(100 * (1 + 75 / r2.value) * 1e4) / 1e4);
+  });
+
+  test("après une photo d'avant ce suivi (sans lignes détaillées), l'indice repart à 100", async () => {
+    await seedPrices();
+    const u = await userWith({ portfolio: [{ ticker: "AIR.PA", quantity: 1 }] });
+    await h.db.collection("history_daily").insertOne({ userId: u.id, date: "2026-09-27", value: 1, invested: 1, cash: 0, missing: 0 });
+    await dailyHistory.snapshotAll({ date: D1 });
+    const all = await rows(u);
+    assert.equal(all.length, 2);
+    assert.equal(all[1].perf, 100);
+  });
+
+  test("l'API renvoie perf et dayGain, sans le détail des lignes", async () => {
+    await seedPrices();
+    const u = await userWith({ portfolio: [{ ticker: "AIR.PA", quantity: 2 }] });
+    await dailyHistory.snapshotAll({ date: new Date() });
+    const res = await h.request("GET", "/api/user/history/daily?days=30", { token: u.token });
+    assert.equal(res.body[0].perf, 100);
+    assert.equal(res.body[0].dayGain, 0);
+    assert.equal(res.body[0].holdings, undefined);
+  });
+});
+
 describe("GET /api/user/history/daily", () => {
   test("exige d'être connecté", async () => {
     assert.equal((await h.request("GET", "/api/user/history/daily")).status, 401);

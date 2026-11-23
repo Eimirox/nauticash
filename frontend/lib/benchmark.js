@@ -43,7 +43,13 @@ export function estimatePastDividends(positions, from, to) {
  */
 export function compareToBenchmark(daily, index, payments = []) {
   const byDate = (a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
-  const pts = (daily || []).filter((p) => Number(p.value) > 0).sort(byDate);
+  // Courbe du portefeuille : indice hors apports (« perf ») quand l'historique en contient au moins deux, sinon valeur totale.
+  // `eur` garde la valeur réelle en euros (nécessaire pour remettre les dividendes dans le portefeuille).
+  const all = (daily || []).filter((p) => Number(p.value) > 0);
+  const useIndex = all.filter((p) => Number(p.perf) > 0).length >= 2;
+  const pts = (useIndex ? all.filter((p) => Number(p.perf) > 0) : all)
+    .map((p) => ({ date: p.date, value: useIndex ? Number(p.perf) : Number(p.value), eur: Number(p.value) }))
+    .sort(byDate);
   const idx = (index || []).filter((p) => Number(p.close) > 0).sort(byDate);
   if (pts.length < 2 || !idx.length) return null;
 
@@ -51,7 +57,7 @@ export function compareToBenchmark(daily, index, payments = []) {
   let j = -1;
   for (const p of pts) {
     while (j + 1 < idx.length && idx[j + 1].date <= p.date) j++;
-    if (j >= 0) rows.push({ date: p.date, value: Number(p.value), close: idx[j].close });
+    if (j >= 0) rows.push({ date: p.date, value: p.value, eur: p.eur, close: idx[j].close });
   }
   if (rows.length < 2) return null;
 
@@ -67,7 +73,7 @@ export function compareToBenchmark(daily, index, payments = []) {
   }
   let factor = 1;
   const series = rows.map((r, i) => {
-    if (byRow.has(i)) factor *= 1 + byRow.get(i) / r.value;
+    if (byRow.has(i)) factor *= 1 + byRow.get(i) / r.eur;
     const point = {
       date: r.date,
       portfolio: Math.round((r.value / v0) * 10000) / 100,
