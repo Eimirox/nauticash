@@ -300,7 +300,9 @@ export default function PerformancePage() {
             <p className="mt-4 text-xs text-ink-muted">
               {daily.length < 2
                 ? "La valeur de votre portefeuille est enregistrée automatiquement chaque soir : les performances par période s'afficheront dès le deuxième jour."
-                : "Variation de la valeur du portefeuille en euros (taux BCE), achats et ventes de la période inclus. « Depuis l'achat » compare la valeur actuelle à vos prix de revient (PRU)."}
+                : periods.some((p) => p.approx === false)
+                  ? "Performance des cours de vos lignes en euros (taux BCE), hors apports, retraits et changements de lignes ; les dividendes ne sont pas comptés. « Depuis l'achat » compare la valeur actuelle à vos prix de revient (PRU)."
+                  : "Variation de la valeur totale du portefeuille (taux BCE), achats et ventes inclus. La performance hors apports s'affichera dès le deuxième jour de suivi. « Depuis l'achat » compare la valeur actuelle à vos prix de revient (PRU)."}
             </p>
           </section>
 
