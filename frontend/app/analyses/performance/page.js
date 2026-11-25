@@ -68,6 +68,7 @@ export default function PerformancePage() {
   }, []);
 
   const periods = useMemo(() => periodPerformance(daily), [daily]);
+  const mixedPeriods = periods.some((p) => p.approx === false) && periods.some((p) => p.approx);
   const lastDaily = daily.length ? daily[daily.length - 1] : null;
 
   // Calculs optimisés avec useMemo
@@ -277,7 +278,12 @@ export default function PerformancePage() {
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
               {periods.map((p) => (
                 <div key={p.key} className="rounded-lg border border-line bg-surface-2 p-3">
-                  <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-muted">{p.label}</p>
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                    {p.label}
+                    {mixedPeriods && p.approx && (
+                      <span title="Période qui remonte avant le début du suivi hors apports : valeur totale, achats et ventes inclus"> ≈</span>
+                    )}
+                  </p>
                   <Delta value={p.pct} className="text-lg" />
                   {p.amount != null && (
                     <p className={`money text-xs tabular-nums ${getColorClass(p.amount)}`}>{formatAmount(p.amount)}</p>
@@ -300,9 +306,11 @@ export default function PerformancePage() {
             <p className="mt-4 text-xs text-ink-muted">
               {daily.length < 2
                 ? "La valeur de votre portefeuille est enregistrée automatiquement chaque soir : les performances par période s'afficheront dès le deuxième jour."
-                : periods.some((p) => p.approx === false)
+                : periods.every((p) => p.approx === false)
                   ? "Performance des cours de vos lignes en euros (taux BCE), hors apports, retraits et changements de lignes ; les dividendes ne sont pas comptés. « Depuis l'achat » compare la valeur actuelle à vos prix de revient (PRU)."
-                  : "Variation de la valeur totale du portefeuille (taux BCE), achats et ventes inclus. La performance hors apports s'affichera dès le deuxième jour de suivi. « Depuis l'achat » compare la valeur actuelle à vos prix de revient (PRU)."}
+                  : periods.some((p) => p.approx === false)
+                    ? "Hors apports, retraits et changements de lignes depuis le début du suivi (dividendes non comptés) ; les périodes qui remontent plus loin (« ≈ ») restent la variation de la valeur totale, achats et ventes inclus. « Depuis l'achat » compare la valeur actuelle à vos prix de revient (PRU)."
+                    : "Variation de la valeur totale du portefeuille (taux BCE), achats et ventes inclus. La performance hors apports s'affichera dès le deuxième jour de suivi. « Depuis l'achat » compare la valeur actuelle à vos prix de revient (PRU)."}
             </p>
           </section>
 

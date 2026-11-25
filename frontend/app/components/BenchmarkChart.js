@@ -173,7 +173,7 @@ export default function BenchmarkChart({ daily, dividendPositions = [] }) {
           </div>
           <p className="mt-2 text-[11px] text-ink-muted/70">
             Base 100 au premier jour commun. L&apos;indice est suivi dans sa devise ({bench.currency}), hors dividendes ; la
-            courbe du portefeuille inclut vos achats et ventes.
+            courbe du portefeuille ne compte ni vos apports ni vos retraits depuis le début du suivi (avant, elle suit la valeur totale).
             {showDivs && !withDivs && " Aucun versement de dividende estimé sur cette période."}
             {withDivs &&
               " Courbe jaune : estimation avec dividendes bruts réinvestis, dates déduites du dernier détachement et de la fréquence, quantités et dividende actuels appliqués à toute la période."}

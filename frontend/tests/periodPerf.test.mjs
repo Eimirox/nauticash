@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { periodPerformance } from "../lib/periodPerf.js";
+import { periodPerformance, performanceSeries } from "../lib/periodPerf.js";
 import { compareToBenchmark } from "../lib/benchmark.js";
 
 const find = (res, key) => res.find((r) => r.key === key);
@@ -28,15 +28,37 @@ test("avec indice : un apport massif ne change pas la performance", () => {
   assert.equal(w.amount, 500);
 });
 
-test("avec indice : seules les photos munies d'un indice servent de référence", () => {
+test("avec indice : l'ancien historique est raccordé à l'indice (jour de raccord = rendement nul)", () => {
   const pts = [
-    { date: "2026-10-01", value: 9999 }, // ancienne photo, ignorée
-    { date: "2026-11-20", value: 2000, perf: 100, dayGain: 0 },
-    { date: "2026-11-22", value: 2200, perf: 105, dayGain: 100 },
+    { date: "2026-10-01", value: 1000 }, // ancien historique, sans indice
+    { date: "2026-11-01", value: 1100 }, // +10 % sur l'ancien historique
+    { date: "2026-11-20", value: 5000, perf: 100, dayGain: 0 }, // gros apport le jour du raccord : ignoré
+    { date: "2026-11-22", value: 5250, perf: 105, dayGain: 250 },
   ];
+  const { indexed, series } = performanceSeries(pts);
+  assert.equal(indexed, true);
+  assert.equal(series.length, 4);
+  assert.equal(series[1].idx, 100, "le dernier point de l'ancien historique se raccorde à 100");
+  assert.equal(Math.round(series[0].idx * 100) / 100, 90.91);
   const res = periodPerformance(pts);
-  assert.equal(find(res, "1m").approx, false);
-  assert.equal(Math.round(find(res, "1m").pct * 100) / 100, 5);
+  assert.equal(find(res, "1y").approx, true, "une période qui remonte dans l'ancien historique reste approximative");
+  assert.equal(find(res, "1d").approx, false);
+  // 1 an : +10 % (ancien) puis +5 % (indice) = +15,5 % ; le jour du gros apport ne compte pas
+  assert.equal(Math.round(find(res, "1y").pct * 10) / 10, 15.5);
+});
+
+test("avec indice : la courbe garde tout l'historique (pas seulement les jours avec indice)", () => {
+  const daily = [
+    { date: "2026-10-01", value: 1000 },
+    { date: "2026-10-02", value: 1010 },
+    { date: "2026-10-03", value: 1020 },
+    { date: "2026-10-04", value: 1030, perf: 100, dayGain: 0 },
+    { date: "2026-10-05", value: 1060, perf: 103, dayGain: 30 },
+  ];
+  const index = daily.map((p, i) => ({ date: p.date, close: 100 + i }));
+  const out = compareToBenchmark(daily, index);
+  assert.equal(out.series.length, 5);
+  assert.equal(out.from, "2026-10-01");
 });
 
 test("comparaison à un indice : la courbe du portefeuille suit l'indice hors apports", () => {
