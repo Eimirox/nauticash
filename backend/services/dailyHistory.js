@@ -20,6 +20,9 @@ const users = () => mongoose.connection.collection("users");
 
 const round2 = (n) => Math.round(n * 100) / 100;
 
+// Au-delà de ce nombre de jours sans photo, le rendement de l'écart n'est pas attribué (voir nextPerf)
+const MAX_GAP_DAYS = 7;
+
 /** « 2026-09-28 » (jour UTC) */
 function dayKey(date = new Date()) {
   return date.toISOString().slice(0, 10);
@@ -60,9 +63,14 @@ function valueUser(user, pricesBySymbol, rates) {
  * Renvoie { perf, dayGain } : perf = indice base 100 au premier jour suivi, dayGain = gain du jour en euros.
  * Sans veille exploitable (premier jour, ou ligne d'avant l'introduction de ce suivi), l'indice repart à 100.
  */
-function nextPerf(prev, holdings) {
+function nextPerf(prev, holdings, key) {
   if (!prev || !Array.isArray(prev.holdings) || !Number.isFinite(prev.perf) || !(prev.perf > 0)) {
     return { perf: 100, dayGain: 0 };
+  }
+  // Trou de plus de 7 jours (portefeuille vidé puis rempli, service arrêté) : on ne sait pas ce qui était détenu
+  // entre-temps, donc aucun rendement n'est attribué à ce trou (l'indice est simplement reporté).
+  if (key && (new Date(`${key}T12:00:00Z`) - new Date(`${prev.date}T12:00:00Z`)) / 86400000 > MAX_GAP_DAYS) {
+    return { perf: prev.perf, dayGain: 0 };
   }
   const now = new Map((holdings || []).map((h) => [h.t, h.p]));
   let dayGain = 0;
@@ -99,12 +107,22 @@ async function snapshotAll({ date = new Date() } = {}) {
     // Dernière photo antérieure à ce jour (rejouer le même jour ne décale pas la référence)
     const before = await daily().find({ userId, date: { $lt: key } }).toArray();
     const prev = before.reduce((m, r) => (!m || r.date > m.date ? r : m), null);
-    const { perf, dayGain } = nextPerf(prev, v.holdings);
+    const { perf, dayGain } = nextPerf(prev, v.holdings, key);
     await daily().updateOne(
       { userId, date: key },
       { $set: { ...v, perf, dayGain, currency: "EUR", fxStale: Boolean(stale), updatedAt: new Date() } },
       { upsert: true }
     );
+
+    // Seule la photo de la veille sert à calculer la performance du jour : on retire le détail des lignes des plus
+    // anciennes (garde la base légère). La veille est conservée pour qu'une relance le même jour donne le même résultat.
+    if (prev) {
+      for (const old of before) {
+        if (old.date < prev.date && old.holdings !== undefined) {
+          await daily().updateOne({ userId, date: old.date }, { $unset: { holdings: "" } });
+        }
+      }
+    }
 
     const existing = await monthly().findOne({ userId, year, month });
     if (!existing || existing.auto === true) {

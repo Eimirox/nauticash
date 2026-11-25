@@ -168,6 +168,38 @@ describe("performance hors apports (perf, dayGain)", () => {
     assert.equal(all[1].perf, 100);
   });
 
+  test("le détail des lignes n'est gardé que pour les deux derniers jours (base légère), les indices restent", async () => {
+    await seedPrices();
+    const u = await userWith({ portfolio: [{ ticker: "AIR.PA", quantity: 10 }] });
+    const days = ["2026-09-28", "2026-09-29", "2026-09-30", "2026-10-01"].map((d) => new Date(`${d}T21:45:00Z`));
+    for (const d of days) await dailyHistory.snapshotAll({ date: d });
+    const all = await rows(u);
+    assert.deepEqual(all.map((r) => r.holdings !== undefined), [false, false, true, true]);
+    assert.ok(all.every((r) => Number.isFinite(r.perf)), "l'indice, lui, est conservé partout");
+
+    // Relancer le dernier jour redonne le même indice (la veille garde son détail)
+    await dailyHistory.snapshotAll({ date: new Date("2026-10-01T23:30:00Z") });
+    const again = await rows(u);
+    assert.equal(again[3].perf, all[3].perf);
+  });
+
+  test("un long trou (portefeuille vidé puis rempli) n'attribue aucun rendement à la période sans photo", async () => {
+    await seedPrices();
+    const u = await userWith({ portfolio: [{ ticker: "AIR.PA", quantity: 10 }] });
+    await dailyHistory.snapshotAll({ date: D1 });
+    // 30 jours plus tard, même ligne, cours +10 % : rien n'était suivi entre-temps
+    await prices().updateOne({ symbol: "AIR.PA" }, { $set: { close: 165 } });
+    await dailyHistory.snapshotAll({ date: new Date("2026-10-28T21:45:00Z") });
+    const [, r2] = await rows(u);
+    assert.equal(r2.perf, 100);
+    assert.equal(r2.dayGain, 0);
+    // Le jour suivant, le suivi normal reprend
+    await prices().updateOne({ symbol: "AIR.PA" }, { $set: { close: 181.5 } }); // +10 %
+    await dailyHistory.snapshotAll({ date: new Date("2026-10-29T21:45:00Z") });
+    const [, , r3] = await rows(u);
+    assert.equal(r3.perf, 110);
+  });
+
   test("l'API renvoie perf et dayGain, sans le détail des lignes", async () => {
     await seedPrices();
     const u = await userWith({ portfolio: [{ ticker: "AIR.PA", quantity: 2 }] });
