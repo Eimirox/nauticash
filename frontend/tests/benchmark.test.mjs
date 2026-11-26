@@ -57,3 +57,28 @@ test('courbe dividendes réinvestis : au-dessus du portefeuille après un versem
   assert.equal(none.dividendsPct, undefined);
   assert.equal(none.series[0].withDividends, undefined);
 });
+
+test('zones entre les courbes : couleur selon le côté, croisement interpolé', async () => {
+  const { gapBands } = await import('../lib/benchmark.js');
+  const s = [
+    { date: '2026-10-01', portfolio: 100, index: 100 },
+    { date: '2026-10-02', portfolio: 104, index: 101 }, // au-dessus
+    { date: '2026-10-03', portfolio: 98, index: 102 }, // en dessous : croisement entre le 2 et le 3
+    { date: '2026-10-04', portfolio: 97, index: 99 },
+  ];
+  const b = gapBands(s);
+  assert.equal(b.length, 5);
+  assert.deepEqual(b[0].ahead, [100, 100]); // égalité : les deux zones se rejoignent
+  assert.deepEqual(b[0].behind, [100, 100]);
+  assert.deepEqual(b[1].ahead, [101, 104]);
+  assert.equal(b[1].behind, null);
+  const cross = b[2];
+  assert.equal(cross.cross, true);
+  // écart +3 puis −4 : croisement aux 3/7 du chemin
+  assert.ok(Math.abs(cross.index - (101 + (3 / 7) * 1)) < 0.01);
+  assert.deepEqual(cross.ahead, cross.behind);
+  assert.ok(cross.t > b[1].t && cross.t < b[3].t);
+  assert.equal(b[3].ahead, null);
+  assert.deepEqual(b[3].behind, [98, 102]);
+  assert.deepEqual(gapBands([]), []);
+});

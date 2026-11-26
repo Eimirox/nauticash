@@ -114,3 +114,45 @@ export function sliceDaily(daily, periodKey) {
 export function gapPoints(cmp) {
   return cmp ? cmp.portfolioPct - cmp.indexPct : null;
 }
+
+/**
+ * Zones colorées entre le portefeuille et l'indice (aires « en bande » de Recharts).
+ * series : [{ date, portfolio, index, ... }] (voir compareToBenchmark)
+ * → mêmes points avec :
+ *   - t : horodatage (axe horizontal numérique, pour placer les croisements entre deux jours) ;
+ *   - ahead : [index, portfolio] quand le portefeuille est au-dessus (ou à égalité), sinon null ;
+ *   - behind : [portfolio, index] quand il est en dessous (ou à égalité), sinon null ;
+ * et, entre deux jours où l'écart change de signe, un point de croisement interpolé (cross: true)
+ * où les deux courbes se rejoignent, pour que la couleur change exactement au croisement.
+ */
+export function gapBands(series) {
+  const t = (date) => new Date(`${date}T12:00:00Z`).getTime();
+  const band = (p) => {
+    const d = p.portfolio - p.index;
+    return {
+      ...p,
+      ahead: d >= 0 ? [p.index, p.portfolio] : null,
+      behind: d <= 0 ? [p.portfolio, p.index] : null,
+    };
+  };
+  const out = [];
+  (series || []).forEach((p, i) => {
+    const prev = i > 0 ? series[i - 1] : null;
+    if (prev) {
+      const d0 = prev.portfolio - prev.index;
+      const d1 = p.portfolio - p.index;
+      if (d0 * d1 < 0) {
+        const k = d0 / (d0 - d1); // part du chemin entre les deux jours
+        const t0 = t(prev.date);
+        const value = Math.round((prev.index + k * (p.index - prev.index)) * 100) / 100;
+        const cross = { date: prev.date, t: Math.round(t0 + k * (t(p.date) - t0)), portfolio: value, index: value, cross: true, ahead: [value, value], behind: [value, value] };
+        if (prev.withDividends != null && p.withDividends != null) {
+          cross.withDividends = Math.round((prev.withDividends + k * (p.withDividends - prev.withDividends)) * 100) / 100;
+        }
+        out.push(cross);
+      }
+    }
+    out.push({ ...band(p), t: t(p.date) });
+  });
+  return out;
+}

@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { apiFetch } from "@/lib/api";
-import { compareToBenchmark, sliceDaily, gapPoints, estimatePastDividends, BENCH_PERIODS } from "@/lib/benchmark";
+import { compareToBenchmark, sliceDaily, gapPoints, gapBands, estimatePastDividends, BENCH_PERIODS } from "@/lib/benchmark";
 import { Delta } from "./ui";
 import { signedPct } from "@/lib/chartSummary";
 
@@ -12,7 +12,9 @@ const OPTIONS = [
   { key: "SP500", label: "S&P 500" },
 ];
 
-const shortDate = (d) => new Date(`${d}T12:00:00Z`).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
+// Axe horizontal numérique (horodatages) : les croisements tombent entre deux jours
+const shortTime = (t) => new Date(t).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", timeZone: "UTC" });
+const longTime = (t) => new Date(t).toLocaleDateString("fr-FR", { timeZone: "UTC" });
 
 /**
  * Évolution du portefeuille comparée à un indice (base 100 au premier jour commun).
@@ -51,6 +53,8 @@ export default function BenchmarkChart({ daily, dividendPositions = [] }) {
     return compareToBenchmark(days, bench.points, payments);
   }, [daily, bench, period, dividendPositions, showDivs]);
   const withDivs = cmp?.dividendsPct != null;
+  // Zones entre les deux courbes : vert quand le portefeuille est au-dessus de l'indice, rouge en dessous
+  const bands = useMemo(() => (cmp ? gapBands(cmp.series) : []), [cmp]);
   const canShowDivs = (dividendPositions || []).length > 0;
   const gap = gapPoints(cmp);
   const label = OPTIONS.find((o) => o.key === key)?.label;
@@ -146,15 +150,49 @@ export default function BenchmarkChart({ daily, dividendPositions = [] }) {
             }`}
           >
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={cmp.series} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+              <ComposedChart data={bands} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--border))" />
-                <XAxis dataKey="date" tickFormatter={shortDate} tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }} minTickGap={24} />
+                <XAxis
+                  dataKey="t"
+                  type="number"
+                  scale="time"
+                  domain={["dataMin", "dataMax"]}
+                  tickFormatter={shortTime}
+                  tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }}
+                  minTickGap={24}
+                />
                 <YAxis domain={["auto", "auto"]} tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }} width={48} />
                 <Tooltip
-                  labelFormatter={(d) => new Date(`${d}T12:00:00Z`).toLocaleDateString("fr-FR")}
+                  labelFormatter={(t, payload) =>
+                    payload?.[0]?.payload?.cross ? `Croisement (vers le ${longTime(t)})` : longTime(t)
+                  }
                   formatter={(v, name) => [`${Number(v).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}`, name]}
                 />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Area
+                  type="monotone"
+                  dataKey="ahead"
+                  stroke="none"
+                  fill="rgb(var(--gain))"
+                  fillOpacity={0.18}
+                  connectNulls={false}
+                  isAnimationActive={false}
+                  legendType="none"
+                  tooltipType="none"
+                  activeDot={false}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="behind"
+                  stroke="none"
+                  fill="rgb(var(--loss))"
+                  fillOpacity={0.18}
+                  connectNulls={false}
+                  isAnimationActive={false}
+                  legendType="none"
+                  tooltipType="none"
+                  activeDot={false}
+                />
                 <Line type="monotone" dataKey="portfolio" name="Portefeuille" stroke="rgb(var(--accent))" strokeWidth={2.5} dot={false} />
                 {withDivs && (
                   <Line
@@ -168,11 +206,11 @@ export default function BenchmarkChart({ daily, dividendPositions = [] }) {
                   />
                 )}
                 <Line type="monotone" dataKey="index" name={label} stroke="rgb(var(--chart-1))" strokeWidth={2} strokeDasharray="5 4" dot={false} />
-              </LineChart>
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
           <p className="mt-2 text-[11px] text-ink-muted/70">
-            Base 100 au premier jour commun. L&apos;indice est suivi dans sa devise ({bench.currency}), hors dividendes ; la
+            Base 100 au premier jour commun. Zone verte : portefeuille au-dessus de l&apos;indice ; zone rouge : en dessous. L&apos;indice est suivi dans sa devise ({bench.currency}), hors dividendes ; la
             courbe du portefeuille ne compte ni vos apports ni vos retraits depuis le début du suivi (avant, elle suit la valeur totale).
             {showDivs && !withDivs && " Aucun versement de dividende estimé sur cette période."}
             {withDivs &&
