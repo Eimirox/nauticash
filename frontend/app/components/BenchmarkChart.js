@@ -28,6 +28,19 @@ export default function BenchmarkChart({ daily, dividendPositions = [] }) {
   // Courbe « dividendes réinvestis » : masquée par défaut, à la demande de l'utilisateur
   const [showDivs, setShowDivs] = useState(false);
   const [status, setStatus] = useState("loading");
+  // Grand écran : le graphique occupe toute la fenêtre (Échap ou « Réduire » pour revenir)
+  const [expanded, setExpanded] = useState(false);
+  useEffect(() => {
+    if (!expanded) return undefined;
+    const onKey = (e) => e.key === "Escape" && setExpanded(false);
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = overflow;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [expanded]);
 
   useEffect(() => {
     if (!daily || daily.length < 2) return;
@@ -60,11 +73,30 @@ export default function BenchmarkChart({ daily, dividendPositions = [] }) {
   const label = OPTIONS.find((o) => o.key === key)?.label;
 
   return (
-    <section aria-labelledby="benchmark-title" className="mb-6 rounded-xl border border-line bg-surface p-6 shadow-lg">
+    <section
+      aria-labelledby="benchmark-title"
+      className={
+        expanded
+          ? "fixed inset-0 z-50 flex flex-col overflow-auto bg-surface p-4 sm:p-6"
+          : "mb-6 rounded-xl border border-line bg-surface p-6 shadow-lg"
+      }
+    >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 id="benchmark-title" className="text-lg font-bold text-ink">
-          Comparaison à un indice
-        </h2>
+        <div className="flex items-center gap-2">
+          <h2 id="benchmark-title" className="text-lg font-bold text-ink">
+            Comparaison à un indice
+          </h2>
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            aria-pressed={expanded}
+            title={expanded ? "Réduire (Échap)" : "Afficher en grand écran"}
+            className="rounded-lg border border-line px-2 py-1 text-xs font-medium text-ink-muted transition hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            <span aria-hidden="true" className="mr-1">{expanded ? "⤡" : "⤢"}</span>
+            {expanded ? "Réduire" : "Grand écran"}
+          </button>
+        </div>
         <div role="group" aria-label="Indice de comparaison" className="flex gap-1 rounded-xl bg-surface-2 p-1">
           {OPTIONS.map((o) => (
             <button
@@ -143,7 +175,7 @@ export default function BenchmarkChart({ daily, dividendPositions = [] }) {
             <span className="text-ink-muted/70">depuis le {new Date(`${cmp.from}T12:00:00Z`).toLocaleDateString("fr-FR")}</span>
           </div>
           <div
-            className="h-64"
+            className={expanded ? "min-h-[320px] flex-1" : "h-64"}
             role="img"
             aria-label={`Courbes base 100 depuis le ${new Date(`${cmp.from}T12:00:00Z`).toLocaleDateString("fr-FR")} : portefeuille ${signedPct(cmp.portfolioPct)}, ${withDivs ? `avec dividendes réinvestis (estimation) ${signedPct(cmp.dividendsPct)}, ` : ""}${label} ${signedPct(cmp.indexPct)}. ${
               cmp.portfolioPct > cmp.indexPct ? "Le portefeuille fait mieux que l'indice." : cmp.portfolioPct < cmp.indexPct ? "L'indice fait mieux que le portefeuille." : "Performances égales."
