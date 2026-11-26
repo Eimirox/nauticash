@@ -228,7 +228,7 @@ export default function TickerDetailPage() {
                             label={{ value: `PRU ${nf(stock.pru)}`, position: "insideTopLeft", fontSize: 12, fontWeight: 600, fill: "rgb(var(--chart-3))" }}
                           />
                         )}
-                        <Line type="monotone" dataKey="close" name="Clôture" stroke="rgb(var(--accent))" strokeWidth={2} dot={false} />
+                        <Line isAnimationActive={false} type="monotone" dataKey="close" name="Clôture" stroke="rgb(var(--accent))" strokeWidth={2} dot={false} />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
