@@ -82,9 +82,9 @@ export default function ProjectionChart({ current, goalAmount, monthlySavings, e
                 label={{ value: discreet ? "Objectif" : `Objectif ${compact.format(target)} ${symbol}`, position: "insideTopLeft", fontSize: 11, fill: "rgb(var(--text-muted))" }}
               />
             )}
-            <Line type="monotone" dataKey="optimiste" name={`Optimiste (${nf1.format(scenarios[2].rate)} %)`} stroke={COLORS.optimiste} strokeWidth={2} strokeDasharray="4 3" dot={false} />
-            <Line type="monotone" dataKey="median" name={`Médian (${nf1.format(scenarios[1].rate)} %)`} stroke={COLORS.median} strokeWidth={3} dot={false} />
-            <Line type="monotone" dataKey="prudent" name={`Prudent (${nf1.format(scenarios[0].rate)} %)`} stroke={COLORS.prudent} strokeWidth={2} strokeDasharray="2 3" dot={false} />
+            <Line isAnimationActive={false} type="monotone" dataKey="optimiste" name={`Optimiste (${nf1.format(scenarios[2].rate)} %)`} stroke={COLORS.optimiste} strokeWidth={2} strokeDasharray="4 3" dot={false} />
+            <Line isAnimationActive={false} type="monotone" dataKey="median" name={`Médian (${nf1.format(scenarios[1].rate)} %)`} stroke={COLORS.median} strokeWidth={3} dot={false} />
+            <Line isAnimationActive={false} type="monotone" dataKey="prudent" name={`Prudent (${nf1.format(scenarios[0].rate)} %)`} stroke={COLORS.prudent} strokeWidth={2} strokeDasharray="2 3" dot={false} />
           </LineChart>
         </ResponsiveContainer>
       </div>

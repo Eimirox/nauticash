@@ -225,9 +225,9 @@ export default function BenchmarkChart({ daily, dividendPositions = [] }) {
                   tooltipType="none"
                   activeDot={false}
                 />
-                <Line type="monotone" dataKey="portfolio" name="Portefeuille" stroke="rgb(var(--accent))" strokeWidth={2.5} dot={false} />
+                <Line isAnimationActive={false} type="monotone" dataKey="portfolio" name="Portefeuille" stroke="rgb(var(--accent))" strokeWidth={2.5} dot={false} />
                 {withDivs && (
-                  <Line
+                  <Line isAnimationActive={false}
                     type="monotone"
                     dataKey="withDividends"
                     name="Avec dividendes réinvestis (estim.)"
@@ -237,7 +237,7 @@ export default function BenchmarkChart({ daily, dividendPositions = [] }) {
                     dot={false}
                   />
                 )}
-                <Line type="monotone" dataKey="index" name={label} stroke="rgb(var(--chart-1))" strokeWidth={2} strokeDasharray="5 4" dot={false} />
+                <Line isAnimationActive={false} type="monotone" dataKey="index" name={label} stroke="rgb(var(--chart-1))" strokeWidth={2} strokeDasharray="5 4" dot={false} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
