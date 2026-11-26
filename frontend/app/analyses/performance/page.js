@@ -10,6 +10,7 @@ import { periodPerformance } from "@/lib/periodPerf";
 import BenchmarkChart from "../../components/BenchmarkChart";
 import { fetchFxRates, toEUR } from "@/lib/fx";
 import { dividendPositions } from "@/lib/dividendCalendar";
+import { calendarPerformance } from "@/lib/calendarPerf";
 import { SkeletonRegion, SkeletonStat, SkeletonChart } from "../../components/ui/Skeleton";
 
 export default function PerformancePage() {
@@ -29,7 +30,7 @@ export default function PerformancePage() {
       try {
         const [data, dailyData] = await Promise.all([
           apiFetch("/api/user/history").then((d) => (Array.isArray(d) ? d : [])),
-          apiFetch("/api/user/history/daily?days=400")
+          apiFetch("/api/user/history/daily?days=3660")
             .then((d) => (Array.isArray(d) ? d : []))
             .catch(() => []),
         ]);
@@ -71,133 +72,22 @@ export default function PerformancePage() {
   const mixedPeriods = periods.some((p) => p.approx === false) && periods.some((p) => p.approx);
   const lastDaily = daily.length ? daily[daily.length - 1] : null;
 
-  // Calculs optimisés avec useMemo
+  // Mois, années et total : hors apports quand le suivi quotidien existe (voir lib/calendarPerf.js)
   const performanceData = useMemo(() => {
-    if (!history || history.length === 0) {
-      return {
-        monthly: [],
-        yearly: [],
-        currentMonthPerf: null,
-        currentYearPerf: null,
-        allTimePerf: null
-      };
-    }
-
-    // Convertir mois anglais en numéro
-    const MONTH_MAP = {
-      "January": 1, "February": 2, "March": 3, "April": 4,
-      "May": 5, "June": 6, "July": 7, "August": 8,
-      "September": 9, "October": 10, "November": 11, "December": 12
-    };
-
-    const getMonthNumber = (month) => {
-      if (typeof month === 'number') return month;
-      const parsed = parseInt(month);
-      if (!isNaN(parsed)) return parsed;
-      return MONTH_MAP[month] || null;
-    };
-
-    // Trier l'historique par date
-    const sortedHistory = [...history].sort((a, b) => {
-      const dateA = new Date(a.year, getMonthNumber(a.month) - 1);
-      const dateB = new Date(b.year, getMonthNumber(b.month) - 1);
-      return dateA - dateB;
-    });
-
-    // Calcul des performances mensuelles
-    const monthly = [];
-    for (let i = 1; i < sortedHistory.length; i++) {
-      const current = sortedHistory[i];
-      const previous = sortedHistory[i - 1];
-      
-      const perfPercent = ((current.value - previous.value) / previous.value) * 100;
-      const perfAmount = current.value - previous.value;
-      
-      monthly.push({
-        year: current.year,
-        month: current.month,
-        monthNum: getMonthNumber(current.month),
-        value: current.value,
-        perfPercent: perfPercent,
-        perfAmount: perfAmount,
-        previousValue: previous.value
-      });
-    }
-
-    // Calcul des performances annuelles
-    const yearlyMap = {};
-    sortedHistory.forEach(item => {
-      const year = item.year;
-      if (!yearlyMap[year]) {
-        yearlyMap[year] = [];
-      }
-      yearlyMap[year].push({
-        ...item,
-        monthNum: getMonthNumber(item.month)
-      });
-    });
-
-    const yearly = [];
-    Object.keys(yearlyMap).sort().forEach((year, index, years) => {
-      const yearData = yearlyMap[year].sort((a, b) => a.monthNum - b.monthNum);
-      const endValue = yearData[yearData.length - 1].value;
-      
-      // Valeur de début = dernier mois de l'année précédente OU premier mois de cette année
-      let startValue;
-      if (index > 0) {
-        const previousYear = years[index - 1];
-        const previousYearData = yearlyMap[previousYear];
-        startValue = previousYearData[previousYearData.length - 1].value;
-      } else {
-        startValue = yearData[0].value;
-      }
-      
-      const perfPercent = ((endValue - startValue) / startValue) * 100;
-      const perfAmount = endValue - startValue;
-      
-      yearly.push({
-        year: parseInt(year),
-        startValue,
-        endValue,
-        perfPercent,
-        perfAmount,
-        monthsCount: yearData.length
-      });
-    });
-
-    // Performance mois actuel
+    const { monthly, yearly, total } = calendarPerformance(daily, history);
+    const row = (r) => (r ? { ...r, perfPercent: r.pct, perfAmount: r.amount } : null);
     const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1;
-    
-    const currentMonthData = monthly.find(
-      m => m.year === currentYear && m.monthNum === currentMonth
-    );
-
-    // Performance année actuelle
-    const currentYearData = yearly.find(y => y.year === currentYear);
-
-    // Performance totale (depuis le début)
-    let allTimePerf = null;
-    if (sortedHistory.length >= 2) {
-      const first = sortedHistory[0].value;
-      const last = sortedHistory[sortedHistory.length - 1].value;
-      allTimePerf = {
-        perfPercent: ((last - first) / first) * 100,
-        perfAmount: last - first,
-        startValue: first,
-        endValue: last
-      };
-    }
-
+    const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const monthlyRows = monthly.map((m) => ({ ...row(m), previousValue: m.startValue, value: m.endValue }));
+    const yearlyRows = yearly.map(row);
     return {
-      monthly,
-      yearly,
-      currentMonthPerf: currentMonthData,
-      currentYearPerf: currentYearData,
-      allTimePerf
+      monthly: monthlyRows,
+      yearly: yearlyRows,
+      currentMonthPerf: monthlyRows.find((m) => m.key === currentKey) || null,
+      currentYearPerf: yearlyRows.find((y) => y.year === now.getFullYear()) || null,
+      allTimePerf: row(total),
     };
-  }, [history]);
+  }, [daily, history]);
 
   const formatPercent = (value) => {
     if (value == null || isNaN(value)) return "N/A";
@@ -219,6 +109,22 @@ export default function PerformancePage() {
     if (value == null || isNaN(value)) return "text-ink-muted";
     return value >= 0 ? "text-accent" : "text-loss";
   };
+
+  // Pastilles : « ≈ » apports inclus (avant le suivi quotidien), « partiel » période incomplète
+  const Badges = ({ item, partialTitle }) => (
+    <>
+      {item.approx && (
+        <span title="Variation de la valeur totale, apports et retraits inclus (avant le suivi quotidien)" className="ml-1.5 rounded bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-ink-muted">
+          ≈
+        </span>
+      )}
+      {item.partial && (
+        <span title={partialTitle} className="ml-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">
+          partiel
+        </span>
+      )}
+    </>
+  );
 
   const getMonthName = (month) => {
     const monthNames = [
@@ -316,7 +222,7 @@ export default function PerformancePage() {
 
           <BenchmarkChart daily={daily} dividendPositions={divPositions} />
 
-          {!history || history.length < 2 ? (
+          {performanceData.monthly.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-ink-muted">
             <svg className="w-16 h-16 mb-4 text-ink-muted/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -350,6 +256,7 @@ export default function PerformancePage() {
                     <p className={`money text-sm ${getColorClass(performanceData.currentMonthPerf.perfAmount)}`}>
                       {formatAmount(performanceData.currentMonthPerf.perfAmount)}
                     </p>
+                    {performanceData.currentMonthPerf.approx && <p className="mt-1 text-[11px] text-ink-muted">≈ apports et retraits inclus</p>}
                   </>
                 ) : (
                   <p className="text-2xl font-bold text-ink-muted/70">N/A</p>
@@ -372,6 +279,7 @@ export default function PerformancePage() {
                     <p className={`money text-sm ${getColorClass(performanceData.currentYearPerf.perfAmount)}`}>
                       {formatAmount(performanceData.currentYearPerf.perfAmount)}
                     </p>
+                    {performanceData.currentYearPerf.approx && <p className="mt-1 text-[11px] text-ink-muted">≈ apports et retraits inclus</p>}
                   </>
                 ) : (
                   <p className="text-2xl font-bold text-ink-muted/70">N/A</p>
@@ -394,6 +302,8 @@ export default function PerformancePage() {
                     <p className={`money text-sm ${getColorClass(performanceData.allTimePerf.perfAmount)}`}>
                       {formatAmount(performanceData.allTimePerf.perfAmount)}
                     </p>
+                    {performanceData.allTimePerf.approx && <p className="mt-1 text-[11px] text-ink-muted">≈ apports et retraits inclus</p>}
+                    <p className="mt-1 text-[11px] text-ink-muted">depuis {new Date(`${performanceData.allTimePerf.from.slice(0, 7)}-01T12:00:00`).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}</p>
                   </>
                 ) : (
                   <p className="text-2xl font-bold text-ink-muted/70">N/A</p>
@@ -411,21 +321,23 @@ export default function PerformancePage() {
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <caption className="sr-only">Performance mensuelle : valeur de début, valeur de fin, performance en pourcentage et montant.</caption>
+                  <caption className="sr-only">Performance mensuelle : valeur de début, valeur de fin, performance en pourcentage, gain et apports ou retraits.</caption>
                   <thead>
                     <tr className="border-b border-line">
                       <th scope="col" className="text-left py-3 px-4 text-sm font-semibold text-ink-muted">Période</th>
                       <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Valeur Début</th>
                       <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Valeur Fin</th>
                       <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Performance</th>
-                      <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Montant</th>
+                      <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Gain</th>
+                      <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Apports / retraits</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {performanceData.monthly.slice().reverse().map((item, idx) => (
-                      <tr key={idx} className="border-b border-line hover:bg-surface-2 transition">
+                    {performanceData.monthly.slice().reverse().map((item) => (
+                      <tr key={item.key} className="border-b border-line hover:bg-surface-2 transition">
                         <td className="py-3 px-4 text-sm font-medium text-ink">
                           {getMonthName(item.month)} {item.year}
+                          <Badges item={item} partialTitle={`Mois précédent absent : variation sur ${item.gapMonths} mois`} />
                         </td>
                         <td className="text-right py-3 px-4 text-sm text-ink-muted">
                           <span className="money">{item.previousValue.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €</span>
@@ -438,6 +350,9 @@ export default function PerformancePage() {
                         </td>
                         <td className={`text-right py-3 px-4 text-sm font-medium ${getColorClass(item.perfAmount)}`}>
                           <span className="money">{formatAmount(item.perfAmount)}</span>
+                        </td>
+                        <td className="text-right py-3 px-4 text-sm text-ink-muted">
+                          <span className="money">{item.flows == null ? "—" : formatAmount(item.flows)}</span>
                         </td>
                       </tr>
                     ))}
@@ -456,22 +371,24 @@ export default function PerformancePage() {
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <caption className="sr-only">Performance annuelle : valeur de début, valeur de fin, performance en pourcentage et montant.</caption>
+                  <caption className="sr-only">Performance annuelle : valeur de début, valeur de fin, performance en pourcentage, gain et apports ou retraits.</caption>
                   <thead>
                     <tr className="border-b border-line">
                       <th scope="col" className="text-left py-3 px-4 text-sm font-semibold text-ink-muted">Année</th>
                       <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Valeur Début</th>
                       <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Valeur Fin</th>
                       <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Performance</th>
-                      <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Montant</th>
+                      <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Gain</th>
+                      <th scope="col" className="text-right py-3 px-4 text-sm font-semibold text-ink-muted">Apports / retraits</th>
                       <th scope="col" className="text-center py-3 px-4 text-sm font-semibold text-ink-muted">Mois</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {performanceData.yearly.slice().reverse().map((item, idx) => (
-                      <tr key={idx} className="border-b border-line hover:bg-surface-2 transition">
+                    {performanceData.yearly.slice().reverse().map((item) => (
+                      <tr key={item.year} className="border-b border-line hover:bg-surface-2 transition">
                         <td className="py-3 px-4 text-sm font-medium text-ink">
                           {item.year}
+                          <Badges item={item} partialTitle="Pas de valeur à fin décembre de l'année précédente : depuis le premier mois connu" />
                         </td>
                         <td className="text-right py-3 px-4 text-sm text-ink-muted">
                           <span className="money">{item.startValue.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €</span>
@@ -484,6 +401,9 @@ export default function PerformancePage() {
                         </td>
                         <td className={`text-right py-3 px-4 text-sm font-medium ${getColorClass(item.perfAmount)}`}>
                           <span className="money">{formatAmount(item.perfAmount)}</span>
+                        </td>
+                        <td className="text-right py-3 px-4 text-sm text-ink-muted">
+                          <span className="money">{item.flows == null ? "—" : formatAmount(item.flows)}</span>
                         </td>
                         <td className="text-center py-3 px-4 text-sm text-ink-muted">
                           {item.monthsCount}/12
@@ -504,8 +424,10 @@ export default function PerformancePage() {
                 <div className="text-sm text-blue-900 dark:text-sky-200">
                   <p className="font-semibold mb-1">📊 Calcul des performances</p>
                   <p className="text-blue-700 dark:text-sky-200">
-                    Les performances mensuelles sont calculées à partir du relevé de chaque mois, mis à jour
-                    automatiquement chaque soir (une valeur saisie à la main reste prioritaire).
+                    Depuis le début du suivi quotidien, la performance est calculée hors apports et retraits : seule
+                    la variation des cours de vos lignes compte (taux BCE, dividendes non comptés). « Gain » est le gain
+                    de marché en euros, « Apports / retraits » le reste de la variation de valeur. Avant ce suivi, les
+                    mois marqués « ≈ » reprennent le relevé mensuel (variation de la valeur totale, apports inclus).
                   </p>
                 </div>
               </div>
