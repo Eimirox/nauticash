@@ -23,27 +23,53 @@ function startOf(period, end) {
 }
 
 /**
- * points : [{ date: "AAAA-MM-JJ", value }] triés ou non.
- * Renvoie pour chaque période { key, label, pct, amount, from, partial } :
+ * Série de performance continue, base commune « idx » :
+ * - tant qu'il y a moins de 2 photos avec indice (`perf`), simple valeur totale (indexed = false) ;
+ * - sinon, l'indice à partir de la première photo qui en a un, PRÉCÉDÉ de l'ancien historique (sans indice)
+ *   remis à l'échelle pour se raccorder à 100 : le jour de raccord compte pour un rendement nul (on ne peut pas
+ *   savoir ce qui a bougé ce jour-là), et l'ancien historique reste approximatif (apports inclus, legacy = true).
+ * Chaque point : { date, idx, eur (valeur réelle en €), dayGain (€, null pour l'ancien historique), legacy }.
+ */
+export function performanceSeries(points) {
+  const byDate = (a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+  const clean = (points || []).filter((p) => p && p.date && Number.isFinite(Number(p.value)) && Number(p.value) > 0);
+  const withPerf = clean.filter((p) => Number(p.perf) > 0).sort(byDate);
+  if (withPerf.length < 2) {
+    return {
+      indexed: false,
+      series: clean
+        .map((p) => ({ date: p.date, idx: Number(p.value), eur: Number(p.value), dayGain: null, legacy: true }))
+        .sort(byDate),
+    };
+  }
+  const first = withPerf[0];
+  const legacy = clean.filter((p) => !(Number(p.perf) > 0) && p.date < first.date).sort(byDate);
+  const anchor = legacy.length ? legacy[legacy.length - 1] : null;
+  const series = [];
+  if (anchor) {
+    for (const p of legacy) {
+      series.push({ date: p.date, idx: (100 * Number(p.value)) / Number(anchor.value), eur: Number(p.value), dayGain: null, legacy: true });
+    }
+  }
+  for (const p of withPerf) {
+    series.push({ date: p.date, idx: Number(p.perf), eur: Number(p.value), dayGain: Number(p.dayGain) || 0, legacy: false });
+  }
+  return { indexed: true, series };
+}
+
+/**
+ * points : [{ date: "AAAA-MM-JJ", value, perf?, dayGain? }] triés ou non.
+ * Renvoie pour chaque période { key, label, pct, amount, from, partial, approx } :
  * - référence = dernier point à la date de début ou avant ;
  * - s'il n'existe pas (historique trop court), premier point disponible et partial = true ;
- * - pct/amount null s'il n'y a pas au moins deux points distincts.
+ * - pct/amount null s'il n'y a pas au moins deux points distincts ;
+ * - approx = true si la période s'appuie sur l'ancien historique (variation de la valeur totale, apports inclus).
  */
 export function periodPerformance(points, periods = PERIODS) {
-  const byDate = (a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
-  const clean = (points || []).filter((p) => p && p.date && Number.isFinite(Number(p.value)));
-  // Indice hors apports : seules les photos qui en ont un, si au moins deux
-  const withPerf = clean
-    .filter((p) => Number.isFinite(Number(p.perf)) && Number(p.perf) > 0)
-    .map((p) => ({ date: p.date, value: Number(p.value), perf: Number(p.perf), dayGain: Number(p.dayGain) || 0 }))
-    .sort(byDate);
-  const useIndex = withPerf.length >= 2;
-  const pts = useIndex
-    ? withPerf
-    : clean.map((p) => ({ date: p.date, value: Number(p.value) })).sort(byDate);
+  const { indexed, series: pts } = performanceSeries(points);
 
   if (pts.length < 2) {
-    return periods.map((p) => ({ key: p.key, label: p.label, pct: null, amount: null, from: null, partial: false, approx: !useIndex }));
+    return periods.map((p) => ({ key: p.key, label: p.label, pct: null, amount: null, from: null, partial: false, approx: !indexed }));
   }
 
   const last = pts[pts.length - 1];
@@ -58,31 +84,26 @@ export function periodPerformance(points, periods = PERIODS) {
     }
     const partial = !ref;
     if (!ref) ref = pts[0];
+    const approx = !indexed || ref.legacy;
     if (ref.date === last.date) {
-      return { key: period.key, label: period.label, pct: null, amount: null, from: ref.date, partial, approx: !useIndex };
+      return { key: period.key, label: period.label, pct: null, amount: null, from: ref.date, partial, approx };
     }
-    if (useIndex) {
-      // Gain en euros = somme des gains journaliers (cours seuls) après la date de référence ; % = variation de l'indice
-      const amount = pts.filter((p) => p.date > ref.date && p.date <= last.date).reduce((sum, p) => sum + p.dayGain, 0);
-      return {
-        key: period.key,
-        label: period.label,
-        amount,
-        pct: (last.perf / ref.perf - 1) * 100,
-        from: ref.date,
-        partial,
-        approx: false,
-      };
+    let amount;
+    if (indexed) {
+      // Gains journaliers (cours seuls) après la référence ; la part d'ancien historique compte pour la variation de valeur
+      const legacyPart = ref.legacy ? pts.filter((p) => p.legacy).slice(-1)[0].eur - ref.eur : 0;
+      amount = legacyPart + pts.filter((p) => !p.legacy && p.date > ref.date).reduce((sum, p) => sum + p.dayGain, 0);
+    } else {
+      amount = last.eur - ref.eur;
     }
-    const amount = last.value - ref.value;
     return {
       key: period.key,
       label: period.label,
       amount,
-      pct: ref.value > 0 ? (amount / ref.value) * 100 : null,
+      pct: ref.idx > 0 ? (last.idx / ref.idx - 1) * 100 : null,
       from: ref.date,
       partial,
-      approx: true,
+      approx,
     };
   });
 }

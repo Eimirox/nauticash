@@ -15,6 +15,8 @@ const isoDay = (d) => {
  * positions : sortie de dividendPositions (totalAnnualBase, frequency, lastExDate) ;
  * → [{ date, amount }] triés par date. Les lignes sans montant converti ou sans date connue sont ignorées.
  */
+import { performanceSeries } from "./periodPerf.js";
+
 export function estimatePastDividends(positions, from, to) {
   const out = [];
   for (const p of positions || []) {
@@ -43,13 +45,9 @@ export function estimatePastDividends(positions, from, to) {
  */
 export function compareToBenchmark(daily, index, payments = []) {
   const byDate = (a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
-  // Courbe du portefeuille : indice hors apports (« perf ») quand l'historique en contient au moins deux, sinon valeur totale.
+  // Courbe du portefeuille : indice hors apports (raccordé à l'ancien historique), sinon valeur totale.
   // `eur` garde la valeur réelle en euros (nécessaire pour remettre les dividendes dans le portefeuille).
-  const all = (daily || []).filter((p) => Number(p.value) > 0);
-  const useIndex = all.filter((p) => Number(p.perf) > 0).length >= 2;
-  const pts = (useIndex ? all.filter((p) => Number(p.perf) > 0) : all)
-    .map((p) => ({ date: p.date, value: useIndex ? Number(p.perf) : Number(p.value), eur: Number(p.value) }))
-    .sort(byDate);
+  const pts = performanceSeries(daily).series.map((p) => ({ date: p.date, value: p.idx, eur: p.eur }));
   const idx = (index || []).filter((p) => Number(p.close) > 0).sort(byDate);
   if (pts.length < 2 || !idx.length) return null;
 
