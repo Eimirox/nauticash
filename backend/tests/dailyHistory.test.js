@@ -89,10 +89,13 @@ describe("snapshotAll", () => {
     const m = await monthly.findOne({ userId: manual.id, year: 2026, month: "September" });
     assert.equal(m.value, 999, "la saisie manuelle est conservée");
 
-    // Une nouvelle photo manuelle remplace la valeur automatique du mois
-    await h.request("POST", "/api/user/history", { token: auto.token, body: { date: "2026-09-29", value: 500 } });
+    // Mois déjà suivi chaque jour : la saisie manuelle est refusée, la valeur automatique continue d'être mise à jour
+    const res = await h.request("POST", "/api/user/history", { token: auto.token, body: { date: "2026-09-29", value: 500 } });
+    assert.equal(res.status, 409);
     await dailyHistory.snapshotAll({ date: new Date("2026-09-30T21:45:00Z") });
-    assert.equal((await monthly.findOne({ userId: auto.id, year: 2026, month: "September" })).value, 500);
+    const after = await monthly.findOne({ userId: auto.id, year: 2026, month: "September" });
+    assert.equal(after.value, 150);
+    assert.equal(after.auto, true);
   });
 
   test("le job planifié exécute la photo et garde le résultat", async () => {

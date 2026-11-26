@@ -146,3 +146,26 @@ test('étiquettes : version courte sans flèche, taille selon la place par mois'
   assert.equal(labelMode(50), 'short');
   assert.equal(labelMode(30), 'none');
 });
+
+test('performance hors apports : remplace la variation de valeur quand elle est connue', async () => {
+  const { calendarPerformance, monthEndValues } = await import('../lib/calendarPerf.js');
+  const daily = [
+    { date: '2026-09-30', value: 1000, perf: 100, dayGain: 0 },
+    { date: '2026-10-15', value: 2000, perf: 100, dayGain: 0 }, // apport de 1 000 €
+    { date: '2026-10-31', value: 2040, perf: 102, dayGain: 40 },
+  ];
+  const values = monthEndValues(daily, []);
+  const perf = new Map(calendarPerformance(daily, []).monthly.map((m) => [m.key, m]));
+  const oct = evolutionRows(values, [2026], perf)[9];
+  assert.equal(oct.year2026, 2040);
+  assert.ok(Math.abs(oct.pct2026 - 2) < 1e-9); // et non +104 %
+  assert.equal(oct.delta2026, 40);
+  assert.equal(oct.flows2026, 1000);
+  assert.equal(oct.approx2026, false);
+  const last = lastSnapshot(values, perf);
+  assert.ok(Math.abs(last.pct - 2) < 1e-9);
+  // Sans performance connue : variation de valeur, marquée approx
+  const raw = evolutionRows(values, [2026])[9];
+  assert.ok(Math.abs(raw.pct2026 - 104) < 1e-9);
+  assert.equal(raw.approx2026, true);
+});

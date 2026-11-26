@@ -30,6 +30,18 @@ router.post("/history", auth, async (req, res) => {
     const year = parsedDate.getFullYear();
     const month = MONTHS[parsedDate.getMonth()];
 
+    // Mois couvert par le suivi quotidien : sa valeur de fin de mois fait foi partout dans l'application,
+    // une saisie à la main ne serait jamais affichée (et créerait deux chiffres différents pour un même mois)
+    const key = `${year}-${String(parsedDate.getMonth() + 1).padStart(2, "0")}`;
+    const tracked = await mongoose.connection
+      .collection("history_daily")
+      .findOne({ userId: String(req.user.userId), date: { $gte: `${key}-01`, $lte: `${key}-31` } });
+    if (tracked) {
+      return res.status(409).json({
+        error: "Ce mois est déjà suivi automatiquement chaque jour : sa valeur ne peut pas être saisie à la main",
+      });
+    }
+
     await history().updateOne(
       { userId: req.user.userId, year, month },
       { $set: { value, auto: false } },

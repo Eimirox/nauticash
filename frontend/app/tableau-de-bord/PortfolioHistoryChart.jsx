@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { apiFetch } from "@/lib/api";
-import { useFxRates, toEUR, fetchFxRates } from "@/lib/fx";
+import { useFxRates } from "@/lib/fx";
+import { calendarPerformance, monthEndValues, firstDailyMonth } from "@/lib/calendarPerf";
 import { useToast } from "../components/ui";
 import { usePersistedPreference, VIEW_PREF_CODECS } from "@/lib/viewPrefs";
 import {
@@ -98,13 +99,13 @@ function makeBarLabel(year, rows, mode) {
 
 export default function PortfolioHistoryChart() {
   const toast = useToast();
-  const [history, setHistory] = useState([]);
+  // Relevé mensuel brut et historique quotidien : les valeurs de fin de mois en sont déduites (voir lib/calendarPerf.js)
+  const [rawHistory, setRawHistory] = useState([]);
+  const [daily, setDaily] = useState([]);
   // Années comparées : choix mémorisé dans le compte ; sans choix, les deux années les plus récentes
   const [pickedYears, setPickedYears, yearsPref] = usePersistedPreference(VIEW_PREF_CODECS.historyYears);
-  const [availableYears, setAvailableYears] = useState([]);
   const [loading, setLoading] = useState(false);
   const [fetched, setFetched] = useState(false); // premier chargement terminé
-  const [lastSnapshot, setLastSnapshot] = useState(null);
   const [showManualEdit, setShowManualEdit] = useState(false);
   const [manualForm, setManualForm] = useState({ date: "", value: "" });
 
@@ -128,22 +129,36 @@ export default function PortfolioHistoryChart() {
 
   const fetchHistory = async () => {
     try {
-      const data = await apiFetch("/api/user/history").then((d) => (Array.isArray(d) ? d : []));
-
-      setHistory(data);
-
-      // Années disponibles : seuls les relevés valides (valeur > 0) comptent
-      const years = yearsOf(data);
-      setAvailableYears(years);
-
-      // Dernier relevé valide (jamais un mois créé à 0 €)
-      setLastSnapshot(latestSnapshot(data));
+      const [data, dailyData] = await Promise.all([
+        apiFetch("/api/user/history").then((d) => (Array.isArray(d) ? d : [])),
+        apiFetch("/api/user/history/daily?days=3660")
+          .then((d) => (Array.isArray(d) ? d : []))
+          .catch(() => []),
+      ]);
+      setRawHistory(data);
+      setDaily(dailyData);
     } catch (err) {
       console.error("❌ Erreur:", err);
     } finally {
       setFetched(true);
     }
   };
+
+  // Mêmes valeurs de fin de mois et même performance mensuelle que la page Performance
+  const history = useMemo(() => monthEndValues(daily, rawHistory), [daily, rawHistory]);
+  const perfByKey = useMemo(
+    () => new Map(calendarPerformance(daily, rawHistory).monthly.map((m) => [m.key, m])),
+    [daily, rawHistory]
+  );
+  const availableYears = useMemo(() => yearsOf(history), [history]);
+  const lastSnapshot = useMemo(() => latestSnapshot(history, perfByKey), [history, perfByKey]);
+  // Saisie manuelle : uniquement les mois d'avant le suivi quotidien (ensuite, la valeur est automatique)
+  const trackedFrom = useMemo(() => firstDailyMonth(daily), [daily]);
+  const manualMax = useMemo(() => {
+    if (!trackedFrom) return undefined;
+    const [y, m] = trackedFrom.split("-").map(Number);
+    return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
+  }, [trackedFrom]);
 
   const saveManualSnapshot = async (e) => {
     e.preventDefault();
@@ -174,50 +189,6 @@ export default function PortfolioHistoryChart() {
     }
   };
 
-  const saveSnapshot = async () => {
-    try {
-      setLoading(true);
-      const [portfolioData, fxData] = await Promise.all([apiFetch("/api/user/portfolio"), fetchFxRates()]);
-
-      // Conversion stricte : une devise inconnue ferait enregistrer une valeur fausse
-      const unknown = new Set();
-      const inEUR = (value, currency) => {
-        const v = toEUR(value, currency || "EUR", fxData.rates);
-        if (v === null) unknown.add(currency);
-        return v ?? 0;
-      };
-
-      let totalValueEUR = 0;
-
-      (portfolioData.stocks || []).forEach((stock) => {
-        const value = (stock.close || 0) * (stock.quantity || 0);
-        totalValueEUR += inEUR(value, stock.currency);
-      });
-
-      const cashValue = portfolioData.cash?.amount || 0;
-      totalValueEUR += inEUR(cashValue, portfolioData.cash?.currency);
-
-      if (unknown.size) throw new Error(`taux de change indisponible pour ${[...unknown].join(", ")}`);
-
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, "0");
-
-      await apiFetch("/api/user/history", {
-        method: "POST",
-        body: { date: `${year}-${month}`, value: totalValueEUR },
-      });
-
-      await fetchHistory();
-      toast.success(`Photo du patrimoine enregistrée : ${totalValueEUR.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`);
-    } catch (err) {
-      console.error(err);
-      toast.error(`Enregistrement impossible : ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Années affichées : le choix enregistré (limité aux années qui ont des relevés), sinon les deux plus récentes
   const selectedYears = (pickedYears ?? availableYears.slice(0, 2)).filter((y) => availableYears.includes(y));
 
@@ -228,7 +199,7 @@ export default function PortfolioHistoryChart() {
   const colorOfYear = (year) => slotColor(YEAR_SLOTS[Math.max(0, availableYears.indexOf(year)) % YEAR_SLOTS.length]);
 
   // Mois affichés : du premier au dernier relevé (6 mois au minimum), les mois vides autour sont masqués
-  const allRows = evolutionRows(history, selectedYears);
+  const allRows = evolutionRows(history, selectedYears, perfByKey);
   const win = monthWindow(allRows, selectedYears);
   const chartData = allRows.slice(win.start - 1, win.end);
 
@@ -256,6 +227,8 @@ export default function PortfolioHistoryChart() {
         {years.map((year) => {
           const pct = row[`pct${year}`];
           const delta = row[`delta${year}`];
+          const flows = row[`flows${year}`];
+          const approx = row[`approx${year}`];
           const dir = direction(pct);
           return (
             <div key={year} className="mb-1 text-sm last:mb-0">
@@ -264,7 +237,7 @@ export default function PortfolioHistoryChart() {
                 {year} : {discreet ? "••••" : euro(row[`year${year}`])}
               </p>
               <p className="tabular-nums text-xs text-slate-300">
-                vs mois précédent :{" "}
+                {approx ? "Variation (apports inclus) :" : "Performance (hors apports) :"}{" "}
                 <span className="font-semibold" style={{ color: dir === "up" ? "#4ADE80" : dir === "down" ? "#F87171" : "#CBD5E1" }}>
                   {formatVariation(pct)}
                 </span>
@@ -276,6 +249,12 @@ export default function PortfolioHistoryChart() {
                   </span>
                 )}
               </p>
+              {!discreet && flows != null && Math.abs(flows) >= 0.01 && (
+                <p className="tabular-nums text-xs text-slate-300">
+                  Apports / retraits : {flows > 0 ? "+" : "−"}
+                  {euro(Math.abs(flows))}
+                </p>
+              )}
             </div>
           );
         })}
@@ -352,53 +331,6 @@ export default function PortfolioHistoryChart() {
             </svg>
             Éditer
           </button>
-          <button
-            onClick={saveSnapshot}
-            disabled={loading}
-            className="px-4 py-2 bg-gradient-to-r from-emerald-700 to-blue-600 text-white text-sm font-semibold rounded-lg hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-2"
-          >
-            {loading ? (
-              <>
-                <svg
-                  className="animate-spin h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-                Sauvegarde...
-              </>
-            ) : (
-              <>
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
-                  />
-                </svg>
-                Snapshot auto
-              </>
-            )}
-          </button>
         </div>
       </div>
 
@@ -410,9 +342,14 @@ export default function PortfolioHistoryChart() {
       {/* Édition manuelle */}
       {showManualEdit && (
         <div id="manual-snapshot" className="mb-6 p-4 bg-surface-2 border border-line rounded-lg">
-          <h4 id="manual-snapshot-title" className="text-sm font-semibold text-ink mb-3">
-            Ajouter/Modifier
+          <h4 id="manual-snapshot-title" className="text-sm font-semibold text-ink mb-1">
+            Ajouter/Modifier un mois passé
           </h4>
+          <p className="mb-3 text-xs text-ink-muted">
+            {manualMax
+              ? `Pour les mois d'avant le suivi automatique (jusqu'à ${new Date(`${manualMax}-01T12:00:00`).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}). Ensuite, la valeur de fin de mois est enregistrée automatiquement chaque soir.`
+              : "La valeur de votre portefeuille est ensuite enregistrée automatiquement chaque soir."}
+          </p>
           <form onSubmit={saveManualSnapshot} aria-labelledby="manual-snapshot-title" className="flex flex-wrap gap-3">
             <div>
               <label htmlFor="manual-date" className="block text-xs font-medium text-ink mb-1">
@@ -421,6 +358,7 @@ export default function PortfolioHistoryChart() {
               <input
                 id="manual-date"
                 type="month"
+                max={manualMax}
                 value={manualForm.date}
                 onChange={(e) =>
                   setManualForm({ ...manualForm, date: e.target.value })
@@ -483,7 +421,7 @@ export default function PortfolioHistoryChart() {
               />
             </svg>
             <span>
-              Dernier relevé :{" "}
+              Fin de mois la plus récente :{" "}
               {new Date(lastSnapshot.year, lastSnapshot.month - 1, 1).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}
             </span>
           </div>
@@ -492,9 +430,10 @@ export default function PortfolioHistoryChart() {
               <span
                 className="text-xs font-semibold tabular-nums"
                 style={{ color: DIRECTION_COLOR[direction(lastSnapshot.pct)] }}
-                title="Évolution par rapport au mois précédent"
+                title={lastSnapshot.approx ? "Variation de valeur, apports inclus" : "Performance des cours, hors apports et retraits"}
               >
-                {formatVariation(lastSnapshot.pct)} <span className="font-normal text-ink-muted">vs mois précédent</span>
+                {formatVariation(lastSnapshot.pct)}{" "}
+                <span className="font-normal text-ink-muted">{lastSnapshot.approx ? "sur le mois (apports inclus)" : "sur le mois (hors apports)"}</span>
               </span>
             )}
             <span className="money font-semibold tabular-nums text-ink">{euro(lastSnapshot.value)}</span>
@@ -529,7 +468,7 @@ export default function PortfolioHistoryChart() {
           </p>
           <p className="text-sm mb-4">
             {history.length === 0
-              ? "Créez votre premier snapshot"
+              ? "La valeur de votre portefeuille est enregistrée automatiquement chaque soir"
               : "Cliquez sur une année ci-dessus"}
           </p>
         </div>
@@ -538,7 +477,7 @@ export default function PortfolioHistoryChart() {
           <div
             className="money-chart"
             role="img"
-            aria-label={`Courbe de la valeur du portefeuille par mois, avec l'évolution en pourcentage par rapport au mois précédent. ${selectedYears
+            aria-label={`Courbe de la valeur du portefeuille en fin de mois, avec la performance mensuelle hors apports. ${selectedYears
               .map((year) => {
                 const last = [...chartData].reverse().find((m) => m[`pct${year}`] != null);
                 const tail = last ? `, dernière variation en ${last.month} : ${formatVariation(last[`pct${year}`])}` : "";
@@ -592,11 +531,11 @@ export default function PortfolioHistoryChart() {
           </div>
           <p className="mt-1 text-xs text-ink-muted">Échelle verticale ajustée aux valeurs (elle ne part pas de 0).</p>
 
-          {/* Variation mensuelle : hausses vers le haut (vert), baisses vers le bas (rouge) */}
-          <h4 className="mb-1 mt-5 text-sm font-semibold text-ink">Variation mensuelle</h4>
+          {/* Performance mensuelle (comme la page Performance) : hausses vers le haut (vert), baisses vers le bas (rouge) */}
+          <h4 className="mb-1 mt-5 text-sm font-semibold text-ink">Performance mensuelle (hors apports)</h4>
           <div
             role="img"
-            aria-label={`Variation mensuelle en pourcentage par rapport au mois précédent. ${selectedYears
+            aria-label={`Performance mensuelle en pourcentage, hors apports et retraits. ${selectedYears
               .map((year) => {
                 const parts = chartData.filter((m) => m[`pct${year}`] != null).map((m) => `${m.month} ${formatVariation(m[`pct${year}`])}`);
                 return `${year} : ${parts.length ? parts.join(", ") : "aucune variation calculable"}`;
@@ -654,10 +593,12 @@ export default function PortfolioHistoryChart() {
             />
           </svg>
           <div className="text-sm text-blue-900 dark:text-sky-200">
-            <p className="font-semibold mb-1">💡 Snapshot mensuel</p>
+            <p className="font-semibold mb-1">💡 Comment lire ce graphique</p>
             <p className="text-blue-700 dark:text-sky-200">
-              Le "Snapshot auto" calcule la valeur totale (stocks + cash) et
-              convertit toutes les devises en euros (taux de référence BCE).
+              La courbe montre la valeur totale en fin de mois (lignes + cash, en euros au taux BCE), enregistrée
+              automatiquement chaque soir. Les pourcentages sont la performance des cours hors apports et retraits,
+              identique à la page Performance ; un versement fait monter la courbe sans compter comme un gain. Les mois
+              d&apos;avant le suivi automatique (« apports inclus ») reprennent la simple variation de valeur.
             </p>
           </div>
         </div>
