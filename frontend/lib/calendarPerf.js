@@ -52,6 +52,26 @@ function monthEnds(series, history) {
   return out.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
 }
 
+/**
+ * Valeurs de fin de mois partagées par toute l'application (graphique du tableau de bord,
+ * page Performance) : dernier point quotidien du mois, sinon relevé mensuel (mois d'avant le suivi).
+ * → [{ year, month, value }] trié
+ */
+export function monthEndValues(daily, history) {
+  const { series } = performanceSeries(daily);
+  return monthEnds(series, history).map((e) => ({
+    year: Number(e.key.slice(0, 4)),
+    month: Number(e.key.slice(5, 7)),
+    value: e.eur,
+  }));
+}
+
+/** Premier mois couvert par le suivi quotidien (« AAAA-MM ») ; null sans suivi */
+export function firstDailyMonth(daily) {
+  const { series } = performanceSeries(daily);
+  return series.length ? series[0].date.slice(0, 7) : null;
+}
+
 /** Performance entre deux fins de période (prev exclu, cur inclus) */
 function between(prev, cur, series) {
   const inside = series.filter((p) => p.date > prev.date && p.date <= cur.date);

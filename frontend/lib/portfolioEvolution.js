@@ -53,13 +53,21 @@ export function variation(previous, current) {
   return { pct: ((c - p) / p) * 100, delta: c - p };
 }
 
+const perfOf = (perfByKey, year, month) => {
+  const p = perfByKey?.get(`${year}-${String(month).padStart(2, "0")}`);
+  return p && !p.partial ? p : null;
+};
+
 /**
  * 12 mois fixes, une valeur par année sélectionnée :
  *  - `year2026` : valeur du mois (null sans relevé) ;
  *  - `pct2026` / `delta2026` : variation en % et en valeur vs le mois N-1 (null sans relevé du mois précédent ;
  *    janvier se compare à décembre de l'année d'avant).
+ * perfByKey (optionnel) : Map « AAAA-MM » → ligne de calendarPerformance().monthly. Quand elle existe (et
+ * que le mois précédent est connu), `pct` / `delta` deviennent la performance hors apports et le gain du mois,
+ * comme sur la page Performance ; `flows2026` = apports / retraits, `approx2026` = apports inclus (avant suivi).
  */
-export function evolutionRows(history, years) {
+export function evolutionRows(history, years, perfByKey = null) {
   const snaps = validSnapshots(history);
   return MONTH_LABELS.map((label, i) => {
     const monthNum = i + 1;
@@ -68,23 +76,37 @@ export function evolutionRows(history, years) {
       const cur = snaps.get(year * 12 + i);
       const prev = snaps.get(year * 12 + i - 1);
       const v = cur && prev ? variation(prev.value, cur.value) : null;
+      const perf = cur && prev ? perfOf(perfByKey, year, monthNum) : null;
       row[`year${year}`] = cur ? cur.value : null;
-      row[`pct${year}`] = v ? v.pct : null;
-      row[`delta${year}`] = v ? v.delta : null;
+      row[`pct${year}`] = perf ? perf.pct : v ? v.pct : null;
+      row[`delta${year}`] = perf ? perf.amount : v ? v.delta : null;
+      row[`flows${year}`] = perf ? perf.flows : null;
+      row[`approx${year}`] = perf ? perf.approx : Boolean(v);
     }
     return row;
   });
 }
 
-/** Dernier relevé valide (valeur > 0) et sa variation vs mois N-1 ; null s'il n'y en a aucun */
-export function lastSnapshot(history) {
+/**
+ * Dernier relevé valide (valeur > 0) et sa variation vs mois N-1 ; null s'il n'y en a aucun.
+ * Avec perfByKey : performance hors apports du mois (voir evolutionRows).
+ */
+export function lastSnapshot(history, perfByKey = null) {
   const snaps = validSnapshots(history);
   if (!snaps.size) return null;
   const key = Math.max(...snaps.keys());
   const cur = snaps.get(key);
   const prev = snaps.get(key - 1);
   const v = prev ? variation(prev.value, cur.value) : null;
-  return { year: cur.year, month: cur.month, value: cur.value, pct: v ? v.pct : null, delta: v ? v.delta : null };
+  const perf = prev ? perfOf(perfByKey, cur.year, cur.month) : null;
+  return {
+    year: cur.year,
+    month: cur.month,
+    value: cur.value,
+    pct: perf ? perf.pct : v ? v.pct : null,
+    delta: perf ? perf.amount : v ? v.delta : null,
+    approx: perf ? perf.approx : Boolean(v),
+  };
 }
 
 /** Années disponibles (relevés valides uniquement), de la plus récente à la plus ancienne */

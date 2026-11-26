@@ -30,6 +30,16 @@ describe("/api/user/history", () => {
     assert.equal(rows[0].value, 1250.75);
   });
 
+  test("refuse une saisie manuelle sur un mois couvert par le suivi quotidien", async () => {
+    const { token } = await h.registerUser();
+    const userId = String(jwt.decode(token).userId);
+    await h.db.collection("history_daily").insertOne({ userId, date: "2026-10-12", value: 1000 });
+    const res = await postHistory(token, { date: "2026-10", value: 5000 });
+    assert.equal(res.status, 409);
+    assert.equal((await postHistory(token, { date: "2026-09", value: 900 })).status, 201);
+    assert.equal((await getHistory(token)).length, 1);
+  });
+
   test("renvoie l'historique trié par ordre chronologique (et non alphabétique)", async () => {
     const { token } = await h.registerUser();
     for (const [date, value] of [

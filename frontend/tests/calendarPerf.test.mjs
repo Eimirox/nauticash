@@ -100,3 +100,18 @@ test('historiques vides', () => {
   assert.deepEqual(calendarPerformance([], []), { monthly: [], yearly: [], total: null });
   assert.deepEqual(calendarPerformance(null, null), { monthly: [], yearly: [], total: null });
 });
+
+test('valeurs de fin de mois : quotidien prioritaire, relevé mensuel avant le suivi', async () => {
+  const { monthEndValues, firstDailyMonth } = await import('../lib/calendarPerf.js');
+  const history = [
+    { year: 2026, month: 'September', value: 900 },
+    { year: 2026, month: 'October', value: 5000 }, // photo figée en cours de mois : ignorée
+  ];
+  assert.deepEqual(monthEndValues(daily, history), [
+    { year: 2026, month: 9, value: 900 },
+    { year: 2026, month: 10, value: 1010 },
+    { year: 2026, month: 11, value: 2060 },
+  ]);
+  assert.equal(firstDailyMonth(daily), '2026-10');
+  assert.equal(firstDailyMonth([]), null);
+});
